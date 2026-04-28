@@ -1,0 +1,120 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function memberDoc(orgId) {
+      return /databases/$(database)/documents/organization_members/$(orgId + '_' + request.auth.uid);
+    }
+
+    function isOrgMember(orgId) {
+      return signedIn() && exists(memberDoc(orgId));
+    }
+
+    function orgRole(orgId) {
+      return get(memberDoc(orgId)).data.role;
+    }
+
+    function isGuest(orgId) {
+      return isOrgMember(orgId) && orgRole(orgId) == 'investor_guest';
+    }
+
+    function canWriteOrg(orgId) {
+      return isOrgMember(orgId) && orgRole(orgId) != 'investor_guest';
+    }
+
+    function isOrgAdmin(orgId) {
+      return isOrgMember(orgId) && orgRole(orgId) in ['admin', 'founder'];
+    }
+
+    match /users/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow write: if signedIn() && request.auth.uid == uid;
+    }
+
+    match /organizations/{orgId} {
+      allow read: if isOrgMember(orgId);
+      allow write: if false;
+    }
+
+    match /organization_members/{memberId} {
+      allow read: if signedIn() && (
+        resource.data.userId == request.auth.uid ||
+        isOrgMember(resource.data.organizationId)
+      );
+      allow write: if false;
+    }
+
+    match /investors/{investorId} {
+      allow read: if isOrgMember(resource.data.organizationId);
+      allow create: if canWriteOrg(request.resource.data.organizationId);
+      allow update, delete: if canWriteOrg(resource.data.organizationId);
+
+      match /notes/{noteId} {
+        allow read: if isOrgMember(get(/databases/$(database)/documents/investors/$(investorId)).data.organizationId);
+        allow write: if canWriteOrg(get(/databases/$(database)/documents/investors/$(investorId)).data.organizationId);
+      }
+    }
+
+    match /tasks/{taskId} {
+      allow read: if isOrgMember(resource.data.organizationId);
+      allow write: if canWriteOrg(resource.data.organizationId);
+    }
+
+    match /activities/{activityId} {
+      allow read: if isOrgMember(resource.data.organizationId);
+      allow write: if canWriteOrg(resource.data.organizationId);
+    }
+
+    match /meetings/{meetingId} {
+      allow read: if isOrgMember(resource.data.organizationId);
+      allow write: if canWriteOrg(resource.data.organizationId);
+    }
+
+    match /campaigns/{campaignId} {
+      allow read: if isOrgMember(resource.data.organizationId);
+      allow write: if canWriteOrg(resource.data.organizationId);
+    }
+
+    match /email_templates/{templateId} {
+      allow read: if isOrgMember(resource.data.organizationId);
+      allow write: if canWriteOrg(resource.data.organizationId);
+    }
+
+    match /emails/{emailId} {
+      allow read: if isOrgMember(resource.data.organizationId);
+      allow write: if canWriteOrg(resource.data.organizationId);
+    }
+
+    match /deals/{dealId} {
+      allow read: if isOrgMember(resource.data.organizationId);
+      allow write: if canWriteOrg(resource.data.organizationId);
+    }
+
+    match /documents/{docId} {
+      allow read: if isOrgMember(resource.data.organizationId);
+      allow write: if canWriteOrg(resource.data.organizationId);
+    }
+
+    match /data_rooms/{roomId} {
+      allow read: if isOrgMember(resource.data.organizationId) || isGuest(resource.data.organizationId);
+      allow write: if canWriteOrg(resource.data.organizationId);
+    }
+
+    match /audit_logs/{logId} {
+      allow read: if isOrgAdmin(resource.data.organizationId);
+      allow write: if false;
+    }
+
+    match /webhooks/{id} {
+      allow read, write: if false;
+    }
+
+    match /subscriptions/{orgId} {
+      allow read: if isOrgMember(orgId);
+      allow write: if false;
+    }
+  }
+}

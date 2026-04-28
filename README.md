@@ -1,36 +1,74 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# CPIN Capital Raise OS
 
-## Getting Started
+AI-powered private capital platform: investor CRM, discovery, outreach, data rooms, deal room, tasks, analytics, AI copilot, and PayPal subscriptions — built with **Next.js (App Router)**, **Firebase** (Auth, Firestore, Storage), **Resend**, **OpenAI / Anthropic**, and **Vercel**.
 
-First, run the development server:
+## Prerequisites
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- Node.js 20+
+- Firebase project (Auth with Email/Password, Firestore, Storage)
+- (Optional) Resend, OpenAI, Anthropic, PayPal sandbox credentials
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Local development
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. Copy environment variables:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+   ```bash
+   cp .env.example .env.local
+   ```
 
-## Learn More
+   Fill in Firebase **client** keys (`NEXT_PUBLIC_*`) and **Admin** service account fields (`FIREBASE_*`).
 
-To learn more about Next.js, take a look at the following resources:
+2. Install dependencies:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+   ```bash
+   npm install
+   ```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+3. Deploy Firestore rules and indexes to your Firebase project (or use emulators):
 
-## Deploy on Vercel
+   ```bash
+   npx firebase deploy --only firestore
+   ```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+4. Run the app:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+   ```bash
+   npm run dev
+   ```
+
+5. Open [http://localhost:3000](http://localhost:3000), sign up, then optionally seed demo data:
+
+   ```bash
+   npm run seed -- <your-firebase-uid>
+   ```
+
+   The UID is shown in Firebase Console → Authentication, or in browser devtools after sign-in.
+
+## Project structure
+
+- `app/(shell)/` — authenticated product (dashboard, CRM, modules)
+- `app/(marketing)/` — landing page
+- `app/(auth)/` — login / signup
+- `app/onboarding/` — create first organization (session without org)
+- `app/api/` — session auth, discovery, outreach, data room signed URLs, AI chat, PayPal billing
+- `lib/` — Firebase, Firestore types/queries, discovery merge, analytics helpers, PayPal, billing
+- `functions/` — Firebase Cloud Functions (member → custom claims sync, scheduled digest)
+- `scripts/seed-demo.ts` — demo org, investors, tasks, emails
+
+## Security notes
+
+- Firestore/Storage rules scope data by `organizationId` and `organization_members`.
+- Organizations and memberships are **written via Admin SDK** from Next.js API routes (rules deny direct client writes to those collections).
+- Session cookies are HTTP-only Firebase session cookies (`cpin_session`); active org is `cpin_org_id`.
+
+## Documentation
+
+See [DEPLOYMENT.md](./DEPLOYMENT.md) for Vercel, Firebase, PayPal webhooks, and GA4/GTM.
+
+## Scripts
+
+| Command        | Description                |
+| -------------- | -------------------------- |
+| `npm run dev`  | Next.js dev server         |
+| `npm run build`| Production build           |
+| `npm run seed` | Seed demo data (needs UID)|
