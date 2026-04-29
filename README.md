@@ -2,59 +2,26 @@
 
 AI-powered private capital platform: investor CRM, discovery, outreach, data rooms, deal room, tasks, analytics, AI copilot, and PayPal subscriptions — built with **Next.js (App Router)**, **Firebase** (Auth, Firestore, Storage), **Resend**, **OpenAI / Anthropic**, and **Vercel**.
 
-## Changelog since last commit
+## Changelog
 
-Baseline: `534f38d` (“feat: CRM, deals, data room, tasks, invitations, RBAC, platform admin, branding”). This update bundles the following working-tree changes.
+### Data Room portal redesign (since `1f136f3`)
 
-### Investor CRM (major UI refresh)
+Premium sponsor workspace for diligence: header actions, six KPI cards (from Firestore + audit aggregation), deal-filtered room rail with search, tabbed workspace (**Documents**, **Activity**, **Investors**, **Settings**, **Investor view**), drag-and-drop uploads with document table, audit-driven activity feed and charts, deal-scoped **Invite investor** dialog, room settings via **PATCH**, and a sticky **Room AI** copilot (`/api/ai/chat` with room context).
 
-- Modular **`components/investors/`** (header, KPI metrics, toolbar, Kanban, table, relationship map with coverage/network/territory tabs, list and calendar views, sticky copilot, `/` command search).
-- **`components/investors-board.tsx`** now re-exports the orchestrator; **`lib/investors/investor-kpis.ts`**, **`investor-filters.ts`**, **`investor-toolbar-types.ts`**, and **`form-options`** (`pipelineStageShortLabel`) support filters, CSV export, and dashboard-aligned KPIs.
-- Investor **detail**: **`InvestorEditModal`** (tabbed edit), **`investor-profile-form-fields`** section mode (`part`), metric strip and heuristic AI insight card on **`investor-detail-client`**.
-- **`app/(shell)/investors/page.tsx`** — shell styling and tab query params (`board`, `table`, `map`, `list`, `calendar`).
+**UI:** Replaced monolithic **`components/data-room-client.tsx`** with **`components/data-room/`** — `DataRoomHeader`, `RoomMetrics`, `RoomCard`, `RoomWorkspace`, `DocumentManager`, `UploadZone`, `ActivityAnalytics`, `InvestorAccessTable`, `RoomSettings`, `InvestorPreview`, `DataRoomCopilot`, orchestrated by **`data-room-shell.tsx`**. **`app/(shell)/data-room/page.tsx`** loads rooms, documents, deals, metrics, invitations, activity, and per-deal maps for preview.
 
-### Dashboard and analytics
+**APIs (additive):**
 
-- New dashboard building blocks: **`dashboard-header`**, **`dashboard-kpi-grid`**, **`metric-card`**, **`pipeline-chart`**, **`alert-bar`** / **`alert-strip`**, **`quick-actions`**, **`priority-tasks`**, **`loading.tsx`** for streaming UX.
-- **`app/(shell)/dashboard/page.tsx`**, **`analytics/page.tsx`**, and **`components/dashboard/*`** refactors for charts, activity feed, stat cards, funnel/outreach visuals.
+- **`POST /api/data-room/rooms`** — optional `dealId`; default visibility/download flags.
+- **`PATCH /api/data-room/rooms/[roomId]`** — name, deal, description, NDA, visibility, downloads, watermark, expiry, login requirement, welcome message, optional **`ndaTemplateRef`** (e-sign prep), archive.
+- **`POST /api/data-room/sign-url`** — increments document **`viewCount`** and sets **`lastViewedAt`**.
+- **`POST /api/data-room/documents`** — stores **`sizeBytes`**, **`mimeType`**, **`createdByUid`**, **`version`**.
+- **`PATCH .../documents/[documentId]`** — optional **`accessLevel`**, **`version`**.
+- **`GET /api/data-room/invitations`**, **`GET /api/data-room/activity`** — staff-only lists for the Investors tab and activity feed.
 
-### Shell, copilot, and navigation
+**Libraries:** **`lib/data-room/metrics.ts`** (org KPIs + week-over-week opens from audit), **`kind-labels.ts`**, **`server-queries.ts`** (invitations + audit feed for RSC).
 
-- **`shell-command-palette.tsx`** ( **`cmdk`** via **`components/ui/command.tsx`** ), **`copilot-ui-context.tsx`**, and updates to **`shell-layout-client`**, **`app-sidebar`**, **`copilot-panel`**, **`app/layout.tsx`**.
-
-### Deals, portal, and e-sign
-
-- **`app/(shell)/deals/[id]/page.tsx`** and **`express-interest`** route updates; **`deal-guest-signing`** component.
-- **`app/(shell)/portal/`** LP portal routes.
-- **`app/api/esign/`**, **`app/api/webhooks/signwell/`**, and **`lib/esign/`** for SignWell-oriented flows.
-
-### Search and APIs
-
-- **`app/api/org-search/route.ts`** — org-scoped search endpoint.
-
-### Billing and plans
-
-- **`lib/billing/features.ts`** and **`billing-client.tsx`** / **`lib/billing/plans.ts`** updates aligned with plan tiers.
-
-### Data layer and actions
-
-- **`lib/firestore/queries.ts`**, **`types.ts`**, **`paths.ts`** — expanded reads/helpers (e.g. dashboard aggregates, analytics helpers).
-- **`lib/dashboard/`** — pipeline and funnel helpers used by dashboard/analytics surfaces.
-- **`app/actions/investors.ts`** — incremental server-action additions tied to CRM behavior.
-
-### Auth and middleware
-
-- **`lib/auth/guest-routes.ts`** and **`middleware.ts`** — path/guest routing tweaks.
-
-### Styling and assets
-
-- **`app/globals.css`**, marketing and shell touches; **`public/cpin-logo.jpg`** branding asset.
-
-### Dependencies
-
-- **`package.json`** / **`package-lock.json`** — adds **`cmdk`** (command palette) and related lockfile updates.
-
-The npm **`package.json` `name`** remains `capital-raise-os` (internal package identifier).
+**Firestore:** **`lib/firestore/types.ts`** — expanded **`DataRoom`** and **`RoomDocument`** fields; **`firestore.indexes.json`** — composite index on **`audit_logs`** (`organizationId`, `createdAt`).
 
 ## Prerequisites
 
@@ -106,7 +73,8 @@ The npm **`package.json` `name`** remains `capital-raise-os` (internal package i
 - `app/(auth)/` — login / signup
 - `app/onboarding/` — create first organization (session without org)
 - `app/invite/[token]/` — redeem investor invitation links
-- `app/api/` — session auth, discovery, outreach, data room (rooms/documents/sign-url), deals, tasks, invitations, AI chat, PayPal billing, webhooks
+- `app/api/` — session auth, discovery, outreach, data room (rooms `POST`/`PATCH`, documents, sign-url, **invitations**, **activity**), deals, tasks, invitations, AI chat, PayPal billing, webhooks
+- `components/data-room/` — Data Room UI modules; `lib/data-room/` — metrics, kind labels, server queries
 - `lib/` — Firebase, Firestore types/queries, discovery merge, analytics helpers, auth (RBAC, guests, platform admin), invitations, PayPal, billing
 - `functions/` — Firebase Cloud Functions (member → custom claims sync, scheduled digest)
 - `scripts/seed-demo.ts` — demo org, investors, tasks, emails

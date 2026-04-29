@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { FieldValue } from "firebase-admin/firestore";
 import { requireOrgSession } from "@/lib/auth/session";
 import { getAdminFirestore, getAdminBucket } from "@/lib/firebase/admin";
 import { col } from "@/lib/firestore/paths";
@@ -26,6 +27,14 @@ export async function POST(req: NextRequest) {
     action: "read",
     expires: Date.now() + 15 * 60 * 1000,
   });
+
+  await db
+    .collection(col.documents)
+    .doc(documentId)
+    .update({
+      viewCount: FieldValue.increment(1),
+      lastViewedAt: Date.now(),
+    });
 
   await writeAuditLog({
     organizationId: ctx.orgId,

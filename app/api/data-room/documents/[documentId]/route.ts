@@ -8,6 +8,7 @@ import { writeAuditLog } from "@/lib/audit";
 import type { RoomDocument } from "@/lib/firestore/types";
 
 const KINDS: RoomDocument["kind"][] = ["deck", "model", "ppm", "video", "legal", "other"];
+const ACCESS: RoomDocument["accessLevel"][] = ["invited", "internal", "vip"];
 
 export async function PATCH(
   req: NextRequest,
@@ -26,8 +27,9 @@ export async function PATCH(
     name?: string;
     dataRoomId?: string;
     kind?: string;
+    accessLevel?: RoomDocument["accessLevel"];
+    version?: number;
   };
-
   const db = getAdminFirestore();
   const ref = db.collection(col.documents).doc(documentId);
   const snap = await ref.get();
@@ -60,6 +62,20 @@ export async function PATCH(
       return NextResponse.json({ error: "Invalid kind" }, { status: 400 });
     }
     updates.kind = body.kind;
+  }
+
+  if (body.accessLevel !== undefined) {
+    if (!ACCESS.includes(body.accessLevel)) {
+      return NextResponse.json({ error: "Invalid accessLevel" }, { status: 400 });
+    }
+    updates.accessLevel = body.accessLevel;
+  }
+
+  if (body.version !== undefined) {
+    if (typeof body.version !== "number" || body.version < 1) {
+      return NextResponse.json({ error: "Invalid version" }, { status: 400 });
+    }
+    updates.version = body.version;
   }
 
   let newStoragePath = data.storagePath;

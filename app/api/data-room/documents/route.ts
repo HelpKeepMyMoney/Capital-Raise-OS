@@ -85,6 +85,10 @@ export async function POST(req: NextRequest) {
     storagePath,
     kind,
     viewCount: 0,
+    sizeBytes: file.size,
+    mimeType: file.type || "application/octet-stream",
+    createdByUid: ctx.user.uid,
+    version: 1,
     createdAt: now,
   });
 

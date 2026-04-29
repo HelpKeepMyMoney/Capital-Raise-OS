@@ -346,14 +346,32 @@ export type SigningRequest = {
   updatedAt: number;
 };
 
+export type DataRoomVisibility = "open" | "invite_only";
+
+/** Access tier for sponsor-side permission model (per document / room UI). */
+export type DataRoomAccessRole = "admin" | "internal" | "investor" | "read_only_advisor";
+
 export type DataRoom = {
   id: string;
   organizationId: string;
   dealId?: string;
   name: string;
+  description?: string;
   ndaRequired: boolean;
+  /** Optional SignWell / e-sign template reference (NDA workflow). */
+  ndaTemplateRef?: string | null;
+  visibility?: DataRoomVisibility;
+  downloadAllowed?: boolean;
+  watermarkDocs?: boolean;
+  expiresAt?: number;
+  requireLogin?: boolean;
+  welcomeMessage?: string;
+  archived?: boolean;
   createdAt: number;
+  updatedAt?: number;
 };
+
+export type RoomDocumentAccess = "invited" | "internal" | "vip";
 
 export type RoomDocument = {
   id: string;
@@ -363,6 +381,13 @@ export type RoomDocument = {
   storagePath: string;
   kind: "deck" | "model" | "ppm" | "video" | "legal" | "other";
   viewCount?: number;
+  lastViewedAt?: number;
+  /** File size on upload. */
+  sizeBytes?: number;
+  mimeType?: string;
+  createdByUid?: string;
+  version?: number;
+  accessLevel?: RoomDocumentAccess;
   totalViewSeconds?: number;
   createdAt: number;
 };
