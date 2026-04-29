@@ -172,11 +172,6 @@ export function DealSettingsForm(props: {
   const linkableRooms =
     orgRooms?.filter((r) => r.dealId !== d.id) ?? [];
 
-  const tractionSig = React.useMemo(
-    () => JSON.stringify(props.deal.tractionMetrics ?? []),
-    [props.deal.tractionMetrics],
-  );
-
   const [tractionRows, setTractionRows] = React.useState<TractionFormRow[]>(() =>
     (d.tractionMetrics?.length
       ? d.tractionMetrics
@@ -188,27 +183,9 @@ export function DealSettingsForm(props: {
     })),
   );
 
-  const narrativeSig = React.useMemo(
-    () =>
-      JSON.stringify(
-        WHY_INVEST_NARRATIVE_FIELD_DEFS.map(
-          ({ key }) => (props.deal[key] as string | undefined) ?? "",
-        ),
-      ),
-    [
-      props.deal.id,
-      props.deal.marketOpportunity,
-      props.deal.problem,
-      props.deal.solution,
-      props.deal.competitiveEdge,
-      props.deal.growthStrategy,
-      props.deal.exitPotential,
-    ],
-  );
-
   React.useEffect(() => {
     setWhyInvestNarrative(narrativeRecordFromDeal(props.deal));
-  }, [props.deal.id, narrativeSig]);
+  }, [props.deal]);
 
   React.useEffect(() => {
     const m = props.deal.tractionMetrics ?? [];
@@ -220,7 +197,7 @@ export function DealSettingsForm(props: {
         hint: row.hint ?? "",
       })),
     );
-  }, [props.deal.id, tractionSig]);
+  }, [props.deal]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();

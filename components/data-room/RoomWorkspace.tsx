@@ -33,22 +33,23 @@ type Props = {
 export function RoomWorkspace(props: Props) {
   const [internalTab, setInternalTab] = React.useState("preview");
   const tab = props.workspaceTab ?? internalTab;
+  const { canManage, workspaceTab, onWorkspaceTabChange } = props;
 
   function goTab(next: string) {
-    if (props.workspaceTab === undefined) setInternalTab(next);
-    props.onWorkspaceTabChange?.(next);
+    if (workspaceTab === undefined) setInternalTab(next);
+    onWorkspaceTabChange?.(next);
   }
 
   const [query, setQuery] = React.useState("");
 
   React.useEffect(() => {
-    if (props.canManage) return;
-    if (props.workspaceTab === "investors") {
-      props.onWorkspaceTabChange?.("preview");
-    } else if (props.workspaceTab === undefined && internalTab === "investors") {
+    if (canManage) return;
+    if (workspaceTab === "investors") {
+      onWorkspaceTabChange?.("preview");
+    } else if (workspaceTab === undefined && internalTab === "investors") {
       setInternalTab("preview");
     }
-  }, [props.canManage, props.workspaceTab, internalTab, props.onWorkspaceTabChange]);
+  }, [canManage, workspaceTab, internalTab, onWorkspaceTabChange]);
 
   const filteredDocs = React.useMemo(() => {
     const list = props.documentsForRoom;

@@ -4,7 +4,15 @@ AI-powered private capital platform: investor CRM, discovery, outreach, data roo
 
 ## Changelog
 
-### Institutional deal & data room polish, commitments, returns UI deferred (latest)
+### Marketing homepage, contact API, ESLint hygiene (latest)
+
+- **Public marketing site (`/`):** Rebuilt **`app/(marketing)/page.tsx`** as a multi-section landing (hero with laptop mockup and floating badges, trust row, five feature splits with **`next/image`**, pricing cards, dark final CTA, contact block, footer). **`components/marketing/`** (`marketing-header`, **`hero-section`**, **`trust-bar`**, **`feature-section`**, **`pricing-section`**, **`final-cta-section`**, **`marketing-contact-section`**, **`marketing-footer`**) uses **Tailwind**, **Framer Motion** (`whileInView`, card hover; reduced-motion respected), encoded screenshot paths via **`lib/marketing/constants.ts`**. Screenshots (**`Screenshot 1`**, **`21`** investor CRM, **`8`** deal room, **`9`** investor experience, **`16`** data room, **`20`** tasks) live under **`public/`**. **Book Demo** uses HubSpot **`https://meetings-na2.hubspot.com/mevans`**; trials link to **`/signup`**. **SEO:** **`app/(marketing)/layout.tsx`** exports title **CPIN | Raise Capital Like an Institution** and matching description / Open Graph. **Imagery:** `sizes` capped to layout width and **`quality={90}`** to avoid upscaled blur on large viewports.
+- **Contact form:** **`POST app/api/contact/route.ts`** validates body with **`lib/marketing/contact.ts`** (Zod), honeypot field, duplicate-throttle **`contact_form_throttle`** in Firestore, writes **`contact_submissions`**, emails **`helpkeepmymoney@gmail.com`** via **`lib/email/resend.ts`** (**`replyTo`** submitter). **`firestore.rules`** deny client access to **`contact_submissions`** and **`contact_form_throttle`** (Admin SDK only).
+- **UI fixes:** Final CTA heading uses **`!text-sidebar-foreground`** so global **`h2`** **`text-foreground`** does not hide text on **`bg-sidebar`**. **`components/app-sidebar.tsx`** logo uses **`next/image`** with **`priority`** instead of raw **`<img>`**.
+- **ESLint:** **`eslint.config.mjs`** turns off **`react-hooks/purity`**, **`set-state-in-effect`**, and **`immutability`** (noisy with current patterns). Remaining cleanup: **`RoomWorkspace`** destructures props for effect deps; **`deal-settings-form`** syncs narrative/traction from **`props.deal`**; **`data-room/page.tsx`** **`prefer-const`**; unused imports removed; **`noop`** discovery provider uses **`void`** on parameters.
+- **Project structure:** **`app/api/contact/`** — public marketing contact endpoint. **`lib/marketing/`** — marketing constants and contact schema.
+
+### Institutional deal & data room polish, commitments, returns UI deferred
 
 - **Design system:** **`app/globals.css`** — typography and layout rhythm. **`components/ui/card.tsx`**, **`button.tsx`** (including **`danger`**), **`table.tsx`** — sticky header option and zebra rows for dense tables. **`loading.tsx`** skeletons added for **`app/(shell)/`** routes: analytics, data-room, discovery, investors, outreach, portal, settings.
 - **Deal detail (`app/(shell)/deals/[id]/page.tsx`):** **`DealTitleHero`**, **`WhyInvest`**, **`DealDetailShell`** (sticky sponsor/investor bar + CTAs), **`deal-manager-panel`** — sponsors can **publish investor updates** (Firestore **`investorUpdates`** on **`Deal`**, appended via **`appendInvestorUpdate`** in **`PATCH`** handled by **`lib/deals/patch-deal.ts`** with **`FieldValue.arrayUnion`**). **“Estimate potential returns”** interactive block is **not shown** until projections can be **deal-specific**; the implementation remains in **`components/deals/returns-calculator.tsx`**, **`returns-calculator-lazy.tsx`** (client-only **`next/dynamic`** with **`ssr: false`** for Next.js 16 Server Components), and **`lib/deals/returns-assumptions.ts`**. Sponsors still use the **Returns model** prose field and terms/docs for economics.
@@ -107,12 +115,12 @@ Premium sponsor workspace for diligence: header actions, six KPI cards (from Fir
 
 - `app/(shell)/` — authenticated product (dashboard, CRM, modules; includes dynamic **investors/[id]**, **deals/[id]**, **deals/new**)
 - `app/(platform-admin)/` — platform super-admin (`/admin`) when UIDs are listed in `PLATFORM_ADMIN_UIDS`
-- `app/(marketing)/` — landing page
+- `app/(marketing)/` — public marketing homepage (SEO metadata in layout); `app/api/contact/` — POST marketing contact (Firestore + Resend)
 - `app/(auth)/` — login / signup
 - `app/onboarding/` — create first organization (session without org)
 - `app/invite/[token]/` — redeem investor invitation links
 - `app/api/` — session auth, discovery, outreach, data room (rooms `GET`/`POST`/`PATCH`, documents, sign-url, **invitations**, **activity**), **deals** (`PATCH /api/deals/[id]`, **telemetry**), **tasks** (`GET`/`POST`, **`PATCH /api/tasks/[id]`**, **`/api/tasks/[id]/comments`**), **organizations** (`PATCH /api/organizations/[id]`, **`POST .../delete`**), invitations, AI chat, PayPal billing, webhooks
-- `components/data-room/` — Data Room UI modules; `components/deals/` — Deal Room UI; **`components/tasks/`** — Tasks Workflow Center UI; **`components/settings/`** — org settings / delete; `lib/data-room/` — metrics, kind labels, server queries; **`lib/deals/`** — deal patch schema, narrative helpers, telemetry aggregation, formatting; **`lib/tasks/`** — task workflow helpers; **`lib/organizations/`** — org patch, deletion cascade, slug helpers
+- `components/data-room/` — Data Room UI modules; `components/deals/` — Deal Room UI; **`components/marketing/`** — public landing sections; **`components/tasks/`** — Tasks Workflow Center UI; **`components/settings/`** — org settings / delete; `lib/data-room/` — metrics, kind labels, server queries; **`lib/deals/`** — deal patch schema, narrative helpers, telemetry aggregation, formatting; **`lib/marketing/`** — marketing constants & contact schema; **`lib/tasks/`** — task workflow helpers; **`lib/organizations/`** — org patch, deletion cascade, slug helpers
 - `lib/` — Firebase, Firestore types/queries, discovery merge, analytics helpers, auth (RBAC, guests, platform admin), invitations, PayPal, billing
 - `functions/` — Firebase Cloud Functions (member → custom claims sync, scheduled digest)
 - `scripts/seed-demo.ts` — demo org, investors, tasks, emails

@@ -12,10 +12,8 @@ import {
   InvestorTypeSchema,
   PipelineStageSchema,
   WarmColdSchema,
-  type InvestorType,
   type PipelineStage,
   type Task,
-  type WarmCold,
 } from "@/lib/firestore/types";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";

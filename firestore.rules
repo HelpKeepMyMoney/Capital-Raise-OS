@@ -173,5 +173,14 @@ service cloud.firestore {
     match /deal_commitments/{id} {
       allow read, write: if false;
     }
+
+    /** Marketing contact — Admin SDK writes only */
+    match /contact_submissions/{id} {
+      allow read, write: if false;
+    }
+
+    match /contact_form_throttle/{id} {
+      allow read, write: if false;
+    }
   }
 }

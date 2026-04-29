@@ -35,6 +35,7 @@ import type { Organization } from "@/lib/firestore/types";
 import { isInvestorGuestRole } from "@/lib/auth/rbac";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import Image from "next/image";
 
 type NavItem = {
   href: string;
@@ -145,15 +146,13 @@ export function AppSidebar(props: {
             className="flex h-10 max-w-[148px] shrink-0 items-center overflow-hidden rounded-xl ring-1 ring-sidebar-primary/25 ring-offset-2 ring-offset-sidebar"
             aria-label="CPIN home"
           >
-            {/* Native img: reliable for /public assets; logo has dark bg — ring offsets it from the sidebar */}
-            <img
+            <Image
               src="/cpin-logo.jpg"
-              alt=""
+              alt="CPIN"
               width={148}
               height={40}
               className="h-10 w-auto max-w-[148px] object-contain object-left"
-              decoding="async"
-              fetchPriority="high"
+              priority
             />
           </Link>
           <div className="min-w-0">

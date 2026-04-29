@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import type { Investor, InvestorType } from "@/lib/firestore/types";
+import type { Investor } from "@/lib/firestore/types";
 import {
   compareInvestorsByLastFirst,
   investorLastFirstName,

@@ -56,7 +56,6 @@ import { InvestorCalendarView } from "@/components/investors/InvestorCalendarVie
 import { InvestorCopilot } from "@/components/investors/InvestorCopilot";
 import { InvestorSearchCommand } from "@/components/investors/InvestorSearchCommand";
 import { LayoutGrid, List, Network, Table2, CalendarDays } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 const PRESETS_STORAGE = "cpin-investor-filter-presets-v1";
 

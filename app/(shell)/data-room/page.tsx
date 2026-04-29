@@ -36,7 +36,7 @@ export default async function DataRoomPage(props: {
     db.collection(col.documents).where("organizationId", "==", ctx.orgId).limit(500).get(),
   ]);
 
-  let roomsRaw: SerializedDataRoom[] = roomsSnap.docs.map((d) => {
+  const roomsRaw: SerializedDataRoom[] = roomsSnap.docs.map((d) => {
     const x = d.data() as Record<string, unknown>;
     return {
       id: d.id,

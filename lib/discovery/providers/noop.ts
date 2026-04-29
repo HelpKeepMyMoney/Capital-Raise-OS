@@ -2,7 +2,9 @@ import type { DiscoveryFilters, DiscoveryProvider, RankedInvestorCandidate } fro
 
 export const noopDiscoveryProvider: DiscoveryProvider = {
   id: "noop",
-  async search(_query: string, _filters: DiscoveryFilters): Promise<RankedInvestorCandidate[]> {
+  async search(query: string, filters: DiscoveryFilters): Promise<RankedInvestorCandidate[]> {
+    void query;
+    void filters;
     return [];
   },
 };
