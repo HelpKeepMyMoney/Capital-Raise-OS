@@ -14,6 +14,12 @@ AI-powered private capital platform: investor CRM, discovery, outreach, data roo
 - **UI polish:** Offering hero (**`deal-title-hero.tsx`**) tightened layout and padding; logo preview and direct-URL hint in settings; **`onError`** hides broken hero logos; traction **`traction-section.tsx`** KPI grid only (chart removed); **Additional terms** row in **`terms-grid.tsx`** spans full width.
 - **Product:** **`/data-room?deal=`** seeds deal filter in **`DataRoomShell`**; **Copilot** quick prompts on deal routes (**`copilot-panel.tsx`**); sidebar **Capital** order: **Deal Room** above **Data Room** (**`app-sidebar.tsx`**).
 
+### Follow-up (deal list, deal documents, data room table)
+
+- **Deal list:** **`deal-card.tsx`** shows **`logoUrl`** when load succeeds (rounded tile + **`onError`** fallback); placeholder monogram or briefcase when missing or invalid.
+- **Deal detail — Documents:** **Download summary** in **`deal-documents.tsx`** calls **`POST /api/data-room/sign-url`** for a heuristically chosen file (name matches summary/overview/teaser, else deck, else first PDF, else first doc) and opens it in a **new tab** only (no navigation of the current tab; pop-up–friendly **`window.open`** usage).
+- **Data Room — document table:** **`DocumentManager.tsx`** supports **sortable columns** (name, category, version, size, uploaded, views, last viewed, access) with header toggles and direction indicators.
+
 ### Data Room portal redesign (since `1f136f3`)
 
 Premium sponsor workspace for diligence: header actions, six KPI cards (from Firestore + audit aggregation), deal-filtered room rail with search, tabbed workspace (**Documents**, **Activity**, **Investors**, **Settings**, **Investor view**), drag-and-drop uploads with document table, audit-driven activity feed and charts, deal-scoped **Invite investor** dialog, room settings via **PATCH**, and a sticky **Room AI** copilot (`/api/ai/chat` with room context).

@@ -42,7 +42,17 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { UploadZone } from "@/components/data-room/UploadZone";
-import { FolderPlus, Layers, MoreHorizontal, Pencil, Upload, Trash2 } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  FolderPlus,
+  Layers,
+  MoreHorizontal,
+  Pencil,
+  Upload,
+  Trash2,
+} from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
 
@@ -52,6 +62,42 @@ function formatBytes(n?: number): string {
   const kb = n / 1024;
   if (kb < 1024) return `${kb.toFixed(1)} KB`;
   return `${(kb / 1024).toFixed(1)} MB`;
+}
+
+type SortColumn = "name" | "category" | "version" | "size" | "uploaded" | "views" | "lastViewed" | "access";
+
+function SortableTableHead(props: {
+  column: SortColumn;
+  label: string;
+  sortColumn: SortColumn;
+  sortDir: "asc" | "desc";
+  onSort: (c: SortColumn) => void;
+  className?: string;
+}) {
+  const active = props.sortColumn === props.column;
+  return (
+    <TableHead className={props.className}>
+      <button
+        type="button"
+        className={cn(
+          "-ml-1 inline-flex items-center gap-1 rounded-md px-1 py-0.5 text-left font-semibold hover:bg-muted/80 hover:text-foreground",
+          active ? "text-foreground" : "text-muted-foreground",
+        )}
+        onClick={() => props.onSort(props.column)}
+      >
+        <span>{props.label}</span>
+        {active ? (
+          props.sortDir === "asc" ? (
+            <ArrowUp className="size-3.5 shrink-0 opacity-90" aria-hidden />
+          ) : (
+            <ArrowDown className="size-3.5 shrink-0 opacity-90" aria-hidden />
+          )
+        ) : (
+          <ArrowUpDown className="size-3.5 shrink-0 opacity-35" aria-hidden />
+        )}
+      </button>
+    </TableHead>
+  );
 }
 
 type Props = {
@@ -78,6 +124,16 @@ export function DocumentManager(props: Props) {
   const [deleting, setDeleting] = React.useState(false);
   /** Per-file concurrent queue state simplified: show first uploading file name optional */
   const [localBusy, setLocalBusy] = React.useState(false);
+  const [sortColumn, setSortColumn] = React.useState<SortColumn>("name");
+  const [sortDir, setSortDir] = React.useState<"asc" | "desc">("asc");
+
+  function onSortColumn(col: SortColumn) {
+    if (sortColumn === col) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else {
+      setSortColumn(col);
+      setSortDir("asc");
+    }
+  }
 
   const mergedUploading =
     props.uploading || localBusy || (props.uploadProgress != null && props.uploadProgress < 100 && props.uploadProgress > 0);
@@ -191,6 +247,37 @@ export function DocumentManager(props: Props) {
 
   const activeDocs = props.documents.filter((d) => !props.selectedRoomId || d.dataRoomId === props.selectedRoomId);
 
+  const sortedDocs = React.useMemo(() => {
+    const list = [...activeDocs];
+    const dir = sortDir === "asc" ? 1 : -1;
+    const cmp = (a: SerializedRoomDocument, b: SerializedRoomDocument): number => {
+      switch (sortColumn) {
+        case "name":
+          return dir * a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+        case "category":
+          return dir * kindLabel(a.kind).localeCompare(kindLabel(b.kind), undefined, { sensitivity: "base" });
+        case "version":
+          return dir * ((a.version ?? 1) - (b.version ?? 1));
+        case "size":
+          return dir * ((a.sizeBytes ?? 0) - (b.sizeBytes ?? 0));
+        case "uploaded":
+          return dir * ((a.createdAt ?? 0) - (b.createdAt ?? 0));
+        case "views":
+          return dir * ((a.viewCount ?? 0) - (b.viewCount ?? 0));
+        case "lastViewed":
+          return dir * ((a.lastViewedAt ?? 0) - (b.lastViewedAt ?? 0));
+        case "access":
+          return dir * (a.accessLevel ?? "invited").localeCompare(b.accessLevel ?? "invited", undefined, {
+            sensitivity: "base",
+          });
+        default:
+          return 0;
+      }
+    };
+    list.sort(cmp);
+    return list;
+  }, [activeDocs, sortColumn, sortDir]);
+
   return (
     <div className="space-y-4">
       {props.uploadProgress != null && props.uploadProgress < 99 ? (
@@ -277,15 +364,66 @@ export function DocumentManager(props: Props) {
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-muted/60">
-              <TableHead>Name</TableHead>
-              <TableHead>Category</TableHead>
-              <TableHead>Ver.</TableHead>
-              <TableHead>Size</TableHead>
-              <TableHead className="hidden xl:table-cell">Uploaded</TableHead>
-              <TableHead>Views</TableHead>
-              <TableHead className="hidden lg:table-cell">Last viewed</TableHead>
-              <TableHead className="hidden 2xl:table-cell">Access</TableHead>
-              <TableHead className="w-[56px]" />
+              <SortableTableHead
+                column="name"
+                label="Name"
+                sortColumn={sortColumn}
+                sortDir={sortDir}
+                onSort={onSortColumn}
+              />
+              <SortableTableHead
+                column="category"
+                label="Category"
+                sortColumn={sortColumn}
+                sortDir={sortDir}
+                onSort={onSortColumn}
+              />
+              <SortableTableHead
+                column="version"
+                label="Ver."
+                sortColumn={sortColumn}
+                sortDir={sortDir}
+                onSort={onSortColumn}
+              />
+              <SortableTableHead
+                column="size"
+                label="Size"
+                sortColumn={sortColumn}
+                sortDir={sortDir}
+                onSort={onSortColumn}
+              />
+              <SortableTableHead
+                column="uploaded"
+                label="Uploaded"
+                className="hidden xl:table-cell"
+                sortColumn={sortColumn}
+                sortDir={sortDir}
+                onSort={onSortColumn}
+              />
+              <SortableTableHead
+                column="views"
+                label="Views"
+                sortColumn={sortColumn}
+                sortDir={sortDir}
+                onSort={onSortColumn}
+              />
+              <SortableTableHead
+                column="lastViewed"
+                label="Last viewed"
+                className="hidden lg:table-cell"
+                sortColumn={sortColumn}
+                sortDir={sortDir}
+                onSort={onSortColumn}
+              />
+              <SortableTableHead
+                column="access"
+                label="Access"
+                className="hidden 2xl:table-cell"
+                sortColumn={sortColumn}
+                sortDir={sortDir}
+                onSort={onSortColumn}
+              />
+              <TableHead className="w-[56px]" aria-label="Actions" />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -296,7 +434,7 @@ export function DocumentManager(props: Props) {
                 </TableCell>
               </TableRow>
             ) : (
-              activeDocs.map((d) => (
+              sortedDocs.map((d) => (
                 <TableRow key={d.id} className="group hover:bg-muted/40">
                   <TableCell className="max-w-[200px] font-medium">
                     <span className="line-clamp-2">{d.name}</span>

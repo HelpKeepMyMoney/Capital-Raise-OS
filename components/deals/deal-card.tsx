@@ -4,7 +4,7 @@ import * as React from "react";
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowRight, LineChart, Pencil, Share2 } from "lucide-react";
+import { ArrowRight, Briefcase, LineChart, Pencil, Share2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -46,6 +46,14 @@ export function DealCard(props: {
     Math.ceil((d.closeDate - nowMs) / 86400000) <= 7 &&
     d.status === "active";
 
+  const [logoFailed, setLogoFailed] = React.useState(false);
+  React.useEffect(() => {
+    setLogoFailed(false);
+  }, [d.logoUrl]);
+
+  const showLogo = Boolean(d.logoUrl?.trim()) && !logoFailed;
+  const initial = d.name.trim().slice(0, 1).toUpperCase() || "?";
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -59,8 +67,27 @@ export function DealCard(props: {
       )}
     >
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="min-w-0 space-y-2">
-          <div className="flex flex-wrap items-center gap-2">
+        <div className="flex min-w-0 flex-1 gap-4">
+          {showLogo ? (
+            <div className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border/70 bg-background shadow-sm sm:size-16">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={d.logoUrl!}
+                alt={`${d.name} logo`}
+                className="max-h-full max-w-full object-contain p-1"
+                onError={() => setLogoFailed(true)}
+              />
+            </div>
+          ) : (
+            <div
+              className="flex size-14 shrink-0 items-center justify-center rounded-xl border border-border/80 bg-muted/40 font-heading text-lg font-semibold text-muted-foreground shadow-sm sm:size-16 sm:text-xl"
+              aria-hidden
+            >
+              {initial.match(/[A-Z0-9]/i) ? initial : <Briefcase className="size-7 opacity-70" />}
+            </div>
+          )}
+          <div className="min-w-0 flex-1 space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
             <Link
               href={`/deals/${d.id}`}
               className="font-heading text-lg font-semibold tracking-tight text-foreground hover:text-blue-600"
@@ -81,12 +108,12 @@ export function DealCard(props: {
                 Closing soon
               </Badge>
             ) : null}
-          </div>
-          <p className="text-sm font-medium capitalize text-muted-foreground">
+            </div>
+            <p className="text-sm font-medium capitalize text-muted-foreground">
             {d.type.replace(/_/g, " ")}
             {d.industry ? ` · ${d.industry}` : ""}
-          </p>
-          <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-foreground/90">
+            </p>
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-foreground/90">
             {target > 0 ? (
               <span>
                 <span className="font-semibold tabular-nums">{fmtUsd(metrics.raised)}</span>
@@ -110,6 +137,7 @@ export function DealCard(props: {
             <span className="text-muted-foreground">
               {metrics.interestCount} interested
             </span>
+            </div>
           </div>
         </div>
         <div className="flex shrink-0 flex-col gap-2 sm:flex-row lg:flex-col lg:items-end">
