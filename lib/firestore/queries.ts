@@ -2,6 +2,7 @@ import { getAdminAuth, getAdminFirestore } from "@/lib/firebase/admin";
 import { col, memberDocId, dealCommitmentDocId, signingRequestDocId } from "@/lib/firestore/paths";
 import type {
   Activity,
+  DataRoom,
   Deal,
   DealCommitment,
   Investor,
@@ -10,6 +11,7 @@ import type {
   Meeting,
   Organization,
   PipelineStage,
+  RoomDocument,
   SigningRequest,
   Task,
 } from "@/lib/firestore/types";
@@ -520,6 +522,92 @@ export async function sumActiveCommitmentsForDeal(orgId: string, dealId: string)
     if (x.status === "active" && typeof x.amount === "number") sum += x.amount;
   }
   return sum;
+}
+
+/** Non-archived data rooms linked to this deal (any match = show Data Room CTA). */
+export async function hasActiveDataRoomForDeal(orgId: string, dealId: string): Promise<boolean> {
+  const db = getAdminFirestore();
+  const snap = await db
+    .collection(col.dataRooms)
+    .where("organizationId", "==", orgId)
+    .where("dealId", "==", dealId)
+    .limit(12)
+    .get();
+  for (const d of snap.docs) {
+    const x = d.data() as { archived?: boolean };
+    if (!x.archived) return true;
+  }
+  return false;
+}
+
+/** Linked non-archived rooms for a deal. */
+export async function listActiveDataRoomsForDeal(orgId: string, dealId: string): Promise<DataRoom[]> {
+  const db = getAdminFirestore();
+  const snap = await db
+    .collection(col.dataRooms)
+    .where("organizationId", "==", orgId)
+    .where("dealId", "==", dealId)
+    .limit(40)
+    .get();
+  return snap.docs
+    .map((d) => ({ id: d.id, ...(d.data() as Omit<DataRoom, "id">) }))
+    .filter((r) => !r.archived);
+}
+
+/** Documents in data rooms tied to this deal. */
+export async function listDocumentsForDeal(orgId: string, dealId: string): Promise<RoomDocument[]> {
+  const rooms = await listActiveDataRoomsForDeal(orgId, dealId);
+  if (rooms.length === 0) return [];
+  const roomIds = new Set(rooms.map((r) => r.id));
+  const db = getAdminFirestore();
+  const snap = await db.collection(col.documents).where("organizationId", "==", orgId).limit(500).get();
+  return snap.docs
+    .map((d) => ({ id: d.id, ...(d.data() as Omit<RoomDocument, "id">) }))
+    .filter((doc) => doc.dataRoomId && roomIds.has(doc.dataRoomId));
+}
+
+const TELEMETRY_ACTION = "deal.telemetry";
+
+/** Recent deal telemetry events from audit log (filtered in memory; uses org + createdAt index). */
+export async function listDealTelemetryEvents(
+  orgId: string,
+  dealId: string,
+  maxScan = 800,
+): Promise<{ event: string; createdAt: number; actorId?: string }[]> {
+  const db = getAdminFirestore();
+  const snap = await db
+    .collection(col.auditLogs)
+    .where("organizationId", "==", orgId)
+    .orderBy("createdAt", "desc")
+    .limit(maxScan)
+    .get();
+  const out: { event: string; createdAt: number; actorId?: string }[] = [];
+  for (const d of snap.docs) {
+    const row = d.data() as {
+      action?: string;
+      createdAt?: number;
+      actorId?: string;
+      payload?: { dealId?: string; event?: string };
+    };
+    if (row.action !== TELEMETRY_ACTION) continue;
+    if (row.payload?.dealId !== dealId) continue;
+    const ev = row.payload?.event;
+    if (typeof ev !== "string" || !ev) continue;
+    out.push({ event: ev, createdAt: row.createdAt ?? 0, actorId: row.actorId });
+    if (out.length >= 400) break;
+  }
+  return out;
+}
+
+/** Investors who have this dealId in interestedDealIds (active CRM rows). */
+export function countInvestorsInterestedInDeal(investors: Investor[], dealId: string): number {
+  let n = 0;
+  for (const inv of investors) {
+    if (!isInvestorActive(inv)) continue;
+    const ids = inv.interestedDealIds ?? [];
+    if (ids.includes(dealId)) n += 1;
+  }
+  return n;
 }
 
 export async function listDealCommitmentsForUser(

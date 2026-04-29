@@ -51,8 +51,8 @@ const raiseNav: NavItem[] = [
 
 const capitalNav: NavItem[] = [
   { href: "/investors", label: "Investor CRM", icon: Users },
-  { href: "/data-room", label: "Data Room", icon: FolderLock },
   { href: "/deals", label: "Deal Room", icon: Briefcase },
+  { href: "/data-room", label: "Data Room", icon: FolderLock },
   { href: "/tasks", label: "Tasks", icon: CheckSquare },
 ];
 

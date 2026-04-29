@@ -9,6 +9,39 @@ import { cn } from "@/lib/utils";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
+const DEAL_QUICK_ACTIONS = [
+  {
+    label: "Hottest investors on this deal?",
+    prompt:
+      "I'm on a live deal page in CPIN. Explain how to identify which investors are hottest for this specific offering using CRM signals (data room views, meeting stage, check fit, relationship score) and what to do next.",
+  },
+  {
+    label: "Draft follow-ups for this deal",
+    prompt:
+      "Draft three concise follow-up emails to investors who viewed this deal but haven't soft-circled yet—professional tone, compliant, with clear CTA to book a call or review the data room.",
+  },
+  {
+    label: "Summarize likely objections",
+    prompt:
+      "List the most common investor objections for a private placement like this and concise sponsor responses I can use on calls.",
+  },
+  {
+    label: "Likely close this month",
+    prompt:
+      "Outline a simple forecast framework for closing a private capital raise this month: pipeline math, assumptions, and what must be true.",
+  },
+  {
+    label: "Weekly raise update",
+    prompt:
+      "Write a weekly investor update email draft for an active private raise: progress vs target, timeline, data room additions, soft commits—tone confident and transparent.",
+  },
+  {
+    label: "Improve this offering copy",
+    prompt:
+      "Rewrite the public-facing deal narrative to be more institutional: tighten headline, tagline, risk disclosures placeholder, and bullets—keep factual, no performance promises.",
+  },
+];
+
 const QUICK_ACTIONS = [
   {
     label: "What needs attention today?",
@@ -43,6 +76,12 @@ export function CopilotPanel(props: {
   copilotEnabled: boolean;
 }) {
   const pathname = usePathname();
+  const quickActions = React.useMemo(() => {
+    if (/^\/deals\/[^/]+$/.test(pathname)) {
+      return [...DEAL_QUICK_ACTIONS, ...QUICK_ACTIONS];
+    }
+    return QUICK_ACTIONS;
+  }, [pathname]);
   const [input, setInput] = React.useState("");
   const [messages, setMessages] = React.useState<{ role: "user" | "assistant"; content: string }[]>(
     [],
@@ -129,7 +168,7 @@ export function CopilotPanel(props: {
           </div>
         ) : null}
         <div className="mt-3 flex flex-wrap gap-2">
-          {QUICK_ACTIONS.map((a) => (
+          {quickActions.map((a) => (
             <Button
               key={a.label}
               type="button"

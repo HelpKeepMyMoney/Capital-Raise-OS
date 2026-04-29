@@ -1,28 +1,50 @@
 import Link from "next/link";
+import { formatDistanceToNow } from "date-fns";
 import { memberCanAccessDeal } from "@/lib/auth/investor-access";
 import { canEditOrgData } from "@/lib/auth/rbac";
 import { requireOrgSession } from "@/lib/auth/session";
 import { getAdminAuth } from "@/lib/firebase/admin";
 import {
+  countInvestorsInterestedInDeal,
   getDeal,
   getDealCommitmentForUser,
   getMembership,
   getSigningRequest,
+  hasActiveDataRoomForDeal,
+  listActiveDataRoomsForDeal,
   listDealCommitmentsForDeal,
+  listDealTelemetryEvents,
+  listDocumentsForDeal,
+  listInvestorInvitationsForOrganization,
+  listInvestors,
   sumActiveCommitmentsForDeal,
 } from "@/lib/firestore/queries";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { ExpressInterestButton } from "@/components/express-interest-button";
+import { aggregateDealTelemetry } from "@/lib/deals/telemetry";
+import { countActiveInvitesForDeal } from "@/lib/deals/invite-helpers";
+import { computeProgressPct } from "@/lib/deals/format";
+import { hasWhyInvestNarrativeOnDeal, pickWhyInvestNarrative } from "@/lib/deals/why-invest-narrative";
+import { DealDetailShell } from "@/components/deals/deal-detail-shell";
+import { DealTitleHero } from "@/components/deals/deal-title-hero";
+import { RaiseProgress } from "@/components/deals/raise-progress";
+import { WhyInvest } from "@/components/deals/why-invest";
+import { TractionSection } from "@/components/deals/traction-section";
+import { FounderCredibility } from "@/components/deals/founder-credibility";
+import { UseOfFundsChart } from "@/components/deals/use-of-funds-chart";
+import { TermsGrid } from "@/components/deals/terms-grid";
+import { DealDocuments } from "@/components/deals/deal-documents";
+import { FaqSection } from "@/components/deals/faq-section";
+import { CommitCTA } from "@/components/deals/commit-cta";
+import { SoftCommitChips } from "@/components/deals/soft-commit-chips";
+import { DealManagerPanel } from "@/components/deals/deal-manager-panel";
+import type { DealAnalyticsDTO } from "@/components/deals/deal-analytics";
 import { DealCommitmentForm } from "@/components/deal-commitment-form";
 import { DealGuestSigning } from "@/components/deal-guest-signing";
-import { InviteInvestorPanel } from "@/components/invite-investor-panel";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { notFound, redirect } from "next/navigation";
 import type { DealCommitment, SigningRequest } from "@/lib/firestore/types";
-import { Calendar, Download, FileText, Phone, Wallet } from "lucide-react";
+import { FileText } from "lucide-react";
 
 async function commitmentsWithEmails(
   rows: DealCommitment[],
@@ -40,12 +62,6 @@ async function commitmentsWithEmails(
   return out;
 }
 
-function fmtUsd(n: number) {
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`;
-  if (n >= 1000) return `$${(n / 1000).toFixed(1)}K`;
-  return `$${n.toLocaleString()}`;
-}
-
 export default async function DealDetailPage(props: { params: Promise<{ id: string }> }) {
   const ctx = await requireOrgSession();
   if (!ctx) redirect("/login");
@@ -59,14 +75,37 @@ export default async function DealDetailPage(props: { params: Promise<{ id: stri
   if (!deal) notFound();
 
   const canManage = membership != null && canEditOrgData(membership.role);
+
+  const [investors, hasDataRoom, roomDocs] = await Promise.all([
+    canManage ? listInvestors(ctx.orgId) : Promise.resolve([]),
+    hasActiveDataRoomForDeal(ctx.orgId, id),
+    listDocumentsForDeal(ctx.orgId, id),
+  ]);
   const guest = membership?.role === "investor_guest";
 
   if (!memberCanAccessDeal(membership, id)) notFound();
 
+  const target = deal.targetRaise ?? 0;
+  const pct = computeProgressPct(raised, target);
+
   let commitmentRows: (DealCommitment & { contactEmail?: string })[] = [];
+  let investorCount = 0;
+  let lastCommitMs: number | null = null;
   if (canManage) {
     const raw = await listDealCommitmentsForDeal(ctx.orgId, id);
-    commitmentRows = await commitmentsWithEmails(raw.filter((c) => c.status === "active"));
+    const active = raw.filter((c) => c.status === "active");
+    commitmentRows = await commitmentsWithEmails(active);
+    investorCount = active.length;
+    for (const c of active) {
+      if (lastCommitMs == null || c.updatedAt > lastCommitMs) lastCommitMs = c.updatedAt;
+    }
+  } else {
+    const allForDeal = await listDealCommitmentsForDeal(ctx.orgId, id);
+    const active = allForDeal.filter((c) => c.status === "active");
+    investorCount = active.length;
+    for (const c of active) {
+      if (lastCommitMs == null || c.updatedAt > lastCommitMs) lastCommitMs = c.updatedAt;
+    }
   }
 
   let myCommitmentAmt: number | undefined;
@@ -77,284 +116,193 @@ export default async function DealDetailPage(props: { params: Promise<{ id: stri
     signingRow = await getSigningRequest(ctx.orgId, id, ctx.user.uid);
   }
 
-  const target = deal.targetRaise ?? 0;
-  const pct = target > 0 ? Math.min(100, Math.round((raised / target) * 100)) : raised > 0 ? 100 : 0;
+  const avgCheck = investorCount > 0 ? raised / investorCount : 0;
+  const interestCount = countInvestorsInterestedInDeal(investors, id);
 
-  let daysRemaining: number | null = null;
-  if (deal.closeDate != null) {
-    daysRemaining = Math.ceil((deal.closeDate - Date.now()) / 86400000);
+  let linkedDataRoomSummaries: { id: string; name: string }[] = [];
+  if (canManage) {
+    const linkedRooms = await listActiveDataRoomsForDeal(ctx.orgId, id);
+    linkedDataRoomSummaries = linkedRooms.map((r) => ({ id: r.id, name: r.name }));
   }
 
+  let telemetry: DealAnalyticsDTO["telemetry"] = {
+    pageViews: 0,
+    uniqueVisitors: 0,
+    byEvent: [],
+  };
+  let activeInviteCount = 0;
+  if (canManage) {
+    const [telEvents, invites] = await Promise.all([
+      listDealTelemetryEvents(ctx.orgId, id),
+      listInvestorInvitationsForOrganization(ctx.orgId, 120),
+    ]);
+    telemetry = aggregateDealTelemetry(telEvents);
+    activeInviteCount = countActiveInvitesForDeal(invites, id);
+  }
+
+  const lastCommitAgo =
+    lastCommitMs != null
+      ? formatDistanceToNow(lastCommitMs, { addSuffix: true })
+      : null;
+
+  const showDataRoomCta = hasDataRoom;
+
+  const analyticsPayload: DealAnalyticsDTO = {
+    interestCount,
+    activeInviteCount,
+    commitments: {
+      count: investorCount,
+      total: raised,
+      avg: avgCheck,
+    },
+    telemetry,
+  };
+
+  const ctaVisibility = deal.cta;
+  const showBookCallCta = ctaVisibility?.showBookCall !== false && Boolean(deal.calendarBookingUrl);
+
   return (
-    <div className="mx-auto max-w-4xl space-y-8">
-      <Link
-        href="/deals"
-        className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "w-fit px-0 text-muted-foreground")}
-      >
-        ← Deal room
-      </Link>
+    <DealDetailShell dealId={deal.id} guest={guest}>
+      <div className="mx-auto max-w-4xl space-y-12 px-4 pb-20 pt-6 md:px-6">
+        <Link
+          href="/deals"
+          className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "w-fit px-0 text-muted-foreground")}
+        >
+          ← Deal room
+        </Link>
 
-      <Card className="overflow-hidden rounded-2xl border-border/80 bg-card shadow-lg">
-        <div className="border-b border-border/70 bg-muted/30 px-6 py-6 md:px-8">
-          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-            <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Offering
-              </p>
-              <h1 className="mt-1 font-heading text-3xl font-semibold tracking-tight md:text-4xl">
-                {deal.name}
-              </h1>
-              <p className="mt-1.5 text-sm capitalize text-muted-foreground">
-                {deal.type.replace(/_/g, " ")} · <span className="capitalize">{deal.status}</span>
-              </p>
-            </div>
-            <div className="flex shrink-0 flex-wrap items-center gap-2">
-              <Badge variant="secondary" className="rounded-lg capitalize">
-                {deal.status}
-              </Badge>
-              {guest ? <ExpressInterestButton dealId={deal.id} dealName={deal.name} /> : null}
-            </div>
-          </div>
-
-          {target > 0 ? (
-            <div className="mt-6 space-y-2">
-              <div className="flex flex-wrap items-end justify-between gap-2 text-sm">
-                <span className="font-medium text-foreground">
-                  {fmtUsd(raised)} raised
-                  <span className="font-normal text-muted-foreground">
-                    {" "}
-                    of {fmtUsd(target)} target
-                  </span>
-                </span>
-                <span className="text-muted-foreground">{pct}% subscribed</span>
-              </div>
-              <Progress value={pct} className="h-2.5 rounded-full" />
-            </div>
-          ) : raised > 0 ? (
-            <p className="mt-4 text-sm font-medium">{fmtUsd(raised)} committed to date</p>
-          ) : null}
-
-          <div className="mt-6 flex flex-wrap gap-2">
-            {guest ? (
-              <Link href="#commit" className={cn(buttonVariants(), "rounded-xl gap-2")}>
-                <Wallet className="size-4" />
-                Commit capital
-              </Link>
-            ) : null}
-            {deal.calendarBookingUrl ? (
-              <a
-                href={deal.calendarBookingUrl}
-                target="_blank"
-                rel="noreferrer"
-                className={cn(buttonVariants({ variant: "outline" }), "rounded-xl gap-2")}
-              >
-                <Calendar className="size-4" />
-                Book a call
-              </a>
-            ) : null}
-            <Link href="/data-room" className={cn(buttonVariants({ variant: "outline" }), "rounded-xl gap-2")}>
-              <Download className="size-4" />
-              Data room
-            </Link>
-            {guest && deal.calendarBookingUrl === undefined ? (
-              <Button variant="ghost" className="rounded-xl gap-2 text-muted-foreground" disabled>
-                <Phone className="size-4" />
-                Book a call
-              </Button>
-            ) : null}
-          </div>
-
-          <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground">
-            {deal.minimumInvestment != null ? (
-              <span>Min {fmtUsd(deal.minimumInvestment)}</span>
-            ) : null}
-            {daysRemaining != null ? (
-              <span className={daysRemaining <= 7 ? "font-medium text-destructive" : ""}>
-                {daysRemaining < 0
-                  ? `Closed ${Math.abs(daysRemaining)}d ago`
-                  : `${daysRemaining} days remaining`}
-              </span>
-            ) : null}
-            {deal.closeDate != null ? (
-              <span>Target close {new Date(deal.closeDate).toLocaleDateString()}</span>
-            ) : null}
-          </div>
-        </div>
-      </Card>
-
-      {deal.executiveSummary ? (
-        <section className="rounded-2xl border border-border/80 bg-card p-6 shadow-md md:p-8">
-          <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
-            <FileText className="size-4" />
-            Executive summary
-          </div>
-          <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-foreground">
-            {deal.executiveSummary}
-          </p>
-        </section>
-      ) : null}
-
-      {deal.sponsorProfile ? (
-        <Card className="rounded-2xl border-border/80 shadow-md">
-          <CardHeader>
-            <CardTitle className="font-heading text-lg">Sponsor profile</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="whitespace-pre-wrap text-sm leading-relaxed">{deal.sponsorProfile}</p>
-          </CardContent>
-        </Card>
-      ) : null}
-
-      {(deal.useOfProceeds || deal.returnsModel) && (
-        <div className="grid gap-6 md:grid-cols-2">
-          {deal.useOfProceeds ? (
-            <Card className="rounded-2xl border-border/80 shadow-md">
-              <CardHeader>
-                <CardTitle className="font-heading text-base">Use of funds</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="whitespace-pre-wrap text-sm">{deal.useOfProceeds}</p>
-              </CardContent>
-            </Card>
-          ) : null}
-          {deal.returnsModel ? (
-            <Card className="rounded-2xl border-border/80 shadow-md">
-              <CardHeader>
-                <CardTitle className="font-heading text-base">Returns model</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="whitespace-pre-wrap text-sm">{deal.returnsModel}</p>
-              </CardContent>
-            </Card>
-          ) : null}
-        </div>
-      )}
-
-      {deal.terms || deal.valuation != null ? (
-        <Card className="rounded-2xl border-border/80 shadow-md">
-          <CardHeader>
-            <CardTitle className="font-heading text-base">Economics &amp; terms</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm">
-            {deal.valuation != null ? (
-              <p>
-                <span className="text-muted-foreground">Valuation: </span>
-                {fmtUsd(deal.valuation)}
-              </p>
-            ) : null}
-            {deal.terms ? <p className="whitespace-pre-wrap">{deal.terms}</p> : null}
-          </CardContent>
-        </Card>
-      ) : null}
-
-      {deal.faqs && deal.faqs.length > 0 ? (
-        <Card className="rounded-2xl border-border/80 shadow-md">
-          <CardHeader>
-            <CardTitle className="font-heading text-lg">FAQs</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {deal.faqs.map((f, i) => (
-              <div key={i} className="border-b border-border/60 pb-4 last:border-0 last:pb-0">
-                <p className="font-medium text-foreground">{f.q}</p>
-                <p className="mt-1 text-sm text-muted-foreground whitespace-pre-wrap">{f.a}</p>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      ) : null}
-
-      {deal.investorUpdates && deal.investorUpdates.length > 0 ? (
-        <Card className="rounded-2xl border-border/80 shadow-md">
-          <CardHeader>
-            <CardTitle className="font-heading text-lg">Investor updates</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            {deal.investorUpdates
-              .slice()
-              .sort((a, b) => b.createdAt - a.createdAt)
-              .map((u, i) => (
-                <div key={i}>
-                  <p className="text-xs text-muted-foreground">
-                    {new Date(u.createdAt).toLocaleDateString()}
-                  </p>
-                  <p className="font-medium">{u.title}</p>
-                  <p className="mt-1 text-sm whitespace-pre-wrap">{u.body}</p>
-                </div>
-              ))}
-          </CardContent>
-        </Card>
-      ) : null}
-
-      {guest ? (
-        <>
-          <DealGuestSigning
-            dealId={deal.id}
-            orgId={ctx.orgId}
-            userId={ctx.user.uid}
-            initial={signingRow}
+        <div id="deal-hero-anchor">
+          <DealTitleHero
+            deal={deal}
+            raised={raised}
+            target={target}
+            pct={pct}
+            investorCount={investorCount}
+            avgCheck={avgCheck}
+            guest={guest}
+            hasDataRoom={hasDataRoom}
+            showDataRoomCta={showDataRoomCta}
           />
-          <Card id="commit" className="rounded-2xl border-border/80 shadow-md">
-            <CardHeader>
-              <CardTitle className="font-heading text-lg">Reserve commitment</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Formalize interest; the sponsor team will confirm allocation and subscription docs.
-              </p>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <DealCommitmentForm
-                dealId={deal.id}
-                dealName={deal.name}
-                initialAmount={myCommitmentAmt}
-              />
-            </CardContent>
-          </Card>
-        </>
-      ) : null}
+        </div>
 
-      {canManage ? (
-        <div className="space-y-4">
-          <InviteInvestorPanel dealId={deal.id} />
+        {target > 0 || raised > 0 ? (
+          <section className="rounded-2xl border border-border/80 bg-card p-6 shadow-sm md:p-8">
+            <RaiseProgress
+              raised={raised}
+              target={target > 0 ? target : raised}
+              investorCount={investorCount}
+              lastCommitAgo={lastCommitAgo}
+            />
+          </section>
+        ) : null}
 
-          <Card className="rounded-2xl border-border/80 shadow-md">
+        <WhyInvest blocks={deal.whyInvest} narrative={pickWhyInvestNarrative(deal)} />
+
+        <TractionSection metrics={deal.tractionMetrics} />
+
+        <FounderCredibility founder={deal.founder} sponsorProfileFallback={deal.sponsorProfile} />
+
+        <UseOfFundsChart split={deal.useOfFundsSplit} proseFallback={deal.useOfProceeds} />
+
+        {deal.returnsModel?.trim() ? (
+          <Card className="rounded-2xl border-border/80 shadow-sm">
             <CardHeader>
-              <CardTitle className="font-heading text-base">Recorded commitments</CardTitle>
+              <CardTitle className="flex items-center gap-2 font-heading text-base">
+                <FileText className="size-4" />
+                Returns model
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              {commitmentRows.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No active commitments yet.</p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead className="text-left text-muted-foreground">
-                      <tr>
-                        <th className="pb-2 pr-4 font-medium">Investor</th>
-                        <th className="pb-2 pr-4 font-medium">Amount (USD)</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {commitmentRows.map((c) => (
-                        <tr key={c.userId} className="border-t border-border">
-                          <td className="py-2 pr-4">{c.contactEmail ?? c.userId.slice(0, 10)}</td>
-                          <td className="py-2">${c.amount.toLocaleString()}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+              <p className="whitespace-pre-wrap text-sm text-muted-foreground">{deal.returnsModel}</p>
             </CardContent>
           </Card>
-        </div>
-      ) : null}
+        ) : null}
 
-      {!deal.executiveSummary &&
-      !deal.sponsorProfile &&
-      !deal.faqs?.length &&
-      !deal.investorUpdates?.length ? (
-        <p className="text-center text-sm text-muted-foreground">
-          Extended offering narrative can be added by your team in Firestore or future deal editor.
-        </p>
-      ) : null}
-    </div>
+        <TermsGrid deal={deal} />
+
+        <DealDocuments dealId={deal.id} documents={roomDocs} />
+
+        {deal.investorUpdates && deal.investorUpdates.length > 0 ? (
+          <Card className="rounded-2xl border-border/80 shadow-sm">
+            <CardHeader>
+              <CardTitle className="font-heading text-lg">Investor updates</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              {deal.investorUpdates
+                .slice()
+                .sort((a, b) => b.createdAt - a.createdAt)
+                .map((u, i) => (
+                  <div key={i}>
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(u.createdAt).toLocaleDateString()}
+                    </p>
+                    <p className="font-medium">{u.title}</p>
+                    <p className="mt-1 text-sm whitespace-pre-wrap text-muted-foreground">{u.body}</p>
+                  </div>
+                ))}
+            </CardContent>
+          </Card>
+        ) : null}
+
+        <FaqSection items={deal.faqs} />
+
+        {guest ? (
+          <>
+            <DealGuestSigning
+              dealId={deal.id}
+              orgId={ctx.orgId}
+              userId={ctx.user.uid}
+              initial={signingRow}
+            />
+            <SoftCommitChips dealId={deal.id} dealName={deal.name} minAmount={deal.minimumInvestment} />
+            <Card id="commit" className="rounded-2xl border-border/80 shadow-md">
+              <CardHeader>
+                <CardTitle className="font-heading text-lg">Reserve commitment</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Formalize interest; the sponsor team will confirm allocation and subscription docs.
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <DealCommitmentForm
+                  dealId={deal.id}
+                  dealName={deal.name}
+                  initialAmount={myCommitmentAmt}
+                />
+              </CardContent>
+            </Card>
+          </>
+        ) : null}
+
+        {guest ? (
+          <CommitCTA
+            dealId={deal.id}
+            showCommit
+            commitHref="#commit"
+            showBookCall={showBookCallCta}
+            calendarUrl={deal.calendarBookingUrl}
+            showDataRoom={showDataRoomCta && hasDataRoom}
+            dataRoomHref={`/data-room?deal=${encodeURIComponent(deal.id)}`}
+          />
+        ) : null}
+
+        {canManage ? (
+          <DealManagerPanel
+            deal={deal}
+            analytics={analyticsPayload}
+            commitments={commitmentRows}
+            linkedDataRooms={linkedDataRoomSummaries}
+          />
+        ) : null}
+
+        {!hasWhyInvestNarrativeOnDeal(deal) &&
+        !deal.sponsorProfile &&
+        !(deal.faqs && deal.faqs.length > 0) &&
+        !deal.investorUpdates?.length ? (
+          <p className="text-center text-sm text-muted-foreground">
+            Extended offering narrative can be added by your team in Settings.
+          </p>
+        ) : null}
+      </div>
+    </DealDetailShell>
   );
 }

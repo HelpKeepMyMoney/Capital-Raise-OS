@@ -8,6 +8,38 @@ import { getDeal, getMembership } from "@/lib/firestore/queries";
 import { writeAuditLog } from "@/lib/audit";
 import type { DataRoomVisibility } from "@/lib/firestore/types";
 
+/** List active (non-archived) data rooms for the org (deal settings link UI). */
+export async function GET() {
+  const ctx = await requireOrgSession();
+  if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const m = await getMembership(ctx.orgId, ctx.user.uid);
+  if (!m || !canEditOrgData(m.role)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const db = getAdminFirestore();
+  const snap = await db
+    .collection(col.dataRooms)
+    .where("organizationId", "==", ctx.orgId)
+    .limit(120)
+    .get();
+
+  const rooms = snap.docs
+    .map((d) => {
+      const x = d.data() as { name?: string; dealId?: string | null; archived?: boolean };
+      return {
+        id: d.id,
+        name: typeof x.name === "string" ? x.name : d.id,
+        dealId: typeof x.dealId === "string" ? x.dealId : null,
+        archived: Boolean(x.archived),
+      };
+    })
+    .filter((r) => !r.archived);
+
+  return NextResponse.json({ rooms });
+}
+
 export async function POST(req: NextRequest) {
   const ctx = await requireOrgSession();
   if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

@@ -248,6 +248,8 @@ export type Activity = {
   id: string;
   organizationId: string;
   investorId?: string;
+  /** Set for deal-scoped events (e.g. telemetry) for efficient queries. */
+  dealId?: string;
   type: string;
   summary: string;
   actorId?: string;
@@ -304,6 +306,25 @@ export type OutreachEmail = {
   createdAt: number;
 };
 
+export type DealWhyInvestBlock = { title: string; body: string };
+
+export type DealTractionMetric = { label: string; value: string; hint?: string };
+
+export type DealUseOfFundsSplit = { label: string; pct: number };
+
+export type DealFounder = {
+  name?: string;
+  role?: string;
+  photoUrl?: string;
+  bio?: string;
+  highlights?: string[];
+};
+
+export type DealCtaVisibility = {
+  showDataRoom?: boolean;
+  showBookCall?: boolean;
+};
+
 export type Deal = {
   id: string;
   organizationId: string;
@@ -316,13 +337,31 @@ export type Deal = {
   useOfProceeds?: string;
   closeDate?: number;
   status: DealStatus;
-  executiveSummary?: string;
+  /** Why invest — six narrative fields edited in Deal settings. */
+  marketOpportunity?: string;
+  problem?: string;
+  solution?: string;
+  competitiveEdge?: string;
+  growthStrategy?: string;
+  exitPotential?: string;
   sponsorProfile?: string;
   returnsModel?: string;
   faqs?: { q: string; a: string }[];
   investorUpdates?: { title: string; body: string; createdAt: number }[];
   calendarBookingUrl?: string;
   createdAt: number;
+  /** Premium portal fields (all optional, backward compatible). */
+  tagline?: string;
+  industry?: string;
+  stage?: string;
+  logoUrl?: string;
+  whyInvest?: DealWhyInvestBlock[];
+  tractionMetrics?: DealTractionMetric[];
+  useOfFundsSplit?: DealUseOfFundsSplit[];
+  founder?: DealFounder;
+  jurisdiction?: string;
+  eligibility?: string;
+  cta?: DealCtaVisibility;
 };
 
 export type SigningRequestStatus =

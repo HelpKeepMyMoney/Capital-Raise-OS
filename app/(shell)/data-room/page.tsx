@@ -16,11 +16,18 @@ import type { Deal, RoomDocument as RoomDocType } from "@/lib/firestore/types";
 import { listDeals, getDeal, getMembership } from "@/lib/firestore/queries";
 import { redirect } from "next/navigation";
 
-export default async function DataRoomPage() {
+export default async function DataRoomPage(props: {
+  searchParams?: Promise<{ deal?: string }>;
+}) {
   const ctx = await requireOrgSession();
   if (!ctx) redirect("/login");
   const membership = await getMembership(ctx.orgId, ctx.user.uid);
   const canManage = membership != null && canEditOrgData(membership.role);
+
+  const sp = props.searchParams ? await props.searchParams : {};
+  const dealParam = typeof sp.deal === "string" ? sp.deal.trim() : "";
+  const initialDealFilterId =
+    dealParam && (await getDeal(ctx.orgId, dealParam)) ? dealParam : undefined;
 
   const db = getAdminFirestore();
   const [roomsSnap, docsSnap] = await Promise.all([
@@ -107,6 +114,7 @@ export default async function DataRoomPage() {
         invitations={invitationsOrEmpty}
         activityPreview={activityPreviewOrEmpty}
         canManage={canManage}
+        initialDealFilterId={initialDealFilterId}
       />
     </div>
   );

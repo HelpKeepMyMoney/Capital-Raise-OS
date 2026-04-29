@@ -36,16 +36,21 @@ type Props = {
   invitations: InviteRow[];
   activityPreview: ActivityFeedItemDTO[];
   canManage: boolean;
+  /** When opening /data-room?deal=…, pre-select this deal in the workspace filter. */
+  initialDealFilterId?: string;
 };
 
 export function DataRoomShell(props: Props) {
   const router = useRouter();
   const wsRef = React.useRef<HTMLDivElement>(null);
 
-  const [dealFilterId, setDealFilterId] = React.useState<string>("");
+  const [dealFilterId, setDealFilterId] = React.useState<string>(props.initialDealFilterId ?? "");
   const [searchRooms, setSearchRooms] = React.useState("");
-
   const [selectedRoomId, setSelectedRoomId] = React.useState(props.rooms[0]?.id ?? "");
+
+  React.useEffect(() => {
+    if (props.initialDealFilterId) setDealFilterId(props.initialDealFilterId);
+  }, [props.initialDealFilterId]);
   React.useEffect(() => {
     if (props.rooms.length && !props.rooms.some((r) => r.id === selectedRoomId)) {
       setSelectedRoomId(props.rooms[0]!.id);

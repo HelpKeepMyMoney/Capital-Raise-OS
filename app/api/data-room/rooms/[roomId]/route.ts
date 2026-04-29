@@ -136,13 +136,17 @@ export async function PATCH(
 
   await ref.update(updates);
 
-  await writeAuditLog({
-    organizationId: ctx.orgId,
-    actorId: ctx.user.uid,
-    action: "data_room.update",
-    resource: `${col.dataRooms}/${roomId}`,
-    payload: updates,
-  });
+  try {
+    await writeAuditLog({
+      organizationId: ctx.orgId,
+      actorId: ctx.user.uid,
+      action: "data_room.update",
+      resource: `${col.dataRooms}/${roomId}`,
+      payload: updates,
+    });
+  } catch (err) {
+    console.error("[data room PATCH] audit log skipped:", err);
+  }
 
   return NextResponse.json({ ok: true, id: roomId, ...updates });
 }

@@ -3,6 +3,7 @@
 import * as React from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { trackDealTelemetry } from "@/components/deals/deal-telemetry";
 
 export function ExpressInterestButton(props: { dealId: string; dealName: string }) {
   const [pending, setPending] = React.useState(false);
@@ -10,6 +11,7 @@ export function ExpressInterestButton(props: { dealId: string; dealName: string 
   async function onExpress() {
     setPending(true);
     try {
+      void trackDealTelemetry(props.dealId, "cta_express_interest");
       const res = await fetch("/api/deals/express-interest", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
