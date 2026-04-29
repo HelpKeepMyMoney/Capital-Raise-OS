@@ -1,14 +1,16 @@
-import { getAdminFirestore } from "@/lib/firebase/admin";
-import { col, memberDocId, dealCommitmentDocId } from "@/lib/firestore/paths";
+import { getAdminAuth, getAdminFirestore } from "@/lib/firebase/admin";
+import { col, memberDocId, dealCommitmentDocId, signingRequestDocId } from "@/lib/firestore/paths";
 import type {
   Activity,
   Deal,
+  DealCommitment,
   Investor,
   InvestorInvitation,
-  DealCommitment,
+  InvestorAccess,
   Meeting,
   Organization,
-  InvestorAccess,
+  PipelineStage,
+  SigningRequest,
   Task,
 } from "@/lib/firestore/types";
 function mapDocs<T extends { id: string }>(
@@ -313,4 +315,268 @@ export async function weeklyOutreachStats(
       label: new Date(ts).toISOString().slice(0, 10),
       ...v,
     }));
+}
+
+export type DashboardEngagementDay = {
+  label: string;
+  sent: number;
+  replies: number;
+  /** Meetings created (booked) that day */
+  meetingsBooked: number;
+};
+
+/** Last `days` calendar days (UTC) of outreach + meeting booking counts — caps Firestore reads. */
+export async function dashboardEngagementDailySeries(
+  orgId: string,
+  days = 90,
+): Promise<DashboardEngagementDay[]> {
+  const cutoff = Date.now() - days * 86400000;
+  const db = getAdminFirestore();
+
+  const dayKeys: string[] = [];
+  const anchor = new Date();
+  anchor.setUTCHours(0, 0, 0, 0);
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(anchor);
+    d.setUTCDate(d.getUTCDate() - i);
+    dayKeys.push(d.toISOString().slice(0, 10));
+  }
+
+  const buckets = new Map<string, { sent: number; replies: number; meetingsBooked: number }>();
+  for (const k of dayKeys) {
+    buckets.set(k, { sent: 0, replies: 0, meetingsBooked: 0 });
+  }
+
+  const emailSnap = await db
+    .collection(col.emails)
+    .where("organizationId", "==", orgId)
+    .orderBy("createdAt", "desc")
+    .limit(1200)
+    .get();
+
+  for (const doc of emailSnap.docs) {
+    const e = doc.data() as {
+      createdAt?: number;
+      status?: string;
+      replySentiment?: string;
+    };
+    if (!e.createdAt || e.createdAt < cutoff) continue;
+    const day = new Date(e.createdAt).toISOString().slice(0, 10);
+    const cur = buckets.get(day);
+    if (!cur) continue;
+    if (e.status === "sent" || e.status === "delivered") cur.sent += 1;
+    if (e.replySentiment && e.replySentiment !== "unknown") cur.replies += 1;
+  }
+
+  const meetSnap = await db
+    .collection(col.meetings)
+    .where("organizationId", "==", orgId)
+    .orderBy("createdAt", "desc")
+    .limit(400)
+    .get();
+
+  for (const doc of meetSnap.docs) {
+    const m = doc.data() as { createdAt?: number; status?: string };
+    if (!m.createdAt || m.createdAt < cutoff) continue;
+    if (m.status && m.status !== "scheduled") continue;
+    const day = new Date(m.createdAt).toISOString().slice(0, 10);
+    const cur = buckets.get(day);
+    if (!cur) continue;
+    cur.meetingsBooked += 1;
+  }
+
+  return dayKeys.map((label) => {
+    const v = buckets.get(label)!;
+    return { label, ...v };
+  });
+}
+
+const WEIGHTED_PIPELINE_STAGES: PipelineStage[] = [
+  "contacted",
+  "responded",
+  "meeting_scheduled",
+  "data_room_opened",
+  "due_diligence",
+  "soft_circled",
+];
+
+/** Midpoint check × relationshipScore/100 for mid-funnel stages. */
+export function weightedPipelineValueUsd(investors: Investor[]): number {
+  const list = investors.filter(isInvestorActive);
+  let sum = 0;
+  for (const inv of list) {
+    if (!WEIGHTED_PIPELINE_STAGES.includes(inv.pipelineStage)) continue;
+    const mid =
+      inv.checkSizeMin != null && inv.checkSizeMax != null
+        ? (inv.checkSizeMin + inv.checkSizeMax) / 2
+        : (inv.checkSizeMax ?? inv.checkSizeMin ?? 0);
+    if (mid <= 0) continue;
+    const score = (inv.relationshipScore ?? 50) / 100;
+    sum += mid * Math.min(1, Math.max(0, score));
+  }
+  return Math.round(sum);
+}
+
+/** Uses updatedAt − createdAt for closed rows (`closedAt` preferred in a later migration). */
+export function averageDaysToClose(investors: Investor[]): number | null {
+  const closed = investors.filter((i) => i.pipelineStage === "closed" && isInvestorActive(i));
+  if (closed.length === 0) return null;
+  const msDay = 86400000;
+  const total = closed.reduce((s, i) => s + Math.max(0, (i.updatedAt - i.createdAt) / msDay), 0);
+  return Math.round((total / closed.length) * 10) / 10;
+}
+
+export function openTasksDueBefore(tasks: Task[], endMsExclusive: number): Task[] {
+  return tasks.filter(
+    (t) => t.status === "open" && t.dueAt != null && t.dueAt < endMsExclusive,
+  );
+}
+
+export async function listDealCommitmentsForOrganization(
+  orgId: string,
+  limit = 300,
+): Promise<DealCommitment[]> {
+  const db = getAdminFirestore();
+  const snap = await db
+    .collection(col.dealCommitments)
+    .where("organizationId", "==", orgId)
+    .limit(limit)
+    .get();
+  const list = snap.docs.map((d) => ({
+    id: d.id,
+    ...(d.data() as Omit<DealCommitment, "id">),
+  }));
+  list.sort((a, b) => b.updatedAt - a.updatedAt);
+  return list;
+}
+
+export type OrganizationMemberPublic = {
+  userId: string;
+  role: string;
+  email?: string;
+  displayName?: string;
+};
+
+export async function listOrganizationMembers(orgId: string): Promise<OrganizationMemberPublic[]> {
+  const db = getAdminFirestore();
+  const snap = await db
+    .collection(col.organizationMembers)
+    .where("organizationId", "==", orgId)
+    .limit(100)
+    .get();
+  const auth = getAdminAuth();
+  const out: OrganizationMemberPublic[] = [];
+  for (const d of snap.docs) {
+    const data = d.data() as { userId?: string; role?: string };
+    const userId = data.userId ?? "";
+    if (!userId) continue;
+    let email: string | undefined;
+    let displayName: string | undefined;
+    try {
+      const u = await auth.getUser(userId);
+      email = u.email ?? undefined;
+      displayName = u.displayName ?? undefined;
+    } catch {
+      /* stale member */
+    }
+    out.push({
+      userId,
+      role: data.role ?? "assistant",
+      email,
+      displayName,
+    });
+  }
+  out.sort((a, b) =>
+    (a.displayName ?? a.email ?? a.userId).localeCompare(b.displayName ?? b.email ?? b.userId),
+  );
+  return out;
+}
+
+/** Latest SignWell signing request for this LP + deal. */
+export async function getSigningRequest(
+  orgId: string,
+  dealId: string,
+  userId: string,
+): Promise<SigningRequest | null> {
+  const db = getAdminFirestore();
+  const d = await db.collection(col.signingRequests).doc(signingRequestDocId(orgId, dealId, userId)).get();
+  if (!d.exists) return null;
+  const data = d.data() as Omit<SigningRequest, "id">;
+  return { id: d.id, ...data };
+}
+
+/** Sum of active commitment amounts for a deal (whole currency units). */
+export async function sumActiveCommitmentsForDeal(orgId: string, dealId: string): Promise<number> {
+  const db = getAdminFirestore();
+  const snap = await db
+    .collection(col.dealCommitments)
+    .where("organizationId", "==", orgId)
+    .where("dealId", "==", dealId)
+    .limit(200)
+    .get();
+  let sum = 0;
+  for (const d of snap.docs) {
+    const x = d.data() as { amount?: number; status?: string };
+    if (x.status === "active" && typeof x.amount === "number") sum += x.amount;
+  }
+  return sum;
+}
+
+export async function listDealCommitmentsForUser(
+  orgId: string,
+  userId: string,
+  limit = 80,
+): Promise<DealCommitment[]> {
+  const db = getAdminFirestore();
+  const snap = await db
+    .collection(col.dealCommitments)
+    .where("organizationId", "==", orgId)
+    .where("userId", "==", userId)
+    .limit(limit)
+    .get();
+  const list = snap.docs.map((d) => ({
+    id: d.id,
+    ...(d.data() as Omit<DealCommitment, "id">),
+  }));
+  list.sort((a, b) => b.updatedAt - a.updatedAt);
+  return list;
+}
+
+export async function listCampaignsForOrg(
+  orgId: string,
+  lim = 20,
+): Promise<
+  {
+    id: string;
+    name: string;
+    stats?: { sent: number; opened: number; clicked: number; replied: number; bounced: number };
+  }[]
+> {
+  const db = getAdminFirestore();
+  const snap = await db.collection(col.campaigns).where("organizationId", "==", orgId).limit(lim).get();
+  return snap.docs.map((d) => {
+    const x = d.data() as {
+      name?: string;
+      stats?: { sent: number; opened: number; clicked: number; replied: number; bounced: number };
+    };
+    return { id: d.id, name: x.name ?? d.id, stats: x.stats };
+  });
+}
+
+export async function listEmailsForOrg(
+  orgId: string,
+  lim = 200,
+): Promise<{ status: string; replySentiment?: string; createdAt: number }[]> {
+  const db = getAdminFirestore();
+  const snap = await db.collection(col.emails).where("organizationId", "==", orgId).limit(lim).get();
+  const list = snap.docs.map((d) => {
+    const x = d.data() as { status?: string; replySentiment?: string; createdAt?: number };
+    return {
+      status: x.status ?? "unknown",
+      replySentiment: x.replySentiment,
+      createdAt: x.createdAt ?? 0,
+    };
+  });
+  list.sort((a, b) => b.createdAt - a.createdAt);
+  return list;
 }

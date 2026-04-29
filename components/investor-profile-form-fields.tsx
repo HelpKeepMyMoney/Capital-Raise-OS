@@ -53,14 +53,22 @@ export type InvestorProfileFormFieldsProps = {
   onNextFollowUpChange: (v: string) => void;
   notesSummary: string;
   onNotesSummaryChange: (v: string) => void;
+  /** Limit visible blocks for tabbed edit modals. Default shows full form (add investor). */
+  part?: "all" | "basic" | "capital" | "notes";
 };
 
 export function InvestorProfileFormFields(props: InvestorProfileFormFieldsProps) {
   const p = props.idPrefix;
+  const part = props.part ?? "all";
+  const showBasic = part === "all" || part === "basic";
+  const showCapital = part === "all" || part === "capital";
+  const showNotes = part === "all" || part === "notes";
 
   return (
     <div className="grid gap-3 py-1">
       <div className="grid gap-3 sm:grid-cols-2">
+        {showBasic ? (
+          <>
         <div className="space-y-1.5">
           <Label htmlFor={`${p}-first`}>First name</Label>
           <Input
@@ -156,6 +164,10 @@ export function InvestorProfileFormFields(props: InvestorProfileFormFieldsProps)
             </Select>
           </div>
         ) : null}
+          </>
+        ) : null}
+        {showCapital ? (
+          <>
         <div className="space-y-1.5">
           <Label>Type</Label>
           <Select
@@ -243,6 +255,9 @@ export function InvestorProfileFormFields(props: InvestorProfileFormFieldsProps)
             that task.
           </p>
         </div>
+          </>
+        ) : null}
+        {showNotes ? (
         <div className="space-y-1.5 sm:col-span-2">
           <Label htmlFor={`${p}-notes`}>Notes summary</Label>
           <Textarea
@@ -252,6 +267,7 @@ export function InvestorProfileFormFields(props: InvestorProfileFormFieldsProps)
             onChange={(e) => props.onNotesSummaryChange(e.target.value)}
           />
         </div>
+        ) : null}
       </div>
     </div>
   );

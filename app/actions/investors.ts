@@ -166,6 +166,10 @@ const CreateInvestorSchema = z.object({
   relationshipScore: z.number().min(0).max(100).optional(),
   nextFollowUpAt: z.number().optional().nullable(),
   committedAmount: z.number().nonnegative().optional(),
+  investProbability: z.number().min(0).max(100).optional(),
+  referralSource: z.string().trim().optional(),
+  interestedDealIds: z.array(z.string()).optional(),
+  relationshipOwnerUserId: z.string().trim().optional(),
 });
 
 const UpdateInvestorSchema = z.object({
@@ -190,6 +194,10 @@ const UpdateInvestorSchema = z.object({
   lastContactAt: z.number().optional().nullable(),
   nextFollowUpAt: z.number().optional().nullable(),
   committedAmount: z.number().optional().nullable(),
+  investProbability: z.number().min(0).max(100).optional().nullable(),
+  referralSource: z.string().trim().optional().nullable(),
+  interestedDealIds: z.array(z.string()).optional().nullable(),
+  relationshipOwnerUserId: z.string().trim().optional().nullable(),
 });
 
 export async function createInvestor(raw: z.infer<typeof CreateInvestorSchema>) {
@@ -238,6 +246,10 @@ export async function createInvestor(raw: z.infer<typeof CreateInvestorSchema>) 
     doc.nextFollowUpAt = d.nextFollowUpAt;
   }
   if (d.committedAmount !== undefined) doc.committedAmount = d.committedAmount;
+  if (d.investProbability !== undefined) doc.investProbability = d.investProbability;
+  if (d.referralSource?.trim()) doc.referralSource = d.referralSource.trim();
+  if (d.interestedDealIds?.length) doc.interestedDealIds = d.interestedDealIds;
+  if (d.relationshipOwnerUserId?.trim()) doc.relationshipOwnerUserId = d.relationshipOwnerUserId.trim();
 
   await ref.set(doc);
 
@@ -300,6 +312,12 @@ export async function updateInvestor(
   if (data.lastContactAt !== undefined) patch.lastContactAt = data.lastContactAt;
   if (data.nextFollowUpAt !== undefined) patch.nextFollowUpAt = data.nextFollowUpAt;
   if (data.committedAmount !== undefined) patch.committedAmount = data.committedAmount;
+  if (data.investProbability !== undefined) patch.investProbability = data.investProbability;
+  if (data.referralSource !== undefined) patch.referralSource = data.referralSource || null;
+  if (data.interestedDealIds !== undefined)
+    patch.interestedDealIds = data.interestedDealIds?.length ? data.interestedDealIds : null;
+  if (data.relationshipOwnerUserId !== undefined)
+    patch.relationshipOwnerUserId = data.relationshipOwnerUserId || null;
 
   if (data.nextFollowUpAt !== undefined) {
     const displayName = buildInvestorFullName(data.firstName, data.lastName);

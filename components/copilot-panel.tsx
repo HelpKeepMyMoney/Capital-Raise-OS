@@ -1,32 +1,75 @@
 "use client";
 
 import * as React from "react";
+import { usePathname } from "next/navigation";
+import Link from "next/link";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
-export function CopilotPanel(props: { open: boolean; onOpenChange: (v: boolean) => void }) {
+const QUICK_ACTIONS = [
+  {
+    label: "What needs attention today?",
+    prompt:
+      "Given what a capital-raising team usually tracks, list the top priorities I should focus on today: pipeline, overdue follow-ups, commitments pending docs, and meetings — be specific and actionable.",
+  },
+  {
+    label: "Who is most likely to invest?",
+    prompt:
+      "Explain how to rank investors by likelihood to commit using pipeline stage, relationship score, engagement (data room, meetings), and check size fit. Give a practical rubric I can apply this week.",
+  },
+  {
+    label: "Draft follow-ups",
+    prompt:
+      "Draft three short follow-up email variants for warm LPs after they viewed our data room: one checking intent, one offering a call, one sharing a light update.",
+  },
+  {
+    label: "Summarize pipeline",
+    prompt:
+      "Summarize how to read a private-capital pipeline from lead to close: key stages, common leakage points, and what good looks like for weekly cadence.",
+  },
+  {
+    label: "Show stale leads",
+    prompt:
+      "List objective criteria for 'stale' investor leads in a raise (timing, stage, last touch) and give re-engagement plays for each pattern.",
+  },
+];
+
+export function CopilotPanel(props: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  copilotEnabled: boolean;
+}) {
+  const pathname = usePathname();
   const [input, setInput] = React.useState("");
   const [messages, setMessages] = React.useState<{ role: "user" | "assistant"; content: string }[]>(
     [],
   );
   const [loading, setLoading] = React.useState(false);
 
-  async function send() {
-    if (!input.trim() || loading) return;
-    const next = [...messages, { role: "user" as const, content: input.trim() }];
-    setMessages(next);
-    setInput("");
+  async function runSend(appendMessages: { role: "user" | "assistant"; content: string }[]) {
     setLoading(true);
     try {
       const res = await fetch("/api/ai/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          messages: next.slice(-12).map((m) => ({ role: m.role, content: m.content })),
+          messages: appendMessages.slice(-12).map((m) => ({
+            role: m.role,
+            content:
+              m.role === "user" && appendMessages.length === 1
+                ? `[Screen: ${pathname}]\n${m.content}`
+                : m.content,
+          })),
         }),
       });
+      if (res.status === 402) {
+        const text = await res.text();
+        setMessages((m) => [...m, { role: "assistant", content: text }]);
+        return;
+      }
       if (!res.ok) throw new Error("Chat failed");
       const reader = res.body?.getReader();
       const decoder = new TextDecoder();
@@ -43,23 +86,77 @@ export function CopilotPanel(props: { open: boolean; onOpenChange: (v: boolean) 
         });
       }
     } catch {
-      setMessages((m) => [...m, { role: "assistant", content: "Unable to reach Copilot. Check API keys." }]);
+      setMessages((m) => [
+        ...m,
+        { role: "assistant", content: "Unable to reach Copilot. Check API keys and billing tier." },
+      ]);
     } finally {
       setLoading(false);
     }
   }
 
+  async function send() {
+    if (!input.trim() || loading) return;
+    const next = [...messages, { role: "user" as const, content: input.trim() }];
+    setMessages(next);
+    setInput("");
+    await runSend(next);
+  }
+
+  function runQuick(prompt: string) {
+    const next = [...messages, { role: "user" as const, content: prompt }];
+    setMessages(next);
+    void runSend(next);
+  }
+
   return (
     <Sheet open={props.open} onOpenChange={props.onOpenChange}>
-      <SheetContent className="w-full sm:max-w-lg border-l border-white/10 bg-background/95 backdrop-blur-xl">
+      <SheetContent className="w-full border-l border-border bg-card sm:max-w-lg">
         <SheetHeader>
-          <SheetTitle>AI Copilot</SheetTitle>
+          <SheetTitle className="font-heading">AI Copilot</SheetTitle>
+          <p className="text-xs text-muted-foreground">
+            Context: <code className="text-[11px]">{pathname}</code> — available on Pro, Growth, and
+            Enterprise.
+          </p>
         </SheetHeader>
-        <ScrollArea className="h-[calc(100vh-12rem)] mt-4 pr-3">
+        {!props.copilotEnabled ? (
+          <div className="mt-3 rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-950 dark:text-amber-100">
+            Your plan does not include Copilot yet.{" "}
+            <Link href="/settings/billing" className="font-semibold underline">
+              Upgrade under Billing
+            </Link>{" "}
+            — you can still explore quick actions below; the assistant will prompt you to upgrade on send.
+          </div>
+        ) : null}
+        <div className="mt-3 flex flex-wrap gap-2">
+          {QUICK_ACTIONS.map((a) => (
+            <Button
+              key={a.label}
+              type="button"
+              size="sm"
+              variant="secondary"
+              className="h-8 rounded-full text-xs"
+              disabled={loading}
+              onClick={() => runQuick(a.prompt)}
+            >
+              {a.label}
+            </Button>
+          ))}
+          <Link
+            href="/settings/billing"
+            className={cn(
+              buttonVariants({ variant: "outline", size: "sm" }),
+              "inline-flex h-8 rounded-full px-3 text-xs",
+            )}
+          >
+            Upgrade
+          </Link>
+        </div>
+        <ScrollArea className="mt-4 h-[calc(100vh-14rem)] pr-3">
           <div className="flex flex-col gap-3 text-sm">
             {messages.length === 0 && (
               <p className="text-muted-foreground">
-                Draft investor emails, summarize meetings, or analyze your funnel. Powered by Claude.
+                Draft LP emails, pressure-test your funnel, or prep IC memos — grounded in CPIN workflows.
               </p>
             )}
             {messages.map((m, i) => (
@@ -67,8 +164,8 @@ export function CopilotPanel(props: { open: boolean; onOpenChange: (v: boolean) 
                 key={i}
                 className={
                   m.role === "user"
-                    ? "ml-8 rounded-lg bg-primary/10 px-3 py-2"
-                    : "mr-4 rounded-lg border border-border/60 bg-card/50 px-3 py-2 whitespace-pre-wrap"
+                    ? "ml-6 rounded-xl bg-primary/10 px-3 py-2"
+                    : "mr-2 rounded-xl border border-border/80 bg-muted/30 px-3 py-2 whitespace-pre-wrap"
                 }
               >
                 {m.content}
@@ -81,7 +178,7 @@ export function CopilotPanel(props: { open: boolean; onOpenChange: (v: boolean) 
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Ask Copilot…"
-            className="min-h-[88px] resize-none"
+            className="min-h-[88px] resize-none rounded-xl"
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
@@ -89,7 +186,7 @@ export function CopilotPanel(props: { open: boolean; onOpenChange: (v: boolean) 
               }
             }}
           />
-          <Button onClick={() => void send()} disabled={loading}>
+          <Button className="rounded-xl" onClick={() => void send()} disabled={loading}>
             {loading ? "Thinking…" : "Send"}
           </Button>
         </div>

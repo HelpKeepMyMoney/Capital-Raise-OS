@@ -28,6 +28,8 @@ export type TaskRow = {
   status?: Task["status"];
   linkedInvestorId?: string;
   isInvestorFollowUp?: boolean;
+  taskType?: Task["taskType"];
+  taskPriority?: Task["taskPriority"];
 };
 
 type Props = {
@@ -171,6 +173,25 @@ export function TasksPanel(props: Props) {
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="font-medium">{t.title}</p>
+                  {t.taskType ? (
+                    <Badge variant="outline" className="text-[10px] capitalize">
+                      {t.taskType.replace(/_/g, " ")}
+                    </Badge>
+                  ) : null}
+                  {t.taskPriority ? (
+                    <Badge
+                      variant={
+                        t.taskPriority === "urgent"
+                          ? "destructive"
+                          : t.taskPriority === "high"
+                            ? "default"
+                            : "secondary"
+                      }
+                      className="text-[10px] capitalize"
+                    >
+                      {t.taskPriority}
+                    </Badge>
+                  ) : null}
                   {t.isInvestorFollowUp ? (
                     <Badge variant="outline" className="text-[10px]">
                       CRM follow-up

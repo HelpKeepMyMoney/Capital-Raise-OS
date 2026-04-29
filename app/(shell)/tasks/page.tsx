@@ -7,7 +7,7 @@ import { TasksPanel } from "@/components/tasks-panel";
 import { redirect } from "next/navigation";
 
 export default async function TasksPage(props: {
-  searchParams: Promise<{ filter?: string }>;
+  searchParams: Promise<{ filter?: string; due?: string }>;
 }) {
   const ctx = await requireOrgSession();
   if (!ctx) redirect("/login");
@@ -22,40 +22,54 @@ export default async function TasksPage(props: {
   redirectInvestorGuestsFromRaiseTools(membership?.role);
   const canManage = membership != null && canEditOrgData(membership.role);
 
-  const rows = tasks.map((t) => ({
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const end = new Date();
+  end.setHours(23, 59, 59, 999);
+
+  let filtered = tasks;
+  if (view === "open" && sp.due === "today") {
+    filtered = tasks.filter(
+      (t) => t.dueAt != null && t.dueAt >= start.getTime() && t.dueAt <= end.getTime(),
+    );
+  } else if (view === "open" && sp.due === "overdue") {
+    filtered = tasks.filter((t) => t.dueAt != null && t.dueAt < start.getTime());
+  }
+
+  const rows = filtered.map((t) => ({
     id: t.id,
     title: t.title,
     dueAt: t.dueAt,
     status: t.status,
     linkedInvestorId: t.linkedInvestorId,
     isInvestorFollowUp: t.isInvestorFollowUp,
+    taskType: t.taskType,
+    taskPriority: t.taskPriority,
   }));
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="mx-auto max-w-3xl space-y-8">
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight">Tasks & automations</h1>
-        <p className="mt-1 text-foreground/85">
-          Follow-ups, meeting tasks, and scheduled playbooks powered by Cloud Functions.
+        <h1 className="font-heading text-3xl font-semibold tracking-tight md:text-4xl">Tasks</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Follow-ups, closing checklists, and workflow-generated actions across your raise.
         </p>
       </div>
 
       <TasksPanel tasks={rows} canManage={canManage} view={view} />
 
-      <Card className="border-border bg-card shadow-sm">
+      <Card className="rounded-2xl border-border/80 shadow-md">
         <CardHeader>
-          <CardTitle className="text-base">Scheduled automations</CardTitle>
+          <CardTitle className="font-heading text-base">Automations</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-2 font-sans text-sm text-muted-foreground">
+        <CardContent className="space-y-2 text-sm text-muted-foreground">
           <p>
-            <span className="font-medium text-foreground">Weekly fundraising digest</span> — when Firebase
-            Functions are deployed, the <code className="text-xs">weeklyFundraisingDigest</code> schedule
-            runs every Monday at 09:00 and queues a &quot;Weekly fundraising report&quot; task per
-            organization (see <code className="text-xs">functions/src/index.ts</code>).
+            Expressing interest on a deal creates a <strong>follow-up</strong> task due in three days for
+            the sponsor team. Additional workflow hooks can extend this pattern.
           </p>
           <p>
-            Local <code className="text-xs">next dev</code> does not execute Cloud Scheduler; deploy functions
-            to Firebase for that job to run in production.
+            Weekly digests and scheduler jobs run when Firebase Functions are deployed (see{" "}
+            <code className="text-xs">functions/src/index.ts</code>).
           </p>
         </CardContent>
       </Card>

@@ -1,4 +1,6 @@
 import { requireOrgSession } from "@/lib/auth/session";
+import { getOrganization } from "@/lib/firestore/queries";
+import { canUseAiCopilot, effectivePlan } from "@/lib/billing/features";
 import { getAnthropic } from "@/lib/ai/anthropic";
 import { checkRateLimit, rateLimitKey } from "@/lib/rate-limit";
 import { NextRequest } from "next/server";
@@ -9,6 +11,15 @@ export async function POST(req: NextRequest) {
   const ctx = await requireOrgSession();
   if (!ctx) {
     return new Response("Unauthorized", { status: 401 });
+  }
+
+  const org = await getOrganization(ctx.orgId);
+  const plan = effectivePlan(org?.subscription?.plan);
+  if (!canUseAiCopilot(plan)) {
+    return new Response(
+      "AI Copilot requires Pro, Growth, or Enterprise. Upgrade under Settings → Billing.",
+      { status: 402 },
+    );
   }
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "local";
   const rl = checkRateLimit(rateLimitKey(ip, "ai-chat"), 20, 60_000);

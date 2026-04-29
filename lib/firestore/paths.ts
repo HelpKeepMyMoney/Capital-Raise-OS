@@ -17,6 +17,7 @@ export const col = {
   subscriptions: "subscriptions",
   investorInvitations: "investor_invitations",
   dealCommitments: "deal_commitments",
+  signingRequests: "signing_requests",
 } as const;
 
 export function memberDocId(orgId: string, uid: string) {
@@ -25,6 +26,10 @@ export function memberDocId(orgId: string, uid: string) {
 
 export function dealCommitmentDocId(orgId: string, dealId: string, userId: string) {
   return `${orgId}__${dealId}__${userId}`;
+}
+
+export function signingRequestDocId(orgId: string, dealId: string, userId: string) {
+  return `${orgId}__${dealId}__${userId}__sign`;
 }
 
 export function investorNotesPath(orgId: string, investorId: string) {

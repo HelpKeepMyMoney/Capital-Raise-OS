@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { randomUUID } from "crypto";
+import { createHash, randomUUID } from "crypto";
 import { memberCanAccessDeal } from "@/lib/auth/investor-access";
 import { requireOrgSession } from "@/lib/auth/session";
 import { getAdminFirestore } from "@/lib/firebase/admin";
@@ -43,6 +43,25 @@ export async function POST(req: NextRequest) {
     action: "deal.express_interest",
     resource: `${col.deals}/${dealId}`,
   });
+
+  const sourceEventId = `express_interest:${ctx.orgId}:${dealId}:${ctx.user.uid}`;
+  const wfId = `wf_${createHash("sha256").update(sourceEventId).digest("hex")}`;
+  const tref = db.collection(col.tasks).doc(wfId);
+  const existing = await tref.get();
+  if (!existing.exists) {
+    await tref.set({
+      id: wfId,
+      organizationId: ctx.orgId,
+      title: `Follow up: interest in ${deal.name}`,
+      status: "open",
+      dueAt: now + 3 * 86400000,
+      linkedDealId: dealId,
+      taskType: "follow_up",
+      taskPriority: "medium",
+      sourceEventId,
+      createdAt: now,
+    });
+  }
 
   return NextResponse.json({ ok: true });
 }

@@ -4,56 +4,55 @@ AI-powered private capital platform: investor CRM, discovery, outreach, data roo
 
 ## Changelog since last commit
 
-Baseline: `c701d2b` (“Initial commit: CPIN Capital Raise OS…”). This update includes the following working-tree changes.
+Baseline: `534f38d` (“feat: CRM, deals, data room, tasks, invitations, RBAC, platform admin, branding”). This update bundles the following working-tree changes.
 
-### Branding and UX
+### Investor CRM (major UI refresh)
 
-- Product display name is **CPIN Capital Management System** (replaces “CPIN Capital Raise OS” and the former two-line sidebar title “CPIN Raise OS” / “Capital platform”).
-- Global styles and several **shadcn/ui** components (`button`, `card`, `input`, `badge`, `tabs`, `table`, `select`, `dropdown-menu`, **sidebar**) plus **theme provider** storage key were refined for the current theme.
-- Dashboard stat/funnel/outreach charts and related components were updated for readability and consistency.
+- Modular **`components/investors/`** (header, KPI metrics, toolbar, Kanban, table, relationship map with coverage/network/territory tabs, list and calendar views, sticky copilot, `/` command search).
+- **`components/investors-board.tsx`** now re-exports the orchestrator; **`lib/investors/investor-kpis.ts`**, **`investor-filters.ts`**, **`investor-toolbar-types.ts`**, and **`form-options`** (`pipelineStageShortLabel`) support filters, CSV export, and dashboard-aligned KPIs.
+- Investor **detail**: **`InvestorEditModal`** (tabbed edit), **`investor-profile-form-fields`** section mode (`part`), metric strip and heuristic AI insight card on **`investor-detail-client`**.
+- **`app/(shell)/investors/page.tsx`** — shell styling and tab query params (`board`, `table`, `map`, `list`, `calendar`).
 
-### Auth, roles, and access control
+### Dashboard and analytics
 
-- **`PLATFORM_ADMIN_UIDS`** (see `.env.example`) — comma-separated Firebase Auth UIDs for platform super-admins who can use **`/admin`** (`app/(platform-admin)/`).
-- Extended **RBAC**: `investor_guest` and related **investor access** scoping (`lib/auth/investor-access.ts`, `lib/auth/rbac.ts`), **guest route helpers** (`lib/auth/guest-routes.ts`), **platform admin** helpers (`lib/auth/platform-admin.ts`).
-- **Middleware** now also protects `/admin` and nested product paths (e.g. dynamic segments under `/deals`, `/investors`, `/tasks`).
-- **Sign-in / sign-up flows** and **auth API** (`register`, `session`) and **organization bootstrap** behavior were expanded to support the new roles and invitations story.
+- New dashboard building blocks: **`dashboard-header`**, **`dashboard-kpi-grid`**, **`metric-card`**, **`pipeline-chart`**, **`alert-bar`** / **`alert-strip`**, **`quick-actions`**, **`priority-tasks`**, **`loading.tsx`** for streaming UX.
+- **`app/(shell)/dashboard/page.tsx`**, **`analytics/page.tsx`**, and **`components/dashboard/*`** refactors for charts, activity feed, stat cards, funnel/outreach visuals.
 
-### Investor CRM and tasks
+### Shell, copilot, and navigation
 
-- **`app/actions/investors.ts`** — large expansion: CRUD, interactions, follow-ups, guest linking, archiving, and richer pipeline behavior.
-- **`components/investors-board.tsx`** — board/list UX overhaul; investor **detail** routes under `app/(shell)/investors/[id]/` with **`investor-detail-client`**, profile fields, outreach/invite panels.
-- **`app/api/tasks/`** and **`app/api/tasks/[id]/`**, **`components/tasks-panel.tsx`**, and shell **Tasks** page — org-scoped tasks API and UI (including follow-ups tied to investors).
+- **`shell-command-palette.tsx`** ( **`cmdk`** via **`components/ui/command.tsx`** ), **`copilot-ui-context.tsx`**, and updates to **`shell-layout-client`**, **`app-sidebar`**, **`copilot-panel`**, **`app/layout.tsx`**.
 
-### Deals and LP / guest flows
+### Deals, portal, and e-sign
 
-- Deals listing and **new deal** (`app/(shell)/deals/new/`, **`new-deal-form`**), **deal detail** (`app/(shell)/deals/[id]/`), commitments (**`deal-commitment-form`**), and **express interest** (`app/api/deals/express-interest/route.ts`, **`express-interest-button`**).
-- **`app/api/deals/`** and related routes for creating deals and recording **commitments**.
+- **`app/(shell)/deals/[id]/page.tsx`** and **`express-interest`** route updates; **`deal-guest-signing`** component.
+- **`app/(shell)/portal/`** LP portal routes.
+- **`app/api/esign/`**, **`app/api/webhooks/signwell/`**, and **`lib/esign/`** for SignWell-oriented flows.
 
-### Data room
+### Search and APIs
 
-- **Rooms and documents** HTTP APIs under `app/api/data-room/rooms/` and `app/api/data-room/documents/` (including per-document routes), plus **`data-room-client.tsx`** and an expanded **data room** shell page.
+- **`app/api/org-search/route.ts`** — org-scoped search endpoint.
 
-### Investor invitations
+### Billing and plans
 
-- **`app/api/invitations/`** — create invitations, **validate** and **redeem** token flows, Resend email copy (branded as CPIN Capital Management System).
-- **`app/invite/[token]/`** — accept-invite UX (`invite-client`).
-- **`components/invite-investor-panel.tsx`** and **`lib/invitations/`** helpers.
+- **`lib/billing/features.ts`** and **`billing-client.tsx`** / **`lib/billing/plans.ts`** updates aligned with plan tiers.
 
-### Billing
+### Data layer and actions
 
-- Settings billing page refactored with **`billing-client.tsx`**; PayPal subscription route uses **`brand_name: "CPIN Capital Management System"`**.
+- **`lib/firestore/queries.ts`**, **`types.ts`**, **`paths.ts`** — expanded reads/helpers (e.g. dashboard aggregates, analytics helpers).
+- **`lib/dashboard/`** — pipeline and funnel helpers used by dashboard/analytics surfaces.
+- **`app/actions/investors.ts`** — incremental server-action additions tied to CRM behavior.
 
-### Firebase and data model
+### Auth and middleware
 
-- **`lib/firestore/types.ts`** — richer **Investor**, **Task**, **Deal**, **DataRoom**, **RoomDocument**, **InvestorInvitation**, **DealCommitment**, roles, pipeline stages, CRM status, etc.
-- **`lib/firestore/queries.ts`**, **`paths.ts`**, **`lib/investors/`** — extended queries and helpers.
-- **`firestore.rules`** and **`firestore.indexes.json`** — updated for new collections and access patterns.
+- **`lib/auth/guest-routes.ts`** and **`middleware.ts`** — path/guest routing tweaks.
 
-### Other
+### Styling and assets
 
-- **Discovery** merge/rank tweaks; **marketing** / **login** copy; **DEPLOYMENT.md** title; **`scripts/seed-demo.ts`** adjustments.
-- **`lib/firebase/client.ts`** minor updates.
+- **`app/globals.css`**, marketing and shell touches; **`public/cpin-logo.jpg`** branding asset.
+
+### Dependencies
+
+- **`package.json`** / **`package-lock.json`** — adds **`cmdk`** (command palette) and related lockfile updates.
 
 The npm **`package.json` `name`** remains `capital-raise-os` (internal package identifier).
 

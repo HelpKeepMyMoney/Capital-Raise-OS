@@ -22,6 +22,7 @@ import {
   updateInvestorTimelineActivity,
 } from "@/app/actions/investors";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
@@ -39,12 +40,13 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { investorDisplayName, investorNamePartsForForm } from "@/lib/investors/display-name";
 import { PIPELINE_STAGES, pipelineStageLabel } from "@/lib/investors/form-options";
-import { InvestorProfileFormFields } from "@/components/investor-profile-form-fields";
+import type { OrganizationMemberPublic } from "@/lib/firestore/queries";
+import { investorSegmentLabel } from "@/lib/investors/crm-labels";
+import { InvestorEditModal } from "@/components/investors/InvestorEditModal";
 import { Pencil, Trash2 } from "lucide-react";
 
 const INTERACTION_TYPES: InvestorInteractionType[] = [
@@ -71,6 +73,8 @@ export function InvestorDetailClient(props: {
   investor: Investor;
   activities: Activity[];
   canManage: boolean;
+  members: OrganizationMemberPublic[];
+  deals: { id: string; name: string }[];
 }) {
   const router = useRouter();
   const [inv, setInv] = React.useState(props.investor);
@@ -114,6 +118,17 @@ export function InvestorDetailClient(props: {
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   });
 
+  const [investProbability, setInvestProbability] = React.useState(
+    inv.investProbability != null ? String(inv.investProbability) : "",
+  );
+  const [referralSource, setReferralSource] = React.useState(inv.referralSource ?? "");
+  const [relationshipOwnerUserId, setRelationshipOwnerUserId] = React.useState(
+    inv.relationshipOwnerUserId ?? "",
+  );
+  const [interestDealIds, setInterestDealIds] = React.useState<Set<string>>(
+    () => new Set(inv.interestedDealIds ?? []),
+  );
+
   React.useEffect(() => {
     if (!editOpen) return;
     const p = investorNamePartsForForm(inv);
@@ -141,6 +156,10 @@ export function InvestorDetailClient(props: {
         `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`,
       );
     }
+    setInvestProbability(inv.investProbability != null ? String(inv.investProbability) : "");
+    setReferralSource(inv.referralSource ?? "");
+    setRelationshipOwnerUserId(inv.relationshipOwnerUserId ?? "");
+    setInterestDealIds(new Set(inv.interestedDealIds ?? []));
   }, [editOpen, inv]);
 
   const [interactionType, setInteractionType] = React.useState<InvestorInteractionType>("note");
@@ -177,6 +196,10 @@ export function InvestorDetailClient(props: {
       checkSizeMax?: number | null;
       committedAmount?: number | null;
       nextFollowUpAt?: number | null;
+      investProbability?: number | null;
+      referralSource?: string | null;
+      interestedDealIds?: string[] | null;
+      relationshipOwnerUserId?: string | null;
     } = {
       firstName: fn,
       lastName: lastName.trim() || null,
@@ -240,6 +263,19 @@ export function InvestorDetailClient(props: {
       }
       patch.nextFollowUpAt = t;
     } else patch.nextFollowUpAt = null;
+
+    const ip = investProbability.trim();
+    if (ip) {
+      const v = Number(ip);
+      if (!Number.isFinite(v) || v < 0 || v > 100) {
+        toast.error("Close probability must be 0–100");
+        return;
+      }
+      patch.investProbability = v;
+    } else patch.investProbability = null;
+    patch.referralSource = referralSource.trim() || null;
+    patch.relationshipOwnerUserId = relationshipOwnerUserId.trim() || null;
+    patch.interestedDealIds = interestDealIds.size > 0 ? Array.from(interestDealIds) : null;
 
     setSaving(true);
     try {
@@ -364,8 +400,17 @@ export function InvestorDetailClient(props: {
     }
   }
 
+  const idleDaysSinceTouch =
+    inv.lastContactAt != null
+      ? Math.max(0, Math.round((Date.now() - inv.lastContactAt) / 86400000))
+      : null;
+  const aiLikelyPct = Math.min(
+    98,
+    Math.round((inv.investProbability ?? 45) * 0.55 + (inv.relationshipScore ?? 45) * 0.45),
+  );
+
   return (
-    <div className="mx-auto max-w-3xl space-y-8">
+    <div className="mx-auto max-w-[1440px] space-y-8 px-3 pb-16 md:px-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <Link
@@ -392,69 +437,107 @@ export function InvestorDetailClient(props: {
               </Badge>
             ) : null}
           </div>
+          <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="rounded-xl border border-border/70 bg-muted/20 px-3 py-3 shadow-inner">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Relationship score
+              </p>
+              <p className="mt-1 font-mono text-xl tabular-nums font-semibold">
+                {inv.relationshipScore ?? "—"}
+              </p>
+            </div>
+            <div className="rounded-xl border border-border/70 bg-muted/20 px-3 py-3 shadow-inner">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Probability to close
+              </p>
+              <p className="mt-1 font-mono text-xl tabular-nums font-semibold">
+                {inv.investProbability != null ? `${inv.investProbability}%` : "—"}
+              </p>
+            </div>
+            <div className="rounded-xl border border-border/70 bg-muted/20 px-3 py-3 shadow-inner">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Est. check size
+              </p>
+              <p className="mt-1 text-sm font-semibold leading-snug">
+                {inv.checkSizeMin != null && inv.checkSizeMax != null
+                  ? `$${Math.round(inv.checkSizeMin / 1000)}K – $${(inv.checkSizeMax / 1_000_000).toFixed(1)}M`
+                  : "—"}
+              </p>
+            </div>
+            <div className="rounded-xl border border-border/70 bg-muted/20 px-3 py-3 shadow-inner">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Committed
+              </p>
+              <p className="mt-1 font-mono text-xl tabular-nums font-semibold">
+                {inv.committedAmount != null ? `$${inv.committedAmount.toLocaleString()}` : "—"}
+              </p>
+            </div>
+          </div>
         </div>
         {props.canManage ? (
           <div className="flex flex-wrap gap-2">
-            <Dialog open={editOpen} onOpenChange={setEditOpen}>
-              <DialogTrigger
-                className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-              >
-                Edit profile
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto" showCloseButton>
-                <DialogHeader>
-                  <DialogTitle>Edit investor</DialogTitle>
-                </DialogHeader>
-                <InvestorProfileFormFields
-                  idPrefix="inv-edit"
-                  showPipelineStage={false}
-                  pipelineStage={inv.pipelineStage}
-                  onPipelineStageChange={() => {}}
-                  firstName={firstName}
-                  onFirstNameChange={setFirstName}
-                  lastName={lastName}
-                  onLastNameChange={setLastName}
-                  firm={firm}
-                  onFirmChange={setFirm}
-                  title={title}
-                  onTitleChange={setTitle}
-                  email={email}
-                  onEmailChange={setEmail}
-                  phone={phone}
-                  onPhoneChange={setPhone}
-                  location={location}
-                  onLocationChange={setLocation}
-                  website={website}
-                  onWebsiteChange={setWebsite}
-                  linkedIn={linkedIn}
-                  onLinkedInChange={setLinkedIn}
-                  investorType={investorType}
-                  onInvestorTypeChange={setInvestorType}
-                  warmCold={warmCold}
-                  onWarmColdChange={setWarmCold}
-                  checkMin={checkMin}
-                  onCheckMinChange={setCheckMin}
-                  checkMax={checkMax}
-                  onCheckMaxChange={setCheckMax}
-                  relationshipScore={relationshipScore}
-                  onRelationshipScoreChange={setRelationshipScore}
-                  committedAmount={committedAmount}
-                  onCommittedAmountChange={setCommittedAmount}
-                  nextFollowUpAt={nextFollowUpAt}
-                  onNextFollowUpChange={setNextFollowUpAt}
-                  notesSummary={notesSummary}
-                  onNotesSummaryChange={setNotesSummary}
-                />
-                <DialogFooter className="border-0 bg-transparent p-0 sm:justify-end">
-                  <Button type="button" variant="outline" onClick={() => setEditOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button type="button" disabled={saving} onClick={() => void submitEdit()}>
-                    {saving ? "Saving…" : "Save"}
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+            <Button
+              variant="outline"
+              size="sm"
+              type="button"
+              onClick={() => setEditOpen(true)}
+            >
+              Edit profile
+            </Button>
+            <InvestorEditModal
+              open={editOpen}
+              onOpenChange={setEditOpen}
+              saving={saving}
+              onSubmit={() => void submitEdit()}
+              idPrefix="inv-edit"
+              showPipelineStage={false}
+              pipelineStage={inv.pipelineStage}
+              onPipelineStageChange={() => {}}
+              firstName={firstName}
+              onFirstNameChange={setFirstName}
+              lastName={lastName}
+              onLastNameChange={setLastName}
+              firm={firm}
+              onFirmChange={setFirm}
+              title={title}
+              onTitleChange={setTitle}
+              email={email}
+              onEmailChange={setEmail}
+              phone={phone}
+              onPhoneChange={setPhone}
+              location={location}
+              onLocationChange={setLocation}
+              website={website}
+              onWebsiteChange={setWebsite}
+              linkedIn={linkedIn}
+              onLinkedInChange={setLinkedIn}
+              investorType={investorType}
+              onInvestorTypeChange={setInvestorType}
+              warmCold={warmCold}
+              onWarmColdChange={setWarmCold}
+              checkMin={checkMin}
+              onCheckMinChange={setCheckMin}
+              checkMax={checkMax}
+              onCheckMaxChange={setCheckMax}
+              relationshipScore={relationshipScore}
+              onRelationshipScoreChange={setRelationshipScore}
+              committedAmount={committedAmount}
+              onCommittedAmountChange={setCommittedAmount}
+              nextFollowUpAt={nextFollowUpAt}
+              onNextFollowUpChange={setNextFollowUpAt}
+              notesSummary={notesSummary}
+              onNotesSummaryChange={setNotesSummary}
+              investProbability={investProbability}
+              onInvestProbabilityChange={setInvestProbability}
+              referralSource={referralSource}
+              onReferralSourceChange={setReferralSource}
+              relationshipOwnerUserId={relationshipOwnerUserId}
+              onRelationshipOwnerUserIdChange={setRelationshipOwnerUserId}
+              deals={props.deals}
+              members={props.members}
+              interestDealIds={interestDealIds}
+              onInterestDealIdsChange={setInterestDealIds}
+            />
             <Button
               variant="outline"
               size="sm"
@@ -490,6 +573,76 @@ export function InvestorDetailClient(props: {
               ))}
             </SelectContent>
           </Select>
+        </CardContent>
+      </Card>
+
+      <Card className="rounded-2xl border-border/80 bg-gradient-to-br from-card to-muted/15 shadow-md">
+        <CardHeader>
+          <CardTitle className="font-heading text-base">Relationship intelligence</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm">
+          <p>
+            <span className="text-muted-foreground">Segment:</span>{" "}
+            <span className="font-medium">{investorSegmentLabel(inv)}</span>
+          </p>
+          {inv.investProbability != null ? (
+            <p>
+              <span className="text-muted-foreground">P(close):</span> {inv.investProbability}%
+            </p>
+          ) : null}
+          {inv.referralSource ? (
+            <p>
+              <span className="text-muted-foreground">Referral:</span> {inv.referralSource}
+            </p>
+          ) : null}
+          {inv.relationshipOwnerUserId ? (
+            <p>
+              <span className="text-muted-foreground">Owner:</span>{" "}
+              {props.members.find((m) => m.userId === inv.relationshipOwnerUserId)?.displayName ??
+                props.members.find((m) => m.userId === inv.relationshipOwnerUserId)?.email ??
+                inv.relationshipOwnerUserId}
+            </p>
+          ) : (
+            <p className="text-muted-foreground">Owner unassigned</p>
+          )}
+          {inv.interestedDealIds?.length ? (
+            <div>
+              <span className="text-muted-foreground">Interested deals:</span>
+              <ul className="mt-1 list-inside list-disc">
+                {inv.interestedDealIds.map((id) => (
+                  <li key={id}>
+                    {props.deals.find((d) => d.id === id)?.name ?? id}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
+
+      <Card className="rounded-2xl border border-emerald-500/15 bg-gradient-to-br from-emerald-500/5 to-card shadow-md">
+        <CardHeader>
+          <CardTitle className="text-base font-heading">AI insight</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm leading-relaxed">
+          <p>
+            <span className="text-muted-foreground">Likely to invest:</span>{" "}
+            <span className="font-semibold text-emerald-700 dark:text-emerald-400">{aiLikelyPct}%</span>
+          </p>
+          <p>
+            <span className="text-muted-foreground">Recommended next action:</span>{" "}
+            {idleDaysSinceTouch != null && idleDaysSinceTouch >= 14
+              ? "Re-establish cadence — last touch over two weeks ago."
+              : inv.nextFollowUpAt
+                ? "Prepare for scheduled follow-up."
+                : "Send a concise update tied to pipeline momentum."}
+          </p>
+          <p className="text-amber-800 dark:text-amber-400">
+            <span className="font-medium">Risk:</span>{" "}
+            {idleDaysSinceTouch != null
+              ? `Last logged touch ${idleDaysSinceTouch} days ago.`
+              : "No logged touchpoint yet — capture interactions on the timeline."}
+          </p>
         </CardContent>
       </Card>
 

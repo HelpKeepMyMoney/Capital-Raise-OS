@@ -21,6 +21,8 @@ export default async function ShellLayout({ children }: { children: React.ReactN
     <ShellLayoutClient
       orgs={orgs}
       currentOrgId={orgId}
+      currentOrgName={currentOrg?.org.name ?? ""}
+      subscriptionPlan={currentOrg?.org.subscription?.plan}
       currentRole={currentRole}
       user={{ email: user.email, name: user.name }}
       isPlatformAdmin={isPlatformAdmin(user)}

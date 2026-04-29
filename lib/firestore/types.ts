@@ -156,6 +156,8 @@ export type DealCommitment = {
   amount: number;
   currency: string;
   status: DealCommitmentStatus;
+  /** Subscription / closing docs outstanding when set. */
+  docStatus?: "pending" | "complete" | "none";
   createdAt: number;
   updatedAt: number;
 };
@@ -204,9 +206,25 @@ export type Investor = {
   archivedAt?: number;
   /** Guest user UID when this CRM row is linked to an invited investor. */
   linkedUserId?: string;
+  /** 0–100 rough close probability for weighted views. */
+  investProbability?: number;
+  referralSource?: string;
+  interestedDealIds?: string[];
+  relationshipOwnerUserId?: string;
   createdAt: number;
   updatedAt: number;
 };
+
+export type TaskType =
+  | "follow_up"
+  | "call_investor"
+  | "send_docs"
+  | "review_commitment"
+  | "prepare_closing"
+  | "update_room"
+  | "other";
+
+export type TaskPriority = "low" | "medium" | "high" | "urgent";
 
 export type Task = {
   id: string;
@@ -219,6 +237,10 @@ export type Task = {
   linkedDealId?: string;
   /** Created when an investor profile sets Next follow-up. */
   isInvestorFollowUp?: boolean;
+  taskType?: TaskType;
+  taskPriority?: TaskPriority;
+  /** Idempotency for workflow-generated tasks. */
+  sourceEventId?: string;
   createdAt: number;
 };
 
@@ -294,7 +316,34 @@ export type Deal = {
   useOfProceeds?: string;
   closeDate?: number;
   status: DealStatus;
+  executiveSummary?: string;
+  sponsorProfile?: string;
+  returnsModel?: string;
+  faqs?: { q: string; a: string }[];
+  investorUpdates?: { title: string; body: string; createdAt: number }[];
+  calendarBookingUrl?: string;
   createdAt: number;
+};
+
+export type SigningRequestStatus =
+  | "draft"
+  | "sent"
+  | "viewed"
+  | "completed"
+  | "declined"
+  | "error";
+
+export type SigningRequest = {
+  id: string;
+  organizationId: string;
+  dealId: string;
+  userId: string;
+  signwellDocumentId?: string;
+  status: SigningRequestStatus;
+  lastEventAt?: number;
+  signingUrl?: string;
+  createdAt: number;
+  updatedAt: number;
 };
 
 export type DataRoom = {
