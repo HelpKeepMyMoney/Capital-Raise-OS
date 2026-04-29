@@ -1,78 +1,89 @@
 import { redirectInvestorGuestsFromRaiseTools } from "@/lib/auth/guest-routes";
 import { canEditOrgData } from "@/lib/auth/rbac";
 import { requireOrgSession } from "@/lib/auth/session";
-import { getMembership, listClosedTasks, listOpenTasks } from "@/lib/firestore/queries";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { TasksPanel } from "@/components/tasks-panel";
+import {
+  getMembership,
+  listClosedTasks,
+  listDataRoomsForOrganization,
+  listDeals,
+  listInvestors,
+  listOpenTasks,
+  listOrganizationMembers,
+  listUpcomingMeetings,
+} from "@/lib/firestore/queries";
+import { TasksWorkflowClient } from "@/components/tasks/tasks-workflow-client";
 import { redirect } from "next/navigation";
+import { computeTaskMetrics } from "@/lib/tasks/metrics";
+import { buildSmartSuggestions } from "@/lib/tasks/smart-suggestions";
 
-export default async function TasksPage(props: {
-  searchParams: Promise<{ filter?: string; due?: string }>;
-}) {
+export default async function TasksPage() {
   const ctx = await requireOrgSession();
   if (!ctx) redirect("/login");
 
-  const sp = await props.searchParams;
-  const view = sp.filter === "closed" ? "closed" : "open";
-
-  const [tasks, membership] = await Promise.all([
-    view === "closed" ? listClosedTasks(ctx.orgId) : listOpenTasks(ctx.orgId),
+  const [
+    openTasks,
+    closedTasks,
+    membership,
+    members,
+    deals,
+    investors,
+    dataRooms,
+    meetings,
+  ] = await Promise.all([
+    listOpenTasks(ctx.orgId),
+    listClosedTasks(ctx.orgId),
     getMembership(ctx.orgId, ctx.user.uid),
+    listOrganizationMembers(ctx.orgId),
+    listDeals(ctx.orgId),
+    listInvestors(ctx.orgId, { limit: 400 }),
+    listDataRoomsForOrganization(ctx.orgId),
+    listUpcomingMeetings(ctx.orgId, undefined, 40),
   ]);
+
   redirectInvestorGuestsFromRaiseTools(membership?.role);
   const canManage = membership != null && canEditOrgData(membership.role);
 
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
-  const end = new Date();
-  end.setHours(23, 59, 59, 999);
+  const metrics = computeTaskMetrics(openTasks, closedTasks);
+  const suggestions = buildSmartSuggestions({
+    tasks: [...openTasks, ...closedTasks],
+    investors,
+    meetings,
+  });
 
-  let filtered = tasks;
-  if (view === "open" && sp.due === "today") {
-    filtered = tasks.filter(
-      (t) => t.dueAt != null && t.dueAt >= start.getTime() && t.dueAt <= end.getTime(),
-    );
-  } else if (view === "open" && sp.due === "overdue") {
-    filtered = tasks.filter((t) => t.dueAt != null && t.dueAt < start.getTime());
-  }
+  const metricsCapped = openTasks.length >= 80 || closedTasks.length >= 80;
 
-  const rows = filtered.map((t) => ({
-    id: t.id,
-    title: t.title,
-    dueAt: t.dueAt,
-    status: t.status,
-    linkedInvestorId: t.linkedInvestorId,
-    isInvestorFollowUp: t.isInvestorFollowUp,
-    taskType: t.taskType,
-    taskPriority: t.taskPriority,
+  const investorOptions = investors.map((inv) => ({
+    id: inv.id,
+    name:
+      inv.name?.trim() ||
+      [inv.firstName, inv.lastName].filter(Boolean).join(" ") ||
+      "Investor",
+  }));
+
+  const dealOptions = deals.map((d) => ({
+    id: d.id,
+    name: d.name || "Deal",
+  }));
+
+  const dataRoomOptions = dataRooms.filter((r) => !r.archived).map((r) => ({
+    id: r.id,
+    name: r.name || "Data room",
   }));
 
   return (
-    <div className="mx-auto max-w-3xl space-y-8">
-      <div>
-        <h1 className="font-heading text-3xl font-semibold tracking-tight md:text-4xl">Tasks</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Follow-ups, closing checklists, and workflow-generated actions across your raise.
-        </p>
-      </div>
-
-      <TasksPanel tasks={rows} canManage={canManage} view={view} />
-
-      <Card className="rounded-2xl border-border/80 shadow-md">
-        <CardHeader>
-          <CardTitle className="font-heading text-base">Automations</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 text-sm text-muted-foreground">
-          <p>
-            Expressing interest on a deal creates a <strong>follow-up</strong> task due in three days for
-            the sponsor team. Additional workflow hooks can extend this pattern.
-          </p>
-          <p>
-            Weekly digests and scheduler jobs run when Firebase Functions are deployed (see{" "}
-            <code className="text-xs">functions/src/index.ts</code>).
-          </p>
-        </CardContent>
-      </Card>
-    </div>
+    <TasksWorkflowClient
+      openTasks={openTasks}
+      closedTasks={closedTasks}
+      members={members}
+      investorOptions={investorOptions}
+      dealOptions={dealOptions}
+      dataRoomOptions={dataRoomOptions}
+      meetings={meetings}
+      suggestions={suggestions}
+      metrics={metrics}
+      metricsCapped={metricsCapped}
+      currentUserId={ctx.user.uid}
+      canManage={canManage}
+    />
   );
 }

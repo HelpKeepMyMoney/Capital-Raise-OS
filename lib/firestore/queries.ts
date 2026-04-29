@@ -160,12 +160,14 @@ export async function listRecentActivities(orgId: string, limit = 20): Promise<A
   return mapDocs(snap, (data, id) => ({ id, ...(data as Omit<Activity, "id">) }));
 }
 
-export async function listUpcomingMeetings(orgId: string, from: number, limit = 20): Promise<Meeting[]> {
+/** `from` defaults to request-time epoch ms (call from server handlers / queries; avoids Date.now in React renders). */
+export async function listUpcomingMeetings(orgId: string, from?: number, limit = 20): Promise<Meeting[]> {
   const db = getAdminFirestore();
+  const fromTs = typeof from === "number" ? from : Date.now();
   const snap = await db
     .collection(col.meetings)
     .where("organizationId", "==", orgId)
-    .where("startsAt", ">=", from)
+    .where("startsAt", ">=", fromTs)
     .orderBy("startsAt", "asc")
     .limit(limit)
     .get();
@@ -244,6 +246,16 @@ export async function listDeals(orgId: string): Promise<Deal[]> {
     .limit(100)
     .get();
   return mapDocs(snap, (data, id) => ({ id, ...(data as Omit<Deal, "id">) }));
+}
+
+export async function listDataRoomsForOrganization(orgId: string, limit = 80): Promise<DataRoom[]> {
+  const db = getAdminFirestore();
+  const snap = await db
+    .collection(col.dataRooms)
+    .where("organizationId", "==", orgId)
+    .limit(limit)
+    .get();
+  return mapDocs(snap, (data, id) => ({ id, ...(data as Omit<DataRoom, "id">) }));
 }
 
 export async function getDeal(orgId: string, dealId: string): Promise<Deal | null> {

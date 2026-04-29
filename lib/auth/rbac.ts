@@ -38,6 +38,27 @@ export function canManageUsers(role: UserRole) {
   return rank[role] >= rank.admin;
 }
 
+/** Org display name / slug in Settings (founder + admin only). */
+export function canEditOrganizationProfile(role: UserRole): boolean {
+  return rank[role] >= rank.founder;
+}
+
+/** Membership role string → same check as `canEditOrganizationProfile`. */
+export function canEditOrganizationProfileRole(roleStr: string): boolean {
+  const r = parseOrgRole(roleStr);
+  return r != null && canEditOrganizationProfile(r);
+}
+
+/** Permanently delete the workspace (Settings UI + API). Founder or org admin only. */
+export function canDeleteOrganization(role: UserRole): boolean {
+  return rank[role] >= rank.founder;
+}
+
+export function canDeleteOrganizationRole(roleStr: string): boolean {
+  const r = parseOrgRole(roleStr);
+  return r != null && canDeleteOrganization(r);
+}
+
 export function canEditInvestors(role: UserRole) {
   return role !== "investor_guest";
 }

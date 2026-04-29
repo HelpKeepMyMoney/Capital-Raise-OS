@@ -1,11 +1,15 @@
 import { redirectInvestorGuestsFromRaiseTools } from "@/lib/auth/guest-routes";
+import {
+  canDeleteOrganizationRole,
+  canEditOrganizationProfileRole,
+} from "@/lib/auth/rbac";
 import { requireOrgSession } from "@/lib/auth/session";
-import { getOrganization, getMembership } from "@/lib/firestore/queries";
+import { DeleteOrganizationSection } from "@/components/settings/delete-organization-section";
+import { OrganizationSettingsForm } from "@/components/settings/organization-settings-form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { getMembership, getOrganization } from "@/lib/firestore/queries";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -15,6 +19,8 @@ export default async function SettingsPage() {
   const membership = await getMembership(ctx.orgId, ctx.user.uid);
   redirectInvestorGuestsFromRaiseTools(membership?.role);
   const org = await getOrganization(ctx.orgId);
+  const canEditOrg = membership ? canEditOrganizationProfileRole(membership.role) : false;
+  const canDeleteOrg = membership ? canDeleteOrganizationRole(membership.role) : false;
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -27,20 +33,27 @@ export default async function SettingsPage() {
           <CardTitle>Organization</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label>Name</Label>
-            <Input defaultValue={org?.name} readOnly />
-          </div>
-          <div className="space-y-2">
-            <Label>Slug</Label>
-            <Input defaultValue={org?.slug} readOnly />
-          </div>
+          {org ? (
+            <OrganizationSettingsForm
+              organizationId={org.id}
+              initialName={org.name}
+              initialSlug={org.slug}
+              canEdit={canEditOrg}
+            />
+          ) : null}
           <Link
             href="/settings/billing"
             className={cn(buttonVariants({ size: "sm" }), "inline-flex")}
           >
             Billing & subscriptions
           </Link>
+          {org ? (
+            <DeleteOrganizationSection
+              organizationId={org.id}
+              organizationName={org.name}
+              canDelete={canDeleteOrg}
+            />
+          ) : null}
         </CardContent>
       </Card>
       <Card className="border-border bg-card shadow-sm">

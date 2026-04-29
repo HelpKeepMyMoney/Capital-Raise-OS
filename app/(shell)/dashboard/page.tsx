@@ -61,12 +61,7 @@ export default async function DashboardPage() {
     listRecentActivities(ctx.orgId, 14),
     listTasksDueToday(ctx.orgId, start.getTime(), end.getTime()),
     listOpenTasks(ctx.orgId, 120),
-    listUpcomingMeetings(
-      ctx.orgId,
-      // eslint-disable-next-line react-hooks/purity -- async Server Component: clock at request time
-      Date.now(),
-      20,
-    ),
+    listUpcomingMeetings(ctx.orgId),
     listDeals(ctx.orgId),
     weeklyOutreachStats(ctx.orgId),
     listDealCommitmentsForOrganization(ctx.orgId),

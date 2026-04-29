@@ -164,7 +164,7 @@ function SortHead(props: {
       <button
         type="button"
         className={cn(
-          "-ml-1 inline-flex items-center gap-1 rounded-md px-1 py-0.5 text-left text-xs font-semibold hover:bg-muted/80",
+          "inline-flex w-full min-w-max items-center justify-start gap-1 whitespace-nowrap rounded-md px-1 py-0.5 text-left text-xs font-semibold hover:bg-muted/80",
           active ? "text-foreground" : "text-muted-foreground",
         )}
         onClick={() => props.onSort(props.column)}
@@ -271,7 +271,7 @@ export function InvestorTable(props: {
                   sortKey={sortKey}
                   sortDir={sortDir}
                   onSort={toggleSort}
-                  className="min-w-[120px]"
+                  className="min-w-[132px] bg-card ps-4"
                 />
                 <SortHead
                   label="Stage"

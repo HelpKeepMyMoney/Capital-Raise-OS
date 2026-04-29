@@ -4,14 +4,7 @@ import { getSessionUser } from "@/lib/auth/session";
 import { getAdminAuth, getAdminFirestore } from "@/lib/firebase/admin";
 import { col, memberDocId } from "@/lib/firestore/paths";
 import { listUserOrganizations } from "@/lib/firestore/queries";
-
-function slugify(s: string) {
-  return s
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "")
-    .slice(0, 48);
-}
+import { slugify } from "@/lib/organizations/slug";
 
 export async function POST(req: NextRequest) {
   try {

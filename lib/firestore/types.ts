@@ -226,6 +226,13 @@ export type TaskType =
 
 export type TaskPriority = "low" | "medium" | "high" | "urgent";
 
+/** Workflow column while status is open (completed column maps to status done). */
+export type TaskWorkflowStatus =
+  | "not_started"
+  | "in_progress"
+  | "waiting"
+  | "blocked";
+
 export type Task = {
   id: string;
   organizationId: string;
@@ -235,12 +242,34 @@ export type Task = {
   status: "open" | "done" | "cancelled";
   linkedInvestorId?: string;
   linkedDealId?: string;
+  linkedDataRoomId?: string;
   /** Created when an investor profile sets Next follow-up. */
   isInvestorFollowUp?: boolean;
   taskType?: TaskType;
   taskPriority?: TaskPriority;
+  workflowStatus?: TaskWorkflowStatus;
+  description?: string;
+  notes?: string;
+  /** User who created the task (when known). */
+  createdByUserId?: string;
+  updatedAt?: number;
+  /** Set when status transitions to done (best-effort). */
+  completedAt?: number;
+  snoozedUntil?: number;
+  reminderAt?: number;
+  /** Cron-style hint only; execution not guaranteed in v1. */
+  repeatSchedule?: string;
   /** Idempotency for workflow-generated tasks. */
   sourceEventId?: string;
+  createdAt: number;
+};
+
+export type TaskComment = {
+  id: string;
+  taskId: string;
+  organizationId: string;
+  authorId: string;
+  body: string;
   createdAt: number;
 };
 

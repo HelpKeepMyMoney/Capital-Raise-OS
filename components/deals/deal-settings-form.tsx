@@ -498,7 +498,7 @@ export function DealSettingsForm(props: {
             <Label className="text-xs text-muted-foreground">Link an existing room</Label>
             <Select
               value={roomLinkPick}
-              onValueChange={setRoomLinkPick}
+              onValueChange={(v) => setRoomLinkPick(v ?? ROOM_LINK_NONE)}
               disabled={roomLinkPending || linkableRooms.length === 0}
             >
               <SelectTrigger className="rounded-xl w-full sm:min-w-[12rem]">

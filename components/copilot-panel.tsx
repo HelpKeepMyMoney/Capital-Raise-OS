@@ -42,6 +42,39 @@ const DEAL_QUICK_ACTIONS = [
   },
 ];
 
+const TASKS_QUICK_ACTIONS = [
+  {
+    label: "What needs attention today?",
+    prompt:
+      "I'm on the Tasks page in CPIN (private capital OS). Given typical fundraising execution work, list concrete priorities for today: follow-ups, overdue items, closing tasks, and investor touches — ordered by impact.",
+  },
+  {
+    label: "Warm leads without follow up?",
+    prompt:
+      "Explain how I'd identify warm investor leads in CPIN who lack a timely follow-up task, using CRM stages, last contact, and data room engagement — then suggest three outreach angles.",
+  },
+  {
+    label: "Top 5 priorities",
+    prompt:
+      "Build my top 5 priorities for closing capital this week as a sponsor: mix of investor meetings, docs, diligence, and pipeline hygiene — bullet format.",
+  },
+  {
+    label: "Summarize overdue risks",
+    prompt:
+      "Summarize risks when fundraising tasks slip (overdue follow-ups, unsigned docs, stalled diligence). What should operators watch for and fix first?",
+  },
+  {
+    label: "Next week action plan",
+    prompt:
+      "Draft a one-week action plan for an active private raise: outreach cadence, internal checkpoints, and LP communications.",
+  },
+  {
+    label: "Closing checklist",
+    prompt:
+      "Generate a practical closing checklist for a private placement (subscription docs, wires, signatures, regulatory reminders) suitable for my Tasks board.",
+  },
+];
+
 const QUICK_ACTIONS = [
   {
     label: "What needs attention today?",
@@ -79,6 +112,9 @@ export function CopilotPanel(props: {
   const quickActions = React.useMemo(() => {
     if (/^\/deals\/[^/]+$/.test(pathname)) {
       return [...DEAL_QUICK_ACTIONS, ...QUICK_ACTIONS];
+    }
+    if (pathname === "/tasks" || pathname.startsWith("/tasks/")) {
+      return TASKS_QUICK_ACTIONS;
     }
     return QUICK_ACTIONS;
   }, [pathname]);

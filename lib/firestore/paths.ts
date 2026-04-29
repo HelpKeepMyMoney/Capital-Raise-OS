@@ -35,3 +35,6 @@ export function signingRequestDocId(orgId: string, dealId: string, userId: strin
 export function investorNotesPath(orgId: string, investorId: string) {
   return `${col.investors}/${investorId}/notes`;
 }
+
+/** Subcollection under each task document. */
+export const taskCommentsSubcollection = "comments" as const;

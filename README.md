@@ -4,6 +4,17 @@ AI-powered private capital platform: investor CRM, discovery, outreach, data roo
 
 ## Changelog
 
+### Tasks Workflow Center, organization lifecycle, investor CRM polish
+
+- **Tasks (`/tasks`):** Replaced the legacy **`tasks-panel`** with **`TasksWorkflowClient`** and **`components/tasks/*`** — header, metrics, toolbar (filters / list · Kanban · calendar · by owner), **`task-list`** / **`task-row`**, **`task-board`** (@dnd-kit), **`task-calendar`**, **`task-owner-board`**, **`task-drawer`**, **`new-task-modal`**, **`automation-center`**, **`smart-suggestions`**, **`task-insights`**, loading skeleton **`app/(shell)/tasks/loading.tsx`**. **`lib/tasks/*`** holds Kanban buckets, metrics, suggestion heuristics, and labels.
+- **Tasks API & data:** Extended **`Task`** in **`lib/firestore/types.ts`**; **`GET` / `POST` `app/api/tasks/route.ts`** and **`PATCH` `app/api/tasks/[id]/route.ts`** with richer fields; **`GET`/`POST` `app/api/tasks/[id]/comments/route.ts`** for Firestore **`tasks/{id}/comments`**; **`firestore.rules`** allow the comments subcollection for org members.
+- **Copilot:** **`copilot-panel.tsx`** adds **`TASKS_QUICK_ACTIONS`** when the route is **`/tasks`**.
+- **Dashboard:** **`listUpcomingMeetings`** usage avoids **`Date.now()`** in render for lint purity (**`app/(shell)/dashboard/page.tsx`**).
+- **Organization settings:** **`PATCH /api/organizations/[id]`** updates **`name`** and **`slug`** (validated in **`lib/organizations/patch-organization.ts`**); shared **`slugify`** in **`lib/organizations/slug.ts`** (also used by **`app/api/organizations/bootstrap/route.ts`**). **`components/settings/organization-settings-form.tsx`** on **`app/(shell)/settings/page.tsx`**. Founders and org admins may edit (**`canEditOrganizationProfile` / `canEditOrganizationProfileRole`**).
+- **Delete organization:** **`POST /api/organizations/[id]/delete`** runs a server-side cascade (**`lib/organizations/delete-organization.ts`**) — deals, tasks (+ nested comments), outreach/data-room-related docs, memberships, org doc, subscription stub, Storage prefix **`orgs/{orgId}/`**, auth claim cleanup; **`investors`** documents are **not** deleted; audit trail keeps a final **`organization.deleted`** entry (org-scoped audit docs are not bulk-deleted). UI: **`DeleteOrganizationSection`** with name confirmation; **founder** or **org admin** only (**`canDeleteOrganization` / `canDeleteOrganizationRole`**).
+- **Investor CRM table:** **`InvestorTable`** — **`SortHead`** overlap fix so the **Firm** header is not clipped by the sticky Name column (padding / stacking-safe layout).
+- **Sidebar:** **`app-sidebar.tsx`** — optional **`suffix`** on nav items; **Discovery**, **Outreach**, and **Analytics** show **`(coming soon)`**.
+
 ### Deal Room experience (premium list & detail, settings, data room link)
 
 - **Deal pages:** `app/(shell)/deals/page.tsx` and `app/(shell)/deals/[id]/page.tsx` compose new **`components/deals/*`** modules (hero/KPIs, why invest, traction, founder, use of funds, terms, documents, FAQ, CTA, guest flows, manager panel). **`loading.tsx`** skeletons for list and detail.
@@ -89,8 +100,8 @@ Premium sponsor workspace for diligence: header actions, six KPI cards (from Fir
 - `app/(auth)/` — login / signup
 - `app/onboarding/` — create first organization (session without org)
 - `app/invite/[token]/` — redeem investor invitation links
-- `app/api/` — session auth, discovery, outreach, data room (rooms `GET`/`POST`/`PATCH`, documents, sign-url, **invitations**, **activity**), **deals** (`PATCH /api/deals/[id]`, **telemetry**), tasks, invitations, AI chat, PayPal billing, webhooks
-- `components/data-room/` — Data Room UI modules; `components/deals/` — Deal Room UI; `lib/data-room/` — metrics, kind labels, server queries; **`lib/deals/`** — deal patch schema, narrative helpers, telemetry aggregation, formatting
+- `app/api/` — session auth, discovery, outreach, data room (rooms `GET`/`POST`/`PATCH`, documents, sign-url, **invitations**, **activity**), **deals** (`PATCH /api/deals/[id]`, **telemetry**), **tasks** (`GET`/`POST`, **`PATCH /api/tasks/[id]`**, **`/api/tasks/[id]/comments`**), **organizations** (`PATCH /api/organizations/[id]`, **`POST .../delete`**), invitations, AI chat, PayPal billing, webhooks
+- `components/data-room/` — Data Room UI modules; `components/deals/` — Deal Room UI; **`components/tasks/`** — Tasks Workflow Center UI; **`components/settings/`** — org settings / delete; `lib/data-room/` — metrics, kind labels, server queries; **`lib/deals/`** — deal patch schema, narrative helpers, telemetry aggregation, formatting; **`lib/tasks/`** — task workflow helpers; **`lib/organizations/`** — org patch, deletion cascade, slug helpers
 - `lib/` — Firebase, Firestore types/queries, discovery merge, analytics helpers, auth (RBAC, guests, platform admin), invitations, PayPal, billing
 - `functions/` — Firebase Cloud Functions (member → custom claims sync, scheduled digest)
 - `scripts/seed-demo.ts` — demo org, investors, tasks, emails

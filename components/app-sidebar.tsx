@@ -36,7 +36,13 @@ import { isInvestorGuestRole } from "@/lib/auth/rbac";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 
-type NavItem = { href: string; label: string; icon: React.ComponentType<{ className?: string }> };
+type NavItem = {
+  href: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  /** Shown beside the label, e.g. "(coming soon)" */
+  suffix?: string;
+};
 
 export function isNavItemActive(pathname: string, href: string): boolean {
   if (href === "/dashboard") return pathname === href;
@@ -45,8 +51,8 @@ export function isNavItemActive(pathname: string, href: string): boolean {
 
 const raiseNav: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/discovery", label: "Discovery", icon: Search },
-  { href: "/outreach", label: "Outreach", icon: Send },
+  { href: "/discovery", label: "Discovery", icon: Search, suffix: "(coming soon)" },
+  { href: "/outreach", label: "Outreach", icon: Send, suffix: "(coming soon)" },
 ];
 
 const capitalNav: NavItem[] = [
@@ -56,7 +62,9 @@ const capitalNav: NavItem[] = [
   { href: "/tasks", label: "Tasks", icon: CheckSquare },
 ];
 
-const insightsNav: NavItem[] = [{ href: "/analytics", label: "Analytics", icon: BarChart3 }];
+const insightsNav: NavItem[] = [
+  { href: "/analytics", label: "Analytics", icon: BarChart3, suffix: "(coming soon)" },
+];
 
 const systemNav: NavItem[] = [{ href: "/settings", label: "Settings", icon: Settings }];
 
@@ -94,8 +102,15 @@ function NavGroupBlock(props: {
                       : "text-sidebar-foreground/90"
                   }
                 >
-                  <item.icon className="size-4" />
-                  <span>{item.label}</span>
+                  <item.icon className="size-4 shrink-0" />
+                  <span className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden">
+                    <span className="truncate">{item.label}</span>
+                    {item.suffix ? (
+                      <span className="shrink-0 whitespace-nowrap text-[10px] font-normal text-sidebar-foreground/55">
+                        {item.suffix}
+                      </span>
+                    ) : null}
+                  </span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             );

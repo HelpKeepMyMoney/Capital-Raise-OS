@@ -90,6 +90,11 @@ service cloud.firestore {
     match /tasks/{taskId} {
       allow read: if isOrgMember(resource.data.organizationId);
       allow write: if canWriteOrg(resource.data.organizationId);
+
+      match /comments/{commentId} {
+        allow read: if isOrgMember(get(/databases/$(database)/documents/tasks/$(taskId)).data.organizationId);
+        allow write: if canWriteOrg(get(/databases/$(database)/documents/tasks/$(taskId)).data.organizationId);
+      }
     }
 
     match /activities/{activityId} {
