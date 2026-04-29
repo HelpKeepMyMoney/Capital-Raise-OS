@@ -43,3 +43,31 @@ export function pickWhyInvestNarrative(deal: Deal): WhyInvestNarrative {
   }
   return n;
 }
+
+/** Institutional three-pillar strip: market, edge, revenue story. */
+export function threePillarWhyInvestBlocks(deal: Deal): DealWhyInvestBlock[] {
+  const narrative = pickWhyInvestNarrative(deal);
+  const custom = deal.whyInvest?.filter((b) => b.title.trim() && b.body.trim()) ?? [];
+  if (custom.length >= 3) {
+    const titles = ["Market opportunity", "Competitive edge", "Revenue model"] as const;
+    return custom.slice(0, 3).map((b, i) => ({
+      title: titles[i] ?? b.title,
+      body: b.body,
+    }));
+  }
+
+  const revenueBody = [narrative.growthStrategy, narrative.exitPotential]
+    .map((s) => s?.trim())
+    .filter(Boolean)
+    .join("\n\n");
+
+  const pillars: DealWhyInvestBlock[] = [
+    { title: "Market opportunity", body: narrative.marketOpportunity?.trim() ?? "" },
+    { title: "Competitive edge", body: narrative.competitiveEdge?.trim() ?? "" },
+    { title: "Revenue model", body: revenueBody },
+  ];
+
+  const filtered = pillars.filter((p) => p.body.length > 0);
+  if (filtered.length > 0) return filtered;
+  return blocksFromNarrative(narrative);
+}

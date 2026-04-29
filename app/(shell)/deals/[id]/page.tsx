@@ -21,11 +21,10 @@ import {
 } from "@/lib/firestore/queries";
 import { aggregateDealTelemetry } from "@/lib/deals/telemetry";
 import { countActiveInvitesForDeal } from "@/lib/deals/invite-helpers";
-import { computeProgressPct } from "@/lib/deals/format";
-import { hasWhyInvestNarrativeOnDeal, pickWhyInvestNarrative } from "@/lib/deals/why-invest-narrative";
+import { computeProgressPct, fmtUsd } from "@/lib/deals/format";
+import { hasWhyInvestNarrativeOnDeal } from "@/lib/deals/why-invest-narrative";
 import { DealDetailShell } from "@/components/deals/deal-detail-shell";
 import { DealTitleHero } from "@/components/deals/deal-title-hero";
-import { RaiseProgress } from "@/components/deals/raise-progress";
 import { WhyInvest } from "@/components/deals/why-invest";
 import { TractionSection } from "@/components/deals/traction-section";
 import { FounderCredibility } from "@/components/deals/founder-credibility";
@@ -87,32 +86,30 @@ export default async function DealDetailPage(props: { params: Promise<{ id: stri
 
   const target = deal.targetRaise ?? 0;
   const pct = computeProgressPct(raised, target);
+  const displayProgressPct = target > 0 ? pct : raised > 0 ? 100 : 0;
 
-  let commitmentRows: (DealCommitment & { contactEmail?: string })[] = [];
-  let investorCount = 0;
+  const rawCommitments = await listDealCommitmentsForDeal(ctx.orgId, id);
+  const activeCommitments = rawCommitments.filter((c) => c.status === "active");
+  const investorCount = activeCommitments.length;
+
   let lastCommitMs: number | null = null;
-  if (canManage) {
-    const raw = await listDealCommitmentsForDeal(ctx.orgId, id);
-    const active = raw.filter((c) => c.status === "active");
-    commitmentRows = await commitmentsWithEmails(active);
-    investorCount = active.length;
-    for (const c of active) {
-      if (lastCommitMs == null || c.updatedAt > lastCommitMs) lastCommitMs = c.updatedAt;
-    }
-  } else {
-    const allForDeal = await listDealCommitmentsForDeal(ctx.orgId, id);
-    const active = allForDeal.filter((c) => c.status === "active");
-    investorCount = active.length;
-    for (const c of active) {
-      if (lastCommitMs == null || c.updatedAt > lastCommitMs) lastCommitMs = c.updatedAt;
+  let lastCommitAmount: number | null = null;
+  for (const c of activeCommitments) {
+    if (lastCommitMs == null || c.updatedAt > lastCommitMs) {
+      lastCommitMs = c.updatedAt;
+      lastCommitAmount = c.amount;
     }
   }
 
-  let myCommitmentAmt: number | undefined;
+  let commitmentRows: (DealCommitment & { contactEmail?: string })[] = [];
+  if (canManage) {
+    commitmentRows = await commitmentsWithEmails(activeCommitments);
+  }
+
+  let myCommitment: DealCommitment | null = null;
   let signingRow: SigningRequest | null = null;
   if (guest) {
-    const mine = await getDealCommitmentForUser(ctx.orgId, id, ctx.user.uid);
-    myCommitmentAmt = mine?.status === "active" ? mine.amount : undefined;
+    myCommitment = await getDealCommitmentForUser(ctx.orgId, id, ctx.user.uid);
     signingRow = await getSigningRequest(ctx.orgId, id, ctx.user.uid);
   }
 
@@ -145,6 +142,36 @@ export default async function DealDetailPage(props: { params: Promise<{ id: stri
       ? formatDistanceToNow(lastCommitMs, { addSuffix: true })
       : null;
 
+  const MS_DAY = 86400000;
+  const weekAgo = Date.now() - 7 * MS_DAY;
+  let newDocsThisWeek = 0;
+  for (const doc of roomDocs) {
+    const t = doc.createdAt ?? 0;
+    if (t >= weekAgo) newDocsThisWeek += 1;
+  }
+
+  let daysRemaining: number | null = null;
+  const closeDate = deal.closeDate;
+  if (typeof closeDate === "number" && closeDate > Date.now()) {
+    daysRemaining = Math.ceil((closeDate - Date.now()) / MS_DAY);
+  }
+
+  const momentumHints: string[] = [];
+  if (lastCommitAmount != null && lastCommitAmount > 0 && lastCommitAgo) {
+    momentumHints.push(`${fmtUsd(lastCommitAmount)} committed ${lastCommitAgo}`);
+  }
+  if (pct > 0) {
+    momentumHints.push(`${pct.toFixed(pct < 1 ? 2 : 0)}% funded`);
+  }
+  if (daysRemaining != null && daysRemaining >= 0) {
+    momentumHints.push(`${daysRemaining} day${daysRemaining === 1 ? "" : "s"} remaining`);
+  }
+  if (newDocsThisWeek > 0) {
+    momentumHints.push(
+      `${newDocsThisWeek} doc${newDocsThisWeek === 1 ? "" : "s"} updated this week`,
+    );
+  }
+
   const showDataRoomCta = hasDataRoom;
 
   const analyticsPayload: DealAnalyticsDTO = {
@@ -162,7 +189,14 @@ export default async function DealDetailPage(props: { params: Promise<{ id: stri
   const showBookCallCta = ctaVisibility?.showBookCall !== false && Boolean(deal.calendarBookingUrl);
 
   return (
-    <DealDetailShell dealId={deal.id} guest={guest}>
+    <DealDetailShell
+      dealId={deal.id}
+      dealName={deal.name}
+      guest={guest}
+      progressPct={displayProgressPct}
+      showBookCall={showBookCallCta}
+      calendarBookingUrl={deal.calendarBookingUrl}
+    >
       <div className="mx-auto max-w-4xl space-y-12 px-4 pb-20 pt-6 md:px-6">
         <Link
           href="/deals"
@@ -182,21 +216,13 @@ export default async function DealDetailPage(props: { params: Promise<{ id: stri
             guest={guest}
             hasDataRoom={hasDataRoom}
             showDataRoomCta={showDataRoomCta}
+            daysRemaining={daysRemaining}
+            momentumHints={momentumHints}
+            displayProgressPct={displayProgressPct}
           />
         </div>
 
-        {target > 0 || raised > 0 ? (
-          <section className="rounded-2xl border border-border/80 bg-card p-6 shadow-sm md:p-8">
-            <RaiseProgress
-              raised={raised}
-              target={target > 0 ? target : raised}
-              investorCount={investorCount}
-              lastCommitAgo={lastCommitAgo}
-            />
-          </section>
-        ) : null}
-
-        <WhyInvest blocks={deal.whyInvest} narrative={pickWhyInvestNarrative(deal)} />
+        <WhyInvest deal={deal} />
 
         <TractionSection metrics={deal.tractionMetrics} />
 
@@ -225,7 +251,10 @@ export default async function DealDetailPage(props: { params: Promise<{ id: stri
         {deal.investorUpdates && deal.investorUpdates.length > 0 ? (
           <Card className="rounded-2xl border-border/80 shadow-sm">
             <CardHeader>
-              <CardTitle className="font-heading text-lg">Investor updates</CardTitle>
+              <CardTitle className="font-heading text-lg">Recent updates</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Published by the sponsor for investors following this offering.
+              </p>
             </CardHeader>
             <CardContent className="space-y-5">
               {deal.investorUpdates
@@ -266,7 +295,7 @@ export default async function DealDetailPage(props: { params: Promise<{ id: stri
                 <DealCommitmentForm
                   dealId={deal.id}
                   dealName={deal.name}
-                  initialAmount={myCommitmentAmt}
+                  initialCommitment={myCommitment}
                 />
               </CardContent>
             </Card>

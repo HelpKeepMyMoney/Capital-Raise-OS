@@ -20,8 +20,8 @@ import {
 } from "@/lib/tasks/kanban-buckets";
 
 const COLUMNS: { id: KanbanColumnId; title: string }[] = [
-  { id: "today", title: "Today" },
-  { id: "week", title: "This Week" },
+  { id: "today", title: "Today & overdue" },
+  { id: "week", title: "Upcoming" },
   { id: "waiting", title: "Waiting" },
   { id: "blocked", title: "Blocked" },
   { id: "done", title: "Completed" },

@@ -66,10 +66,16 @@ export function RoomMetrics(props: Props) {
         value={metrics.activeRooms}
         delay={0}
       />
-      <MetricCell icon={<FileStack className="h-4 w-4" />} label="Documents" value={metrics.totalDocuments} delay={1} />
+      <MetricCell
+        icon={<FileStack className="h-4 w-4" />}
+        label="Documents"
+        value={metrics.totalDocuments}
+        delay={1}
+        trend={metrics.documentsTrendPct}
+      />
       <MetricCell
         icon={<Eye className="h-4 w-4" />}
-        label="Opens (Week)"
+        label="Opens this week"
         value={metrics.investorViewsThisWeek}
         trend={metrics.investorViewsTrendPct}
         delay={2}
@@ -90,7 +96,7 @@ export function RoomMetrics(props: Props) {
       />
       <MetricCell
         icon={<UsersRound className="h-4 w-4" />}
-        label="Invitations"
+        label="Invitations sent"
         value={metrics.invitedInvestorsCount}
         delay={5}
         micro="Active / unexpired invite rows."

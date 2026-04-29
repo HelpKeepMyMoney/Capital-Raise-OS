@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import type { SerializedDataRoom, SerializedDealLite } from "@/components/data-room/types";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
-import { Archive, FolderOpen, Pencil } from "lucide-react";
+import { Archive, BarChart3, FolderOpen, Link2, Pencil } from "lucide-react";
 
 type Props = {
   room: SerializedDataRoom;
@@ -20,6 +20,10 @@ type Props = {
   /** Filter context: spotlight when deal ids match selected deal filter */
   dealFilterId?: string;
   onInvite?: () => void;
+  /** Copy filtered data room URL (deal-scoped when linked). */
+  onCopyInviteLink?: () => void;
+  /** Open workspace Activity tab for this room. */
+  onOpenAnalytics?: () => void;
 };
 
 function statusBadges(room: SerializedDataRoom) {
@@ -97,13 +101,41 @@ export function RoomCard(props: Props) {
               type="button"
               variant="secondary"
               size="sm"
-              className="h-8 flex-1 rounded-lg text-xs"
+              className="h-8 flex-1 rounded-lg text-xs min-w-[4.5rem]"
               onClick={(e) => {
                 e.stopPropagation();
                 props.onSelect();
               }}
             >
               Open
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 rounded-lg px-2"
+              title="Copy link to data room (deal-scoped)"
+              onClick={(e) => {
+                e.stopPropagation();
+                props.onCopyInviteLink?.();
+              }}
+            >
+              <Link2 className="h-3.5 w-3.5" />
+              <span className="sr-only">Copy invite link</span>
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 rounded-lg px-2"
+              title="Activity"
+              onClick={(e) => {
+                e.stopPropagation();
+                props.onOpenAnalytics?.();
+              }}
+            >
+              <BarChart3 className="h-3.5 w-3.5" />
+              <span className="sr-only">Analytics</span>
             </Button>
             <Button
               type="button"

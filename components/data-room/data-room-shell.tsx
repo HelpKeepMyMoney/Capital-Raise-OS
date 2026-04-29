@@ -38,6 +38,8 @@ type Props = {
   canManage: boolean;
   /** When opening /data-room?deal=…, pre-select this deal in the workspace filter. */
   initialDealFilterId?: string;
+  /** Used for “since last login” recent updates on Investor view (Firebase Auth last sign-in). */
+  lastLoginAtMs: number | null;
 };
 
 export function DataRoomShell(props: Props) {
@@ -47,6 +49,11 @@ export function DataRoomShell(props: Props) {
   const [dealFilterId, setDealFilterId] = React.useState<string>(props.initialDealFilterId ?? "");
   const [searchRooms, setSearchRooms] = React.useState("");
   const [selectedRoomId, setSelectedRoomId] = React.useState(props.rooms[0]?.id ?? "");
+  const [workspaceTab, setWorkspaceTab] = React.useState("preview");
+
+  React.useEffect(() => {
+    setWorkspaceTab("preview");
+  }, [selectedRoomId]);
 
   React.useEffect(() => {
     if (props.initialDealFilterId) setDealFilterId(props.initialDealFilterId);
@@ -273,6 +280,19 @@ export function DataRoomShell(props: Props) {
                       if (r.dealId) setInviteDealId(r.dealId);
                       setInviteOpen(true);
                     }}
+                    onCopyInviteLink={() => {
+                      const q = r.dealId ? `?deal=${encodeURIComponent(r.dealId)}` : "";
+                      const url = `${window.location.origin}/data-room${q}`;
+                      void navigator.clipboard.writeText(url).then(
+                        () => toast.success("Data room link copied"),
+                        () => toast.error("Could not copy link"),
+                      );
+                    }}
+                    onOpenAnalytics={() => {
+                      setSelectedRoomId(r.id);
+                      setWorkspaceTab("activity");
+                      wsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+                    }}
                   />
                 );
               })
@@ -304,6 +324,9 @@ export function DataRoomShell(props: Props) {
                 canManage={props.canManage}
                 selectedDealId={dealFilterId || selectedRoom.dealId}
                 roomSelectList={roomSelectList}
+                lastLoginAtMs={props.lastLoginAtMs}
+                workspaceTab={workspaceTab}
+                onWorkspaceTabChange={setWorkspaceTab}
               />
             </>
           )}

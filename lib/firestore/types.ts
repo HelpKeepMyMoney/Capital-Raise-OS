@@ -147,6 +147,8 @@ export type InvestorInvitation = {
 
 export type DealCommitmentStatus = "active" | "withdrawn";
 
+export type DealCommitmentInvestingAs = "individual" | "llc" | "trust" | "ira";
+
 export type DealCommitment = {
   id: string;
   organizationId: string;
@@ -158,6 +160,10 @@ export type DealCommitment = {
   status: DealCommitmentStatus;
   /** Subscription / closing docs outstanding when set. */
   docStatus?: "pending" | "complete" | "none";
+  investingAs?: DealCommitmentInvestingAs;
+  entityName?: string;
+  accreditationStatus?: string;
+  preferredContact?: "email" | "phone" | "either";
   createdAt: number;
   updatedAt: number;
 };

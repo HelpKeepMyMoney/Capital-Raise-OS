@@ -2,7 +2,8 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Calendar, Download, Wallet, Phone } from "lucide-react";
+import { motion } from "framer-motion";
+import { Calendar, Download, Wallet, Phone, TrendingUp } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -21,6 +22,9 @@ export function DealTitleHero(props: {
   guest: boolean;
   hasDataRoom: boolean;
   showDataRoomCta: boolean;
+  daysRemaining: number | null;
+  momentumHints: string[];
+  displayProgressPct: number;
 }) {
   const d = props.deal;
   const [logoFailed, setLogoFailed] = React.useState(false);
@@ -34,18 +38,21 @@ export function DealTitleHero(props: {
   const showDr =
     props.showDataRoomCta && props.hasDataRoom && cta?.showDataRoom !== false;
 
+  const thesis = d.tagline?.trim() || d.sponsorProfile?.trim()?.slice(0, 220);
+
   return (
-    <div className="overflow-hidden rounded-2xl border border-border/80 bg-card shadow-md">
-      <div className="border-b border-border/70 bg-gradient-to-br from-muted/40 via-card to-background px-4 py-5 sm:px-5 sm:py-6 md:px-6 md:py-6">
-        <div className="flex flex-col gap-5 md:gap-6 xl:flex-row xl:items-start xl:justify-between xl:gap-6">
-          <div className="min-w-0 flex-1 space-y-3">
+    <div className="overflow-hidden rounded-2xl border border-border/80 bg-card shadow-md transition-shadow hover:shadow-lg">
+      <div className="border-b border-border/70 bg-gradient-to-br from-muted/35 via-card to-background px-4 py-6 sm:px-5 md:px-6 md:py-7">
+        <div className="flex flex-col gap-8 xl:flex-row xl:items-stretch xl:justify-between xl:gap-8">
+          {/* Left: identity */}
+          <div className="min-w-0 flex-1 space-y-4 xl:max-w-[34%]">
             {d.logoUrl && !logoFailed ? (
-              <div className="flex justify-center lg:justify-start">
+              <div className="flex justify-center xl:justify-start">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={d.logoUrl}
                   alt=""
-                  className="h-14 w-auto max-w-[160px] object-contain"
+                  className="h-16 w-auto max-w-[180px] object-contain"
                   onError={() => setLogoFailed(true)}
                 />
               </div>
@@ -54,54 +61,108 @@ export function DealTitleHero(props: {
               <p className="text-[0.65rem] font-semibold uppercase tracking-wider text-muted-foreground">
                 Offering
               </p>
-              <h1 className="mt-0.5 font-heading text-2xl font-bold tracking-tight sm:text-3xl">
+              <h1 className="mt-1 font-heading text-2xl font-bold tracking-tight sm:text-3xl md:text-[1.75rem] leading-tight">
                 {d.name}
               </h1>
-              {d.tagline ? (
-                <p className="mt-1.5 text-sm text-muted-foreground sm:text-base">{d.tagline}</p>
+              {thesis ? (
+                <p className="mt-2 text-sm leading-relaxed text-foreground/90 sm:text-[0.9375rem]">
+                  {thesis.length > 280 ? `${thesis.slice(0, 277)}…` : thesis}
+                </p>
               ) : null}
-              <div className="mt-2 flex flex-wrap gap-1.5">
+              <div className="mt-3 flex flex-wrap gap-1.5">
                 {d.industry ? (
-                  <Badge variant="secondary" className="rounded-lg">
+                  <Badge variant="secondary" className="rounded-lg font-medium">
                     {d.industry}
                   </Badge>
                 ) : null}
                 {d.stage ? (
-                  <Badge variant="outline" className="rounded-lg">
+                  <Badge variant="outline" className="rounded-lg font-medium">
                     {d.stage}
                   </Badge>
                 ) : null}
-                <Badge variant="outline" className="rounded-lg capitalize">
+                <Badge variant="outline" className="rounded-lg font-medium capitalize">
                   {d.type.replace(/_/g, " ")}
                 </Badge>
-                <Badge variant="secondary" className="rounded-lg capitalize">
+                <Badge variant="secondary" className="rounded-lg font-medium capitalize">
                   {d.status}
                 </Badge>
               </div>
             </div>
           </div>
 
-          <div className="grid w-full shrink-0 grid-cols-2 gap-1.5 sm:max-w-[16rem] md:max-w-[17rem] xl:w-[17rem]">
-            <Metric label="Target raise" value={props.target > 0 ? fmtUsd(props.target) : "—"} />
-            <Metric label="Raised" value={fmtUsd(props.raised)} highlight />
-            <Metric
-              label="% funded"
-              value={`${props.pct.toFixed(props.pct < 1 ? 2 : 0)}%`}
-              highlight
-            />
-            <Metric label="Investors joined" value={String(props.investorCount)} />
-            <Metric
-              label="Avg check"
-              value={props.investorCount > 0 ? fmtUsd(props.avgCheck) : "—"}
-            />
+          {/* Center: KPI + progress */}
+          <div className="flex w-full min-w-0 flex-1 flex-col gap-4 xl:max-w-md">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              <Metric label="Target raise" value={props.target > 0 ? fmtUsd(props.target) : "—"} />
+              <Metric label="Raised" value={fmtUsd(props.raised)} highlight />
+              <Metric
+                label="% funded"
+                value={`${props.pct.toFixed(props.pct < 1 ? 2 : 0)}%`}
+                highlight
+              />
+              <Metric label="Investors joined" value={String(props.investorCount)} />
+              <Metric
+                label="Avg check"
+                value={props.investorCount > 0 ? fmtUsd(props.avgCheck) : "—"}
+              />
+              <Metric
+                label="Days remaining"
+                value={
+                  props.daysRemaining != null && props.daysRemaining >= 0
+                    ? String(props.daysRemaining)
+                    : "—"
+                }
+              />
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                <span>Raise progress</span>
+                <span className="font-medium tabular-nums text-foreground">
+                  {props.displayProgressPct.toFixed(
+                    props.target > 0 && props.displayProgressPct < 1 ? 2 : 0,
+                  )}
+                  %
+                </span>
+              </div>
+              <div className="relative h-2.5 overflow-hidden rounded-full bg-muted">
+                <motion.div
+                  className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-primary to-primary/85"
+                  initial={false}
+                  animate={{ width: `${Math.min(100, props.displayProgressPct)}%` }}
+                  transition={{ duration: 0.85, ease: [0.22, 1, 0.36, 1] }}
+                />
+              </div>
+            </div>
+
+            {props.momentumHints.length > 0 ? (
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-border/60 pt-3">
+                <span className="flex items-center gap-1 text-[0.65rem] font-semibold uppercase tracking-wider text-muted-foreground">
+                  <TrendingUp className="size-3.5 text-primary" aria-hidden />
+                  Momentum
+                </span>
+                {props.momentumHints.map((hint) => (
+                  <span
+                    key={hint}
+                    className="rounded-full bg-muted/80 px-2.5 py-1 text-xs font-medium text-foreground"
+                  >
+                    {hint}
+                  </span>
+                ))}
+              </div>
+            ) : null}
           </div>
 
-          <div className="flex w-full shrink-0 flex-col gap-2 sm:max-w-xs sm:flex-row sm:flex-wrap xl:w-[10.5rem] xl:max-w-none xl:flex-col">
+          {/* Right: CTAs */}
+          <div className="flex w-full shrink-0 flex-col gap-2 sm:flex-row sm:flex-wrap xl:w-[11.25rem] xl:flex-col xl:flex-nowrap">
             {props.guest ? (
               <>
                 <Link
                   href="#commit"
-                  className={cn(buttonVariants({ size: "default" }), "rounded-lg gap-2 shadow-sm")}
+                  className={cn(
+                    buttonVariants({ size: "default" }),
+                    "justify-center gap-2 rounded-xl shadow-sm",
+                  )}
                   onClick={() => void trackDealTelemetry(d.id, "cta_commit_click")}
                 >
                   <Wallet className="size-4" />
@@ -114,7 +175,7 @@ export function DealTitleHero(props: {
                     rel="noreferrer"
                     className={cn(
                       buttonVariants({ variant: "outline", size: "default" }),
-                      "rounded-lg gap-2",
+                      "justify-center gap-2 rounded-xl",
                     )}
                     onClick={() => void trackDealTelemetry(d.id, "cta_book_call_click")}
                   >
@@ -127,7 +188,7 @@ export function DealTitleHero(props: {
                     href={`/data-room?deal=${encodeURIComponent(d.id)}`}
                     className={cn(
                       buttonVariants({ variant: "secondary", size: "default" }),
-                      "rounded-lg gap-2",
+                      "justify-center gap-2 rounded-xl",
                     )}
                     onClick={() => void trackDealTelemetry(d.id, "cta_data_room_click")}
                   >
@@ -135,8 +196,8 @@ export function DealTitleHero(props: {
                     Access data room
                   </Link>
                 ) : null}
-                <div className="flex flex-wrap gap-2 pt-1">
-                  <ExpressInterestButton dealId={d.id} dealName={d.name} />
+                <div className="pt-1">
+                  <ExpressInterestButton dealId={d.id} dealName={d.name} variant="ghost" />
                 </div>
               </>
             ) : (
@@ -144,7 +205,10 @@ export function DealTitleHero(props: {
                 {showDr ? (
                   <Link
                     href={`/data-room?deal=${encodeURIComponent(d.id)}`}
-                    className={cn(buttonVariants({ variant: "outline", size: "default" }), "rounded-lg gap-2")}
+                    className={cn(
+                      buttonVariants({ variant: "outline", size: "default" }),
+                      "justify-center gap-2 rounded-xl",
+                    )}
                   >
                     <Download className="size-4" />
                     Data room
@@ -157,7 +221,7 @@ export function DealTitleHero(props: {
                     rel="noreferrer"
                     className={cn(
                       buttonVariants({ variant: "outline", size: "default" }),
-                      "rounded-lg gap-2",
+                      "justify-center gap-2 rounded-xl",
                     )}
                   >
                     <Phone className="size-4" />
@@ -177,8 +241,8 @@ function Metric(props: { label: string; value: string; highlight?: boolean; clas
   return (
     <div
       className={cn(
-        "flex flex-col justify-center rounded-xl border border-border/70 bg-background/80 px-2.5 py-2 shadow-sm",
-        props.highlight && "border-blue-500/20 bg-blue-500/5",
+        "flex min-h-[3.5rem] flex-col justify-center rounded-xl border border-border/70 bg-background/90 px-2.5 py-2 shadow-sm",
+        props.highlight && "border-primary/25 bg-primary/10",
         props.className,
       )}
     >

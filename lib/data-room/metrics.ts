@@ -7,6 +7,8 @@ export type DataRoomMetricsDTO = {
   investorViewsThisWeek: number;
   /** Week-over-week percent change for signed URL / open events; null if prior week was 0 or unavailable. */
   investorViewsTrendPct: number | null;
+  /** New document rows created this week vs prior week (Firestore `documents.createdAt`). */
+  documentsTrendPct: number | null;
   ndasPending: number;
   mostViewedRoom: { id: string; name: string; views: number } | null;
   invitedInvestorsCount: number;
@@ -59,6 +61,21 @@ export async function computeDataRoomMetrics(orgId: string): Promise<DataRoomMet
 
   let thisWeekViews = 0;
   let prevWeekViews = 0;
+  let docsThisWeek = 0;
+  let docsPrevWeek = 0;
+  for (const d of docsSnap.docs) {
+    const row = d.data() as { createdAt?: number };
+    const t = row.createdAt ?? 0;
+    if (t >= weekStart) docsThisWeek += 1;
+    else if (t >= prevWeekStart && t < weekStart) docsPrevWeek += 1;
+  }
+  let documentsTrendPct: number | null = null;
+  if (docsPrevWeek > 0) {
+    documentsTrendPct = Math.round(((docsThisWeek - docsPrevWeek) / docsPrevWeek) * 100);
+  } else if (docsThisWeek > 0 && docsPrevWeek === 0) {
+    documentsTrendPct = 100;
+  }
+
   for (const d of auditSnap.docs) {
     const row = d.data() as { action?: string; createdAt?: number };
     if (row.action !== "data_room.signed_url") continue;
@@ -110,8 +127,46 @@ export async function computeDataRoomMetrics(orgId: string): Promise<DataRoomMet
     totalDocuments,
     investorViewsThisWeek: thisWeekViews,
     investorViewsTrendPct,
+    documentsTrendPct,
     ndasPending,
     mostViewedRoom,
     invitedInvestorsCount,
+  };
+}
+
+/**
+ * KPI strip for investor_guest — scoped to rooms/documents they may access (not full-org totals).
+ */
+export function buildInvestorGuestMetrics(
+  rooms: Array<{ id: string; name: string; archived?: boolean }>,
+  documents: Array<{ dataRoomId?: string; viewCount?: number }>,
+): DataRoomMetricsDTO {
+  const activeRooms = rooms.filter((r) => !r.archived).length;
+  const totalDocuments = documents.length;
+  const viewsByRoom = new Map<string, number>();
+  for (const d of documents) {
+    const rid = d.dataRoomId;
+    if (!rid) continue;
+    viewsByRoom.set(rid, (viewsByRoom.get(rid) ?? 0) + (d.viewCount ?? 0));
+  }
+  let mostViewedRoom: { id: string; name: string; views: number } | null = null;
+  for (const r of rooms) {
+    if (r.archived) continue;
+    const v = viewsByRoom.get(r.id) ?? 0;
+    if (v <= 0) continue;
+    if (!mostViewedRoom || v > mostViewedRoom.views) {
+      mostViewedRoom = { id: r.id, name: r.name, views: v };
+    }
+  }
+
+  return {
+    activeRooms,
+    totalDocuments,
+    investorViewsThisWeek: 0,
+    investorViewsTrendPct: null,
+    documentsTrendPct: null,
+    ndasPending: 0,
+    mostViewedRoom,
+    invitedInvestorsCount: 0,
   };
 }

@@ -4,6 +4,17 @@ AI-powered private capital platform: investor CRM, discovery, outreach, data roo
 
 ## Changelog
 
+### Institutional deal & data room polish, commitments, returns UI deferred (latest)
+
+- **Design system:** **`app/globals.css`** — typography and layout rhythm. **`components/ui/card.tsx`**, **`button.tsx`** (including **`danger`**), **`table.tsx`** — sticky header option and zebra rows for dense tables. **`loading.tsx`** skeletons added for **`app/(shell)/`** routes: analytics, data-room, discovery, investors, outreach, portal, settings.
+- **Deal detail (`app/(shell)/deals/[id]/page.tsx`):** **`DealTitleHero`**, **`WhyInvest`**, **`DealDetailShell`** (sticky sponsor/investor bar + CTAs), **`deal-manager-panel`** — sponsors can **publish investor updates** (Firestore **`investorUpdates`** on **`Deal`**, appended via **`appendInvestorUpdate`** in **`PATCH`** handled by **`lib/deals/patch-deal.ts`** with **`FieldValue.arrayUnion`**). **“Estimate potential returns”** interactive block is **not shown** until projections can be **deal-specific**; the implementation remains in **`components/deals/returns-calculator.tsx`**, **`returns-calculator-lazy.tsx`** (client-only **`next/dynamic`** with **`ssr: false`** for Next.js 16 Server Components), and **`lib/deals/returns-assumptions.ts`**. Sponsors still use the **Returns model** prose field and terms/docs for economics.
+- **Soft commit / interest:** **`components/deal-commitment-form.tsx`** — richer flow (entity, accreditation, contact preference). **`POST /api/deals/commit`** persists optional **`DealCommitment`** fields (**`investingAs`**, **`entityName`**, **`accreditationStatus`**, **`preferredContact`**, **`docStatus`**). **`components/express-interest-button.tsx`** aligned with the flow.
+- **Data room:** **`lib/data-room/metrics.ts`** — extra KPI helpers (including document-trend style metrics). **`RoomMetrics`**, **`RoomCard`**, **`RoomWorkspace`**, **`data-room-shell`** — wiring and layout. **`DocumentManager`** — filters, upload/visibility UX. **`ActivityAnalytics`** — activity charts/metrics. **`InvestorAccessTable`** — investor access table improvements. **`InvestorPreview`** — investor-facing preview. **`UploadZone`** — small fixes. **`app/(shell)/data-room/page.tsx`** — server data for the shell.
+- **Auth & access:** **`lib/auth/user-metadata.ts`**. **`lib/auth/investor-access.ts`** — extended checks for deal/guest access.
+- **Narrative:** **`lib/deals/why-invest-narrative.ts`** — additional mapping/helpers for **Why invest** blocks.
+- **Tasks:** **`task-board.tsx`** column titles; **`automation-center.tsx`** — extra automation rules.
+- **Assets:** Reference UI captures in **`public/Screenshot*.png`** (and **`Screenshot LP 1.png`**) for documentation or marketing.
+
 ### Tasks Workflow Center, organization lifecycle, investor CRM polish
 
 - **Tasks (`/tasks`):** Replaced the legacy **`tasks-panel`** with **`TasksWorkflowClient`** and **`components/tasks/*`** — header, metrics, toolbar (filters / list · Kanban · calendar · by owner), **`task-list`** / **`task-row`**, **`task-board`** (@dnd-kit), **`task-calendar`**, **`task-owner-board`**, **`task-drawer`**, **`new-task-modal`**, **`automation-center`**, **`smart-suggestions`**, **`task-insights`**, loading skeleton **`app/(shell)/tasks/loading.tsx`**. **`lib/tasks/*`** holds Kanban buckets, metrics, suggestion heuristics, and labels.

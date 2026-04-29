@@ -1,22 +1,89 @@
 "use client";
 
-import type { SerializedDataRoom } from "@/components/data-room/types";
+import type { SerializedDataRoom, SerializedRoomDocument } from "@/components/data-room/types";
 import type { Deal } from "@/lib/firestore/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
 import { Separator } from "@/components/ui/separator";
 import { buttonVariants } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import * as React from "react";
+import { formatDistanceToNow } from "date-fns";
+
+const KIND_ORDER: Record<SerializedRoomDocument["kind"], number> = {
+  deck: 0,
+  ppm: 1,
+  legal: 2,
+  model: 3,
+  video: 4,
+  other: 5,
+};
+
+function sortKeyDocuments(docs: SerializedRoomDocument[]) {
+  return [...docs].sort((a, b) => {
+    const ka = KIND_ORDER[a.kind] ?? 99;
+    const kb = KIND_ORDER[b.kind] ?? 99;
+    if (ka !== kb) return ka - kb;
+    return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+  });
+}
 
 type Props = {
   room: SerializedDataRoom;
   deal: Deal | null | undefined;
+  documentsForRoom: SerializedRoomDocument[];
+  lastLoginAtMs: number | null;
+  onOpenDocuments: () => void;
 };
+
+type RecentRow =
+  | { key: string; kind: "deal"; title: string; body: string; at: number }
+  | { key: string; kind: "doc"; doc: SerializedRoomDocument; at: number };
+
+function buildRecentRows(
+  deal: Deal | null | undefined,
+  docs: SerializedRoomDocument[],
+  sinceMs: number,
+): RecentRow[] {
+  const rows: RecentRow[] = [];
+  for (const u of deal?.investorUpdates ?? []) {
+    if (typeof u.createdAt === "number" && u.createdAt > sinceMs) {
+      rows.push({
+        key: `u-${u.createdAt}-${u.title}`,
+        kind: "deal",
+        title: u.title,
+        body: u.body,
+        at: u.createdAt,
+      });
+    }
+  }
+  for (const d of docs) {
+    const at = d.createdAt;
+    if (typeof at === "number" && at > sinceMs) {
+      rows.push({ key: `d-${d.id}`, kind: "doc", doc: d, at });
+    }
+  }
+  rows.sort((a, b) => b.at - a.at);
+  return rows;
+}
 
 export function InvestorPreview(props: Props) {
   const welcome = props.room.welcomeMessage?.trim()
     ? props.room.welcomeMessage
     : "Welcome to the diligence room. Review materials and reach out with diligence questions.";
+
+  const keyDocs = React.useMemo(() => sortKeyDocuments(props.documentsForRoom), [props.documentsForRoom]);
+
+  const recentRows = React.useMemo(() => {
+    const ninetyDaysMs = 90 * 24 * 60 * 60 * 1000;
+    const boundaryMs = props.lastLoginAtMs ?? Date.now() - ninetyDaysMs;
+    return buildRecentRows(props.deal, props.documentsForRoom, boundaryMs);
+  }, [props.deal, props.documentsForRoom, props.lastLoginAtMs]);
+
+  const faqs = props.deal?.faqs?.filter((f) => f.q?.trim() || f.a?.trim()) ?? [];
+
+  const loginUnavailable = props.lastLoginAtMs == null;
 
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr),280px]">
@@ -30,24 +97,97 @@ export function InvestorPreview(props: Props) {
         </div>
         <CardContent className="space-y-8 p-8">
           <section className="space-y-3">
-            <h4 className="text-sm font-semibold text-foreground">Key documents</h4>
-            <p className="text-sm text-muted-foreground">
-              Deck, model, and legal work product appear in the Documents tab for your team; investors see the curated set you
-              expose.
-            </p>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h4 className="text-sm font-semibold text-foreground">Key documents</h4>
+              <button
+                type="button"
+                onClick={props.onOpenDocuments}
+                className="text-xs font-medium text-primary underline-offset-4 hover:underline"
+              >
+                Open Documents tab
+              </button>
+            </div>
+            {keyDocs.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No documents in this room yet.</p>
+            ) : (
+              <ul className="divide-y divide-border rounded-xl border border-border">
+                {keyDocs.map((d) => (
+                  <li key={d.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm">
+                    <span className="min-w-0 truncate font-medium text-foreground">{d.name}</span>
+                    <Badge variant="secondary" className="shrink-0 capitalize">
+                      {d.kind}
+                    </Badge>
+                  </li>
+                ))}
+              </ul>
+            )}
           </section>
+
           <section className="space-y-3">
             <h4 className="text-sm font-semibold text-foreground">Recent updates</h4>
-            <p className="text-sm text-muted-foreground">
-              Post closing memos and qualitative updates under the deal record — preview hook for LP communications.
-            </p>
+            {loginUnavailable ? (
+              <p className="text-xs text-muted-foreground">
+                Last sign-in time wasn&apos;t available; showing updates from roughly the last 90 days (including deal notes and new
+                files).
+              </p>
+            ) : null}
+            {recentRows.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                {loginUnavailable
+                  ? "No deal notes or new uploads showed up in roughly the last 90 days. Open the Documents tab for the full library."
+                  : "No new deal notes or uploads since your last sign-in. Check the Documents tab for the full library."}
+              </p>
+            ) : (
+              <ul className="space-y-4">
+                {recentRows.map((row) =>
+                  row.kind === "deal" ? (
+                    <li key={row.key} className="rounded-xl border border-border bg-muted/30 px-4 py-3">
+                      <div className="flex flex-wrap items-baseline justify-between gap-2">
+                        <p className="text-sm font-semibold text-foreground">{row.title}</p>
+                        <span className="text-xs text-muted-foreground">
+                          {formatDistanceToNow(row.at, { addSuffix: true })}
+                        </span>
+                      </div>
+                      <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{row.body}</p>
+                    </li>
+                  ) : (
+                    <li key={row.key} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border px-4 py-3 text-sm">
+                      <div className="min-w-0">
+                        <span className="font-medium text-foreground">New file: {row.doc.name}</span>
+                        <Badge variant="outline" className="ml-2 capitalize">
+                          {row.doc.kind}
+                        </Badge>
+                      </div>
+                      <span className="text-xs text-muted-foreground">
+                        {formatDistanceToNow(row.at, { addSuffix: true })}
+                      </span>
+                    </li>
+                  ),
+                )}
+              </ul>
+            )}
           </section>
+
           <section className="space-y-3">
             <h4 className="text-sm font-semibold text-foreground">FAQ</h4>
-            <p className="text-sm text-muted-foreground">
-              Map diligence FAQs from the linked deal when available; placeholders show when the deal is unlinked.
-            </p>
+            {!props.room.dealId || !props.deal ? (
+              <p className="text-sm text-muted-foreground">
+                Link a deal in Settings to show diligence FAQs when they&apos;re configured on the deal record.
+              </p>
+            ) : faqs.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No FAQs published on the linked deal yet.</p>
+            ) : (
+              <div className="space-y-2">
+                {faqs.map((f, i) => (
+                  <details key={i} className="group rounded-xl border border-border px-4 py-2">
+                    <summary className="cursor-pointer text-sm font-medium text-foreground">{f.q}</summary>
+                    <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{f.a}</p>
+                  </details>
+                ))}
+              </div>
+            )}
           </section>
+
           <Separator />
           <div className="flex flex-wrap gap-3">
             <Link href="mailto:" className={cn(buttonVariants({ className: "rounded-xl" }))}>

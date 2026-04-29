@@ -32,9 +32,21 @@ const RULES = [
     status: "Preview",
   },
   {
-    id: "5",
-    trigger: "Deal closes",
-    action: "Archive related open tasks",
+    id: "6",
+    trigger: "Founder call booked from deal page",
+    action: "Create prep task for sponsor",
+    status: "Preview",
+  },
+  {
+    id: "7",
+    trigger: "Investor viewed diligence docs twice with no reply",
+    action: "Create warm follow-up task",
+    status: "Preview",
+  },
+  {
+    id: "8",
+    trigger: "Subscription docs pending wire",
+    action: "Create funding / ops checklist task",
     status: "Preview",
   },
 ];

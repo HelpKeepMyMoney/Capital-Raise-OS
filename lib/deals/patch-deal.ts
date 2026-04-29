@@ -64,6 +64,12 @@ export const DealPatchBodySchema = z
     jurisdiction: z.string().max(500).nullable().optional(),
     eligibility: z.string().max(10_000).nullable().optional(),
     cta: ctaVisibility.optional().nullable(),
+    appendInvestorUpdate: z
+      .object({
+        title: z.string().min(1).max(200),
+        body: z.string().min(1).max(20_000),
+      })
+      .optional(),
   })
   .strict();
 
@@ -128,6 +134,14 @@ export function dealPatchToFirestoreUpdate(patch: DealPatchBody): Record<string,
   if (patch.cta !== undefined) {
     if (patch.cta === null) u.cta = FieldValue.delete();
     else u.cta = patch.cta;
+  }
+
+  if (patch.appendInvestorUpdate) {
+    u.investorUpdates = FieldValue.arrayUnion({
+      title: patch.appendInvestorUpdate.title,
+      body: patch.appendInvestorUpdate.body,
+      createdAt: Date.now(),
+    });
   }
 
   return u;

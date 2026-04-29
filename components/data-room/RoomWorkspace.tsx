@@ -12,6 +12,7 @@ import type { SerializedDataRoom, SerializedRoomDocument, SerializedDealLite } f
 import type { InviteRow } from "@/lib/data-room/server-queries";
 import type { ActivityFeedItemDTO } from "@/lib/data-room/server-queries";
 import type { Deal } from "@/lib/firestore/types";
+import { cn } from "@/lib/utils";
 import { Search } from "lucide-react";
 
 type Props = {
@@ -24,11 +25,30 @@ type Props = {
   canManage: boolean;
   selectedDealId?: string;
   roomSelectList: { id: string; name: string }[];
+  lastLoginAtMs: number | null;
+  workspaceTab?: string;
+  onWorkspaceTabChange?: (tab: string) => void;
 };
 
 export function RoomWorkspace(props: Props) {
-  const [tab, setTab] = React.useState("documents");
+  const [internalTab, setInternalTab] = React.useState("preview");
+  const tab = props.workspaceTab ?? internalTab;
+
+  function goTab(next: string) {
+    if (props.workspaceTab === undefined) setInternalTab(next);
+    props.onWorkspaceTabChange?.(next);
+  }
+
   const [query, setQuery] = React.useState("");
+
+  React.useEffect(() => {
+    if (props.canManage) return;
+    if (props.workspaceTab === "investors") {
+      props.onWorkspaceTabChange?.("preview");
+    } else if (props.workspaceTab === undefined && internalTab === "investors") {
+      setInternalTab("preview");
+    }
+  }, [props.canManage, props.workspaceTab, internalTab, props.onWorkspaceTabChange]);
 
   const filteredDocs = React.useMemo(() => {
     const list = props.documentsForRoom;
@@ -54,24 +74,41 @@ export function RoomWorkspace(props: Props) {
         />
       </div>
 
-      <Tabs value={tab} onValueChange={setTab} className="w-full">
-        <TabsList className="grid h-auto w-full max-w-3xl grid-cols-2 flex-wrap rounded-2xl bg-muted/60 p-1 lg:grid-cols-5">
+      <Tabs value={tab} onValueChange={goTab} className="w-full">
+        <TabsList
+          className={cn(
+            "grid h-auto w-full max-w-3xl grid-cols-2 flex-wrap rounded-2xl bg-muted/60 p-1",
+            props.canManage ? "lg:grid-cols-5" : "lg:grid-cols-4",
+          )}
+        >
+          <TabsTrigger value="preview" className="rounded-xl data-[state=active]:bg-card data-[state=active]:shadow-sm">
+            Investor view
+          </TabsTrigger>
           <TabsTrigger value="documents" className="rounded-xl data-[state=active]:bg-card data-[state=active]:shadow-sm">
             Documents
           </TabsTrigger>
           <TabsTrigger value="activity" className="rounded-xl data-[state=active]:bg-card data-[state=active]:shadow-sm">
             Activity
           </TabsTrigger>
-          <TabsTrigger value="investors" className="rounded-xl data-[state=active]:bg-card data-[state=active]:shadow-sm">
-            Investors
-          </TabsTrigger>
+          {props.canManage ? (
+            <TabsTrigger value="investors" className="rounded-xl data-[state=active]:bg-card data-[state=active]:shadow-sm">
+              Investors
+            </TabsTrigger>
+          ) : null}
           <TabsTrigger value="settings" className="rounded-xl data-[state=active]:bg-card data-[state=active]:shadow-sm">
             Settings
           </TabsTrigger>
-          <TabsTrigger value="preview" className="rounded-xl data-[state=active]:bg-card data-[state=active]:shadow-sm">
-            Investor view
-          </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="preview" className="mt-4 focus-visible:outline-none">
+          <InvestorPreview
+            room={props.room}
+            deal={props.dealForRoom}
+            documentsForRoom={props.documentsForRoom}
+            lastLoginAtMs={props.lastLoginAtMs}
+            onOpenDocuments={() => goTab("documents")}
+          />
+        </TabsContent>
 
         <TabsContent value="documents" className="mt-4 focus-visible:outline-none">
           <DocumentManager
@@ -86,14 +123,13 @@ export function RoomWorkspace(props: Props) {
         <TabsContent value="activity" className="mt-4 focus-visible:outline-none">
           <ActivityAnalytics documents={props.documentsForRoom} activityPreview={props.activityPreview} />
         </TabsContent>
-        <TabsContent value="investors" className="mt-4 focus-visible:outline-none">
-          <InvestorAccessTable invitations={props.invitations} selectedDealId={props.selectedDealId ?? props.room.dealId} />
-        </TabsContent>
+        {props.canManage ? (
+          <TabsContent value="investors" className="mt-4 focus-visible:outline-none">
+            <InvestorAccessTable invitations={props.invitations} selectedDealId={props.selectedDealId ?? props.room.dealId} />
+          </TabsContent>
+        ) : null}
         <TabsContent value="settings" className="mt-4 focus-visible:outline-none">
           <RoomSettings room={props.room} deals={props.deals} canManage={props.canManage} />
-        </TabsContent>
-        <TabsContent value="preview" className="mt-4 focus-visible:outline-none">
-          <InvestorPreview room={props.room} deal={props.dealForRoom} />
         </TabsContent>
       </Tabs>
     </div>

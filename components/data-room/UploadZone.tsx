@@ -1,12 +1,15 @@
 "use client";
 
 import * as React from "react";
+import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { Upload } from "lucide-react";
 
 type Props = {
   disabled?: boolean;
   uploading: boolean;
+  /** 0–100 while uploading */
+  progress?: number | null;
   onFilesSelected: (files: FileList | File[]) => void;
   inputRef: React.RefObject<HTMLInputElement | null>;
 };
@@ -42,7 +45,10 @@ export function UploadZone(props: Props) {
       <p className="mt-1 text-xs text-muted-foreground">
         PDF · DOCX · XLSX · PPTX · PNG · JPG · MP4 · up to 50MB each
       </p>
-      {props.uploading ? (
+      {props.progress != null && props.progress >= 0 && props.progress < 100 ? (
+        <Progress value={props.progress} className="mt-4 h-2 w-full max-w-xs rounded-full" />
+      ) : null}
+      {props.uploading && (props.progress == null || props.progress >= 100) ? (
         <p className="mt-2 animate-pulse text-xs text-primary">Uploading…</p>
       ) : null}
     </div>

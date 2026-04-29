@@ -64,7 +64,42 @@ function formatBytes(n?: number): string {
   return `${(kb / 1024).toFixed(1)} MB`;
 }
 
-type SortColumn = "name" | "category" | "version" | "size" | "uploaded" | "views" | "lastViewed" | "access";
+type DocFilter = "all" | "financials" | "legal" | "pitch" | "media" | "hidden";
+
+function docMatches(d: SerializedRoomDocument, f: DocFilter): boolean {
+  switch (f) {
+    case "all":
+      return true;
+    case "financials":
+      return d.kind === "model" || d.kind === "ppm";
+    case "legal":
+      return d.kind === "legal";
+    case "pitch":
+      return d.kind === "deck";
+    case "media":
+      return d.kind === "video" || d.kind === "other";
+    case "hidden":
+      return d.accessLevel === "internal";
+    default:
+      return true;
+  }
+}
+
+function visibilityLabel(d: SerializedRoomDocument): string {
+  if (d.accessLevel === "internal") return "Hidden";
+  if (d.accessLevel === "vip") return "VIP";
+  return "Investors";
+}
+
+type SortColumn =
+  | "name"
+  | "category"
+  | "version"
+  | "size"
+  | "uploaded"
+  | "views"
+  | "lastViewed"
+  | "visibility";
 
 function SortableTableHead(props: {
   column: SortColumn;
@@ -124,6 +159,8 @@ export function DocumentManager(props: Props) {
   const [deleting, setDeleting] = React.useState(false);
   /** Per-file concurrent queue state simplified: show first uploading file name optional */
   const [localBusy, setLocalBusy] = React.useState(false);
+  const [uploadPct, setUploadPct] = React.useState<number | null>(null);
+  const [docFilter, setDocFilter] = React.useState<DocFilter>("all");
   const [sortColumn, setSortColumn] = React.useState<SortColumn>("name");
   const [sortDir, setSortDir] = React.useState<"asc" | "desc">("asc");
 
@@ -135,10 +172,37 @@ export function DocumentManager(props: Props) {
     }
   }
 
-  const mergedUploading =
-    props.uploading || localBusy || (props.uploadProgress != null && props.uploadProgress < 100 && props.uploadProgress > 0);
+  const mergedUploading = props.uploading || localBusy;
+
+  async function uploadWithProgress(file: File, onPct: (n: number) => void): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", "/api/data-room/documents");
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) resolve();
+        else {
+          try {
+            const j = JSON.parse(xhr.responseText) as { error?: string };
+            reject(new Error(j.error ?? xhr.statusText));
+          } catch {
+            reject(new Error(xhr.statusText || "Upload failed"));
+          }
+        }
+      };
+      xhr.onerror = () => reject(new Error("Network error"));
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) onPct(Math.min(99, Math.round((e.loaded / e.total) * 100)));
+      };
+      const fd = new FormData();
+      fd.set("file", file);
+      fd.set("dataRoomId", props.selectedRoomId);
+      fd.set("kind", kind);
+      xhr.send(fd);
+    });
+  }
 
   async function onFiles(files: FileList | File[]) {
+    if (!props.canManage) return;
     const arr = Array.from(files);
     if (!props.selectedRoomId) {
       toast.error("Select a room first.");
@@ -150,18 +214,20 @@ export function DocumentManager(props: Props) {
 
   async function uploadSequential(files: File[]) {
     setLocalBusy(true);
+    setUploadPct(0);
     let okCount = 0;
     try {
-      for (const file of files) {
-        const fd = new FormData();
-        fd.set("file", file);
-        fd.set("dataRoomId", props.selectedRoomId);
-        fd.set("kind", kind);
-        const res = await fetch("/api/data-room/documents", { method: "POST", body: fd });
-        const data = (await res.json()) as { error?: string };
-        if (!res.ok) throw new Error(data.error ?? "Upload failed");
+      const n = files.length;
+      for (let i = 0; i < n; i++) {
+        const file = files[i]!;
+        await uploadWithProgress(file, (p) => {
+          const base = (i / n) * 100;
+          const slice = (1 / n) * 100;
+          setUploadPct(Math.round(base + (p / 100) * slice));
+        });
         okCount += 1;
       }
+      setUploadPct(100);
       if (okCount === 1) toast.success("Document uploaded.");
       else toast.success(`${okCount} files uploaded.`);
       router.refresh();
@@ -169,6 +235,7 @@ export function DocumentManager(props: Props) {
       toast.error(e instanceof Error ? e.message : "Upload failed.");
     } finally {
       setLocalBusy(false);
+      window.setTimeout(() => setUploadPct(null), 400);
     }
   }
 
@@ -245,10 +312,31 @@ export function DocumentManager(props: Props) {
     }
   }
 
+  async function patchDocumentAccess(doc: SerializedRoomDocument, accessLevel: RoomDocType["accessLevel"]) {
+    try {
+      const res = await fetch(`/api/data-room/documents/${doc.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accessLevel }),
+      });
+      const data = (await res.json()) as { error?: string };
+      if (!res.ok) throw new Error(data.error ?? "Could not update visibility");
+      toast.success(accessLevel === "internal" ? "Hidden from investors" : "Visible to investors");
+      router.refresh();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not update");
+    }
+  }
+
   const activeDocs = props.documents.filter((d) => !props.selectedRoomId || d.dataRoomId === props.selectedRoomId);
 
+  const filteredByCategory = React.useMemo(
+    () => activeDocs.filter((d) => docMatches(d, docFilter)),
+    [activeDocs, docFilter],
+  );
+
   const sortedDocs = React.useMemo(() => {
-    const list = [...activeDocs];
+    const list = [...filteredByCategory];
     const dir = sortDir === "asc" ? 1 : -1;
     const cmp = (a: SerializedRoomDocument, b: SerializedRoomDocument): number => {
       switch (sortColumn) {
@@ -266,8 +354,8 @@ export function DocumentManager(props: Props) {
           return dir * ((a.viewCount ?? 0) - (b.viewCount ?? 0));
         case "lastViewed":
           return dir * ((a.lastViewedAt ?? 0) - (b.lastViewedAt ?? 0));
-        case "access":
-          return dir * (a.accessLevel ?? "invited").localeCompare(b.accessLevel ?? "invited", undefined, {
+        case "visibility":
+          return dir * visibilityLabel(a).localeCompare(visibilityLabel(b), undefined, {
             sensitivity: "base",
           });
         default:
@@ -276,27 +364,27 @@ export function DocumentManager(props: Props) {
     };
     list.sort(cmp);
     return list;
-  }, [activeDocs, sortColumn, sortDir]);
+  }, [filteredByCategory, sortColumn, sortDir]);
 
   return (
     <div className="space-y-4">
-      {props.uploadProgress != null && props.uploadProgress < 99 ? (
-        <Progress value={props.uploadProgress} className="h-1 rounded-full" />
+      {props.canManage && uploadPct != null && uploadPct < 100 ? (
+        <Progress value={uploadPct} className="h-1 rounded-full" />
       ) : null}
 
-      <div className="flex flex-wrap items-center gap-2">
-        <input
-          ref={fileInputRef}
-          type="file"
-          multiple
-          className="hidden"
-          onChange={(e) => {
-            if (e.target.files?.length) void onFiles(e.target.files);
-            e.target.value = "";
-          }}
-        />
-        {props.canManage ? (
-          <>
+      {props.canManage ? (
+        <>
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                if (e.target.files?.length) void onFiles(e.target.files);
+                e.target.value = "";
+              }}
+            />
             <Badge variant="secondary" className="rounded-full">
               Bulk actions
             </Badge>
@@ -308,20 +396,17 @@ export function DocumentManager(props: Props) {
               Generate share link
               <Layers className="h-3.5 w-3.5" />
             </Button>
-          </>
-        ) : null}
-      </div>
+          </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr,minmax(0,340px)]">
-        <UploadZone
-          disabled={!props.canManage || !props.selectedRoomId}
-          uploading={mergedUploading}
-          onFilesSelected={onFiles}
-          inputRef={fileInputRef}
-        />
-        <div className="space-y-4 rounded-2xl border border-border bg-card p-4 shadow-sm">
-          {props.canManage ? (
-            <>
+          <div className="grid gap-6 lg:grid-cols-[1fr,minmax(0,340px)]">
+            <UploadZone
+              disabled={!props.selectedRoomId}
+              uploading={mergedUploading}
+              progress={uploadPct}
+              onFilesSelected={onFiles}
+              inputRef={fileInputRef}
+            />
+            <div className="space-y-4 rounded-2xl border border-border bg-card p-4 shadow-sm">
               <Label className="text-xs uppercase text-muted-foreground">Default upload type</Label>
               <Select
                 value={kind}
@@ -353,15 +438,37 @@ export function DocumentManager(props: Props) {
               <p className="text-[11px] text-muted-foreground">
                 Applies to uploads from the drop zone above. Larger folders upload sequentially — watch for browser limits.
               </p>
-            </>
-          ) : (
-            <p className="text-sm text-muted-foreground">Browse opens from the Documents table below.</p>
-          )}
-        </div>
+            </div>
+          </div>
+        </>
+      ) : null}
+
+      <div className="flex flex-wrap gap-2">
+        {(
+          [
+            ["all", "All"],
+            ["financials", "Financials"],
+            ["legal", "Legal"],
+            ["pitch", "Pitch"],
+            ["media", "Media"],
+            ["hidden", "Hidden"],
+          ] as const
+        ).map(([id, label]) => (
+          <Button
+            key={id}
+            type="button"
+            size="sm"
+            variant={docFilter === id ? "default" : "outline"}
+            className="h-8 rounded-full text-xs"
+            onClick={() => setDocFilter(id)}
+          >
+            {label}
+          </Button>
+        ))}
       </div>
 
       <ScrollArea className="h-[440px] max-h-[52vh] rounded-2xl border border-border shadow-sm [&>div>div]:!block [&>div>div]:!min-h-[min(440px,max-content)]">
-        <Table>
+        <Table zebra>
           <TableHeader>
             <TableRow className="hover:bg-muted/60">
               <SortableTableHead
@@ -416,8 +523,8 @@ export function DocumentManager(props: Props) {
                 onSort={onSortColumn}
               />
               <SortableTableHead
-                column="access"
-                label="Access"
+                column="visibility"
+                label="Visibility"
                 className="hidden 2xl:table-cell"
                 sortColumn={sortColumn}
                 sortDir={sortDir}
@@ -431,6 +538,12 @@ export function DocumentManager(props: Props) {
               <TableRow>
                 <TableCell colSpan={9} className="py-12 text-center text-sm text-muted-foreground">
                   {props.selectedRoomId ? "No documents in this room yet." : "Select a room to see documents."}
+                </TableCell>
+              </TableRow>
+            ) : filteredByCategory.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={9} className="py-12 text-center text-sm text-muted-foreground">
+                  No documents match this filter.
                 </TableCell>
               </TableRow>
             ) : (
@@ -449,7 +562,7 @@ export function DocumentManager(props: Props) {
                   <TableCell className="hidden text-xs text-muted-foreground lg:table-cell">
                     {d.lastViewedAt ? formatDistanceToNow(d.lastViewedAt, { addSuffix: true }) : "—"}
                   </TableCell>
-                  <TableCell className="hidden capitalize 2xl:table-cell">{d.accessLevel ?? "invited"}</TableCell>
+                  <TableCell className="hidden capitalize 2xl:table-cell">{visibilityLabel(d)}</TableCell>
                   <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger
@@ -467,8 +580,11 @@ export function DocumentManager(props: Props) {
                             <DropdownMenuItem onClick={() => beginEdit(d)} className="gap-2">
                               <Pencil className="h-3.5 w-3.5" /> Rename / Move
                             </DropdownMenuItem>
-                            <DropdownMenuItem disabled>Replace version</DropdownMenuItem>
-                            <DropdownMenuItem disabled>Bulk unavailable</DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => void patchDocumentAccess(d, d.accessLevel === "internal" ? "invited" : "internal")}
+                            >
+                              {d.accessLevel === "internal" ? "Visible to investors" : "Hide from investors"}
+                            </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => void openDocument(d.id)} className="text-card-foreground">
                               Download via preview
                             </DropdownMenuItem>

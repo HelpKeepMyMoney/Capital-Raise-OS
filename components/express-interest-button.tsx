@@ -5,7 +5,11 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { trackDealTelemetry } from "@/components/deals/deal-telemetry";
 
-export function ExpressInterestButton(props: { dealId: string; dealName: string }) {
+export function ExpressInterestButton(props: {
+  dealId: string;
+  dealName: string;
+  variant?: "ghost" | "outline";
+}) {
   const [pending, setPending] = React.useState(false);
 
   async function onExpress() {
@@ -28,7 +32,18 @@ export function ExpressInterestButton(props: { dealId: string; dealName: string 
   }
 
   return (
-    <Button type="button" size="sm" onClick={() => void onExpress()} disabled={pending}>
+    <Button
+      type="button"
+      size="sm"
+      variant={props.variant === "outline" ? "outline" : "ghost"}
+      className={
+        props.variant === "ghost"
+          ? "w-full rounded-xl border border-dashed border-border/90 text-muted-foreground hover:border-primary/40 hover:bg-muted/50 hover:text-foreground sm:w-auto"
+          : undefined
+      }
+      onClick={() => void onExpress()}
+      disabled={pending}
+    >
       {pending ? "Saving…" : "Express interest"}
     </Button>
   );

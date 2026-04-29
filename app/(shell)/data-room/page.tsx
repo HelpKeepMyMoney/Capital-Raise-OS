@@ -1,9 +1,10 @@
-import { filterDataRoomsForMember, filterDocumentsForMember } from "@/lib/auth/investor-access";
+import { filterDataRoomsForMember, filterDealsForMember, filterDocumentsForMember } from "@/lib/auth/investor-access";
 import { canEditOrgData } from "@/lib/auth/rbac";
 import { requireOrgSession } from "@/lib/auth/session";
+import { getUserLastSignInMs } from "@/lib/auth/user-metadata";
 import { DataRoomShell } from "@/components/data-room/data-room-shell";
 import { getAdminFirestore } from "@/lib/firebase/admin";
-import { computeDataRoomMetrics } from "@/lib/data-room/metrics";
+import { buildInvestorGuestMetrics, computeDataRoomMetrics } from "@/lib/data-room/metrics";
 import type { InviteRow } from "@/lib/data-room/server-queries";
 import {
   listDataRoomActivityFeed,
@@ -33,12 +34,6 @@ export default async function DataRoomPage(props: {
   const [roomsSnap, docsSnap] = await Promise.all([
     db.collection(col.dataRooms).where("organizationId", "==", ctx.orgId).limit(120).get(),
     db.collection(col.documents).where("organizationId", "==", ctx.orgId).limit(500).get(),
-  ]);
-
-  const [metrics, invitationsOrEmpty, activityPreviewOrEmpty] = await Promise.all([
-    computeDataRoomMetrics(ctx.orgId),
-    canManage ? listInvestorInvitationsForOrganization(ctx.orgId, 120) : Promise.resolve([] as InviteRow[]),
-    canManage ? listDataRoomActivityFeed(ctx.orgId, 50) : Promise.resolve([]),
   ]);
 
   let roomsRaw: SerializedDataRoom[] = roomsSnap.docs.map((d) => {
@@ -86,15 +81,26 @@ export default async function DataRoomPage(props: {
     };
   });
 
-  documents = filterDocumentsForMember(documents, membership);
+  documents = filterDocumentsForMember(documents, membership, roomsRaw);
 
-  const dealsList = await listDeals(ctx.orgId);
+  const metrics = canManage
+    ? await computeDataRoomMetrics(ctx.orgId)
+    : buildInvestorGuestMetrics(rooms, documents);
+
+  const [invitationsOrEmpty, activityPreviewOrEmpty] = await Promise.all([
+    canManage ? listInvestorInvitationsForOrganization(ctx.orgId, 120) : Promise.resolve([] as InviteRow[]),
+    canManage ? listDataRoomActivityFeed(ctx.orgId, 50) : Promise.resolve([]),
+  ]);
+
+  const dealsList = filterDealsForMember(await listDeals(ctx.orgId), membership);
 
   const dealIdsNeeded = [...new Set(rooms.map((r) => r.dealId).filter(Boolean))] as string[];
   const roomDealMap: Record<string, Deal | null> = {};
   for (const did of dealIdsNeeded) {
     roomDealMap[did] = await getDeal(ctx.orgId, did);
   }
+
+  const lastLoginAtMs = await getUserLastSignInMs(ctx.user.uid);
 
   return (
     <div className="mx-auto max-w-[1400px] space-y-6 px-4 pb-12 pt-6 md:px-6 lg:px-8">
@@ -115,6 +121,7 @@ export default async function DataRoomPage(props: {
         activityPreview={activityPreviewOrEmpty}
         canManage={canManage}
         initialDealFilterId={initialDealFilterId}
+        lastLoginAtMs={lastLoginAtMs}
       />
     </div>
   );

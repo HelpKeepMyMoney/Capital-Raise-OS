@@ -6,8 +6,11 @@ import { getAdminFirestore } from "@/lib/firebase/admin";
 import { col, dealCommitmentDocId } from "@/lib/firestore/paths";
 import { getDeal, getMembership } from "@/lib/firestore/queries";
 import { writeAuditLog } from "@/lib/audit";
+import type { DealCommitmentInvestingAs } from "@/lib/firestore/types";
 
 const CURRENCIES = new Set(["USD"]);
+const INVESTING_AS: Set<string> = new Set(["individual", "llc", "trust", "ira"]);
+const PREFERRED_CONTACT: Set<string> = new Set(["email", "phone", "either"]);
 
 export async function POST(req: NextRequest) {
   const ctx = await requireOrgSession();
@@ -18,6 +21,10 @@ export async function POST(req: NextRequest) {
     amount?: number;
     currency?: string;
     withdraw?: boolean;
+    investingAs?: DealCommitmentInvestingAs;
+    entityName?: string;
+    accreditationStatus?: string;
+    preferredContact?: string;
   };
 
   const dealId = typeof body.dealId === "string" ? body.dealId.trim() : "";
@@ -84,6 +91,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "amount must be at least 1 (whole currency units)." }, { status: 400 });
   }
 
+  const investingAs: DealCommitmentInvestingAs | undefined = INVESTING_AS.has(
+    String(body.investingAs),
+  )
+    ? (body.investingAs as DealCommitmentInvestingAs)
+    : undefined;
+  const entityName =
+    typeof body.entityName === "string" ? body.entityName.trim().slice(0, 240) : "";
+  const accreditationStatus =
+    typeof body.accreditationStatus === "string"
+      ? body.accreditationStatus.trim().slice(0, 120)
+      : "";
+  const preferredContact = PREFERRED_CONTACT.has(String(body.preferredContact))
+    ? body.preferredContact
+    : "email";
+
   const creff = db.collection(col.dealCommitments).doc(docId);
   const existing = await creff.get();
   const prevCreatedAt = existing.exists ? (existing.data()?.createdAt as number | undefined) : undefined;
@@ -99,6 +121,10 @@ export async function POST(req: NextRequest) {
       status: "active" as const,
       updatedAt: now,
       createdAt: prevCreatedAt ?? now,
+      ...(investingAs ? { investingAs } : {}),
+      ...(entityName ? { entityName } : {}),
+      ...(accreditationStatus ? { accreditationStatus } : {}),
+      preferredContact,
     },
     { merge: true },
   );
@@ -108,7 +134,13 @@ export async function POST(req: NextRequest) {
     actorId: ctx.user.uid,
     action: "deal.commit_amount",
     resource: `${col.deals}/${dealId}`,
-    payload: { amount: Math.floor(amount), currency },
+    payload: {
+      amount: Math.floor(amount),
+      currency,
+      investingAs,
+      preferredContact,
+      hasEntityName: Boolean(entityName),
+    },
   });
 
   const activityId = randomUUID();
