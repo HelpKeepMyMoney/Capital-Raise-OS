@@ -21,6 +21,32 @@ service cloud.firestore {
       return isOrgMember(orgId) && orgRole(orgId) == 'investor_guest';
     }
 
+    function investorAccess(orgId) {
+      return get(memberDoc(orgId)).data.investorAccess;
+    }
+
+    /** Deal readable by scoped LP guest when in invited deal list or org-wide portal. */
+    function guestDealReadAllowed(orgId, dealDocId) {
+      let ia = investorAccess(orgId);
+      return ia != null && (
+        ia.scope == 'org' ||
+        (ia.scope == 'deal' && dealDocId in ia.dealIds)
+      );
+    }
+
+    function guestDataRoomReadAllowed(orgId, roomId) {
+      let ia = investorAccess(orgId);
+      return ia != null && (
+        ia.scope == 'org' ||
+        (ia.scope == 'deal' && roomId in ia.dataRoomIds)
+      );
+    }
+
+    /** Document belongs to an allowed room, or org-wide guest sees all org docs in rooms. */
+    function guestDocumentReadAllowed(orgId, dataRoomId) {
+      return dataRoomId != '' && guestDataRoomReadAllowed(orgId, dataRoomId);
+    }
+
     function canWriteOrg(orgId) {
       return isOrgMember(orgId) && orgRole(orgId) != 'investor_guest';
     }
@@ -48,7 +74,10 @@ service cloud.firestore {
     }
 
     match /investors/{investorId} {
-      allow read: if isOrgMember(resource.data.organizationId);
+      allow read: if isOrgMember(resource.data.organizationId) && (
+        !isGuest(resource.data.organizationId) ||
+        ('linkedUserId' in resource.data && resource.data.linkedUserId == request.auth.uid)
+      );
       allow create: if canWriteOrg(request.resource.data.organizationId);
       allow update, delete: if canWriteOrg(resource.data.organizationId);
 
@@ -64,7 +93,10 @@ service cloud.firestore {
     }
 
     match /activities/{activityId} {
-      allow read: if isOrgMember(resource.data.organizationId);
+      allow read: if isOrgMember(resource.data.organizationId) && (
+        !isGuest(resource.data.organizationId) ||
+        ('actorId' in resource.data && resource.data.actorId == request.auth.uid)
+      );
       allow write: if canWriteOrg(resource.data.organizationId);
     }
 
@@ -89,17 +121,29 @@ service cloud.firestore {
     }
 
     match /deals/{dealId} {
-      allow read: if isOrgMember(resource.data.organizationId);
+      allow read: if isOrgMember(resource.data.organizationId) && (
+        !isGuest(resource.data.organizationId) ||
+        guestDealReadAllowed(resource.data.organizationId, dealId)
+      );
       allow write: if canWriteOrg(resource.data.organizationId);
     }
 
     match /documents/{docId} {
-      allow read: if isOrgMember(resource.data.organizationId);
+      allow read: if isOrgMember(resource.data.organizationId) && (
+        !isGuest(resource.data.organizationId) ||
+        guestDocumentReadAllowed(
+          resource.data.organizationId,
+          ('dataRoomId' in resource.data ? resource.data.dataRoomId : '')
+        )
+      );
       allow write: if canWriteOrg(resource.data.organizationId);
     }
 
     match /data_rooms/{roomId} {
-      allow read: if isOrgMember(resource.data.organizationId) || isGuest(resource.data.organizationId);
+      allow read: if isOrgMember(resource.data.organizationId) && (
+        !isGuest(resource.data.organizationId) ||
+        guestDataRoomReadAllowed(resource.data.organizationId, roomId)
+      );
       allow write: if canWriteOrg(resource.data.organizationId);
     }
 
@@ -115,6 +159,14 @@ service cloud.firestore {
     match /subscriptions/{orgId} {
       allow read: if isOrgMember(orgId);
       allow write: if false;
+    }
+
+    match /investor_invitations/{id} {
+      allow read, write: if false;
+    }
+
+    match /deal_commitments/{id} {
+      allow read, write: if false;
     }
   }
 }

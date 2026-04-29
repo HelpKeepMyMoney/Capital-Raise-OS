@@ -1,3 +1,4 @@
+import { redirectInvestorGuestsFromRaiseTools } from "@/lib/auth/guest-routes";
 import { requireOrgSession } from "@/lib/auth/session";
 import {
   funnelCounts,
@@ -7,6 +8,7 @@ import {
   listTasksDueToday,
   listUpcomingMeetings,
   weeklyOutreachStats,
+  getMembership,
 } from "@/lib/firestore/queries";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { FunnelChart } from "@/components/dashboard/funnel-chart";
@@ -23,6 +25,8 @@ function fmtMoney(n: number) {
 export default async function DashboardPage() {
   const ctx = await requireOrgSession();
   if (!ctx) redirect("/login");
+  const membership = await getMembership(ctx.orgId, ctx.user.uid);
+  redirectInvestorGuestsFromRaiseTools(membership?.role);
 
   const start = new Date();
   start.setHours(0, 0, 0, 0);
@@ -54,7 +58,7 @@ export default async function DashboardPage() {
     <div className="mx-auto max-w-7xl space-y-8">
       <div>
         <h1 className="text-3xl font-semibold tracking-tight">Executive dashboard</h1>
-        <p className="mt-1 text-muted-foreground">
+        <p className="mt-1 text-foreground/85">
           Real-time fundraising command center for your organization.
         </p>
       </div>

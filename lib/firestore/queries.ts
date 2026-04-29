@@ -1,11 +1,14 @@
 import { getAdminFirestore } from "@/lib/firebase/admin";
-import { col, memberDocId } from "@/lib/firestore/paths";
+import { col, memberDocId, dealCommitmentDocId } from "@/lib/firestore/paths";
 import type {
   Activity,
   Deal,
   Investor,
+  InvestorInvitation,
+  DealCommitment,
   Meeting,
   Organization,
+  InvestorAccess,
   Task,
 } from "@/lib/firestore/types";
 function mapDocs<T extends { id: string }>(
@@ -42,22 +45,59 @@ export async function listUserOrganizations(
 export async function getMembership(
   orgId: string,
   uid: string,
-): Promise<{ role: string } | null> {
+): Promise<{ role: string; investorAccess?: InvestorAccess } | null> {
   const db = getAdminFirestore();
   const d = await db.collection(col.organizationMembers).doc(memberDocId(orgId, uid)).get();
   if (!d.exists) return null;
-  const data = d.data() as { role: string };
-  return { role: data.role };
+  const data = d.data() as { role: string; investorAccess?: InvestorAccess };
+  return { role: data.role, investorAccess: data.investorAccess };
 }
 
-export async function listInvestors(orgId: string, limit = 500): Promise<Investor[]> {
+export function isInvestorActive(inv: Investor): boolean {
+  return inv.crmStatus !== "archived";
+}
+
+export async function getInvestor(orgId: string, investorId: string): Promise<Investor | null> {
+  const db = getAdminFirestore();
+  const d = await db.collection(col.investors).doc(investorId).get();
+  if (!d.exists) return null;
+  const data = d.data() as Omit<Investor, "id">;
+  if (data.organizationId !== orgId) return null;
+  return { id: d.id, ...data };
+}
+
+export async function listInvestors(
+  orgId: string,
+  opts?: { limit?: number; includeArchived?: boolean },
+): Promise<Investor[]> {
+  const limit = opts?.limit ?? 500;
   const db = getAdminFirestore();
   const snap = await db
     .collection(col.investors)
     .where("organizationId", "==", orgId)
     .limit(limit)
     .get();
-  return mapDocs(snap, (data, id) => ({ id, ...(data as Omit<Investor, "id">) }));
+  let list = mapDocs(snap, (data, id) => ({ id, ...(data as Omit<Investor, "id">) }));
+  if (!opts?.includeArchived) {
+    list = list.filter(isInvestorActive);
+  }
+  return list;
+}
+
+export async function listActivitiesForInvestor(
+  orgId: string,
+  investorId: string,
+  limit = 50,
+): Promise<Activity[]> {
+  const db = getAdminFirestore();
+  const snap = await db
+    .collection(col.activities)
+    .where("organizationId", "==", orgId)
+    .where("investorId", "==", investorId)
+    .orderBy("createdAt", "desc")
+    .limit(limit)
+    .get();
+  return mapDocs(snap, (data, id) => ({ id, ...(data as Omit<Activity, "id">) }));
 }
 
 export async function listTasksDueToday(orgId: string, start: number, end: number): Promise<Task[]> {
@@ -72,6 +112,37 @@ export async function listTasksDueToday(orgId: string, start: number, end: numbe
   return mapDocs(snap, (data, id) => ({ id, ...(data as Omit<Task, "id">) })).filter(
     (t) => t.status === "open",
   );
+}
+
+export async function listOpenTasks(orgId: string, limit = 80): Promise<Task[]> {
+  const db = getAdminFirestore();
+  const snap = await db
+    .collection(col.tasks)
+    .where("organizationId", "==", orgId)
+    .where("status", "==", "open")
+    .limit(limit)
+    .get();
+  const list = mapDocs(snap, (data, id) => ({ id, ...(data as Omit<Task, "id">) }));
+  list.sort((a, b) => {
+    const ad = a.dueAt ?? a.createdAt;
+    const bd = b.dueAt ?? b.createdAt;
+    return ad - bd;
+  });
+  return list;
+}
+
+/** Done and cancelled tasks, newest first. */
+export async function listClosedTasks(orgId: string, limit = 80): Promise<Task[]> {
+  const db = getAdminFirestore();
+  const snap = await db
+    .collection(col.tasks)
+    .where("organizationId", "==", orgId)
+    .where("status", "in", ["done", "cancelled"])
+    .limit(limit)
+    .get();
+  const list = mapDocs(snap, (data, id) => ({ id, ...(data as Omit<Task, "id">) }));
+  list.sort((a, b) => b.createdAt - a.createdAt);
+  return list;
 }
 
 export async function listRecentActivities(orgId: string, limit = 20): Promise<Activity[]> {
@@ -97,6 +168,70 @@ export async function listUpcomingMeetings(orgId: string, from: number, limit = 
   return mapDocs(snap, (data, id) => ({ id, ...(data as Omit<Meeting, "id">) }));
 }
 
+export async function findInvitationByTokenHash(
+  tokenHash: string,
+): Promise<InvestorInvitation | null> {
+  const db = getAdminFirestore();
+  const snap = await db
+    .collection(col.investorInvitations)
+    .where("tokenHash", "==", tokenHash)
+    .limit(1)
+    .get();
+  if (snap.empty) return null;
+  const doc = snap.docs[0]!;
+  return { id: doc.id, ...(doc.data() as Omit<InvestorInvitation, "id">) };
+}
+
+export async function listInvestorInvitationsForOrganization(
+  orgId: string,
+  limit = 40,
+): Promise<InvestorInvitation[]> {
+  const db = getAdminFirestore();
+  const snap = await db
+    .collection(col.investorInvitations)
+    .where("organizationId", "==", orgId)
+    .orderBy("createdAt", "desc")
+    .limit(limit)
+    .get();
+  return snap.docs.map((d) => ({
+    id: d.id,
+    ...(d.data() as Omit<InvestorInvitation, "id">),
+  }));
+}
+
+export async function getDealCommitmentForUser(
+  orgId: string,
+  dealId: string,
+  userId: string,
+): Promise<DealCommitment | null> {
+  const db = getAdminFirestore();
+  const id = dealCommitmentDocId(orgId, dealId, userId);
+  const d = await db.collection(col.dealCommitments).doc(id).get();
+  if (!d.exists) return null;
+  const data = d.data() as Omit<DealCommitment, "id">;
+  if (data.organizationId !== orgId) return null;
+  return { id: d.id, ...data };
+}
+
+export async function listDealCommitmentsForDeal(
+  orgId: string,
+  dealId: string,
+  limit = 100,
+): Promise<DealCommitment[]> {
+  const db = getAdminFirestore();
+  const snap = await db
+    .collection(col.dealCommitments)
+    .where("organizationId", "==", orgId)
+    .where("dealId", "==", dealId)
+    .orderBy("updatedAt", "desc")
+    .limit(limit)
+    .get();
+  return snap.docs.map((d) => ({
+    id: d.id,
+    ...(d.data() as Omit<DealCommitment, "id">),
+  }));
+}
+
 export async function listDeals(orgId: string): Promise<Deal[]> {
   const db = getAdminFirestore();
   const snap = await db
@@ -107,7 +242,17 @@ export async function listDeals(orgId: string): Promise<Deal[]> {
   return mapDocs(snap, (data, id) => ({ id, ...(data as Omit<Deal, "id">) }));
 }
 
-export function funnelCounts(investors: Investor[]) {
+export async function getDeal(orgId: string, dealId: string): Promise<Deal | null> {
+  const db = getAdminFirestore();
+  const d = await db.collection(col.deals).doc(dealId).get();
+  if (!d.exists) return null;
+  const data = d.data() as Omit<Deal, "id">;
+  if (data.organizationId !== orgId) return null;
+  return { id: d.id, ...data };
+}
+
+export function funnelCounts(investors: Investor[], activeOnly = true) {
+  const list = activeOnly ? investors.filter(isInvestorActive) : investors;
   const stages = [
     "lead",
     "researching",
@@ -123,7 +268,7 @@ export function funnelCounts(investors: Investor[]) {
   ] as const;
   const counts: Record<string, number> = {};
   for (const s of stages) counts[s] = 0;
-  for (const inv of investors) {
+  for (const inv of list) {
     counts[inv.pipelineStage] = (counts[inv.pipelineStage] ?? 0) + 1;
   }
   return stages.map((s) => ({ stage: s, count: counts[s] ?? 0 }));

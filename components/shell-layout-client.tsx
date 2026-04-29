@@ -13,7 +13,9 @@ export function ShellLayoutClient(props: {
   children: React.ReactNode;
   orgs: { org: Organization; role: string }[];
   currentOrgId: string;
+  currentRole: string;
   user: { email?: string; name?: string };
+  isPlatformAdmin?: boolean;
 }) {
   const [copilotOpen, setCopilotOpen] = React.useState(false);
 
@@ -22,18 +24,20 @@ export function ShellLayoutClient(props: {
       <AppSidebar
         orgs={props.orgs}
         currentOrgId={props.currentOrgId}
+        currentRole={props.currentRole}
         user={props.user}
+        isPlatformAdmin={props.isPlatformAdmin ?? false}
         onOpenCopilot={() => setCopilotOpen(true)}
       />
-      <SidebarInset className="bg-[radial-gradient(ellipse_at_top,oklch(0.22_0.04_250/0.35),transparent_55%),radial-gradient(ellipse_at_bottom,oklch(0.25_0.05_160/0.2),transparent_50%)]">
-        <header className="flex h-14 shrink-0 items-center gap-2 border-b border-white/10 bg-background/40 px-4 backdrop-blur-xl">
+      <SidebarInset className="bg-background">
+        <header className="flex h-14 shrink-0 items-center gap-2 border-b border-border bg-background/50 px-4 backdrop-blur-xl">
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="mr-2 h-4" />
           <div className="flex flex-1 items-center justify-end gap-2">
             <Button
               variant="ghost"
               size="sm"
-              className="text-muted-foreground"
+              className="text-foreground/80"
               type="button"
               onClick={async () => {
                 await fetch("/api/auth/logout", { method: "POST" });

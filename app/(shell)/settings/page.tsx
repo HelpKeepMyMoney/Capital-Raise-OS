@@ -1,5 +1,6 @@
+import { redirectInvestorGuestsFromRaiseTools } from "@/lib/auth/guest-routes";
 import { requireOrgSession } from "@/lib/auth/session";
-import { getOrganization } from "@/lib/firestore/queries";
+import { getOrganization, getMembership } from "@/lib/firestore/queries";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,15 +12,17 @@ import { redirect } from "next/navigation";
 export default async function SettingsPage() {
   const ctx = await requireOrgSession();
   if (!ctx) redirect("/login");
+  const membership = await getMembership(ctx.orgId, ctx.user.uid);
+  redirectInvestorGuestsFromRaiseTools(membership?.role);
   const org = await getOrganization(ctx.orgId);
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
         <h1 className="text-3xl font-semibold tracking-tight">Settings</h1>
-        <p className="mt-1 text-muted-foreground">Organization, branding, integrations, and API keys.</p>
+        <p className="mt-1 text-foreground/85">Organization, branding, integrations, and API keys.</p>
       </div>
-      <Card className="border-white/10 bg-card/60 backdrop-blur-md">
+      <Card className="border-border bg-card shadow-sm">
         <CardHeader>
           <CardTitle>Organization</CardTitle>
         </CardHeader>
@@ -34,13 +37,13 @@ export default async function SettingsPage() {
           </div>
           <Link
             href="/settings/billing"
-            className={cn(buttonVariants({ variant: "outline" }), "inline-flex")}
+            className={cn(buttonVariants({ size: "sm" }), "inline-flex")}
           >
             Billing & subscriptions
           </Link>
         </CardContent>
       </Card>
-      <Card className="border-white/10 bg-card/60 backdrop-blur-md">
+      <Card className="border-border bg-card shadow-sm">
         <CardHeader>
           <CardTitle>Integrations</CardTitle>
         </CardHeader>

@@ -15,9 +15,9 @@ export function StatCard(props: {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, delay: props.delay ?? 0 }}
     >
-      <Card className="border-white/10 bg-gradient-to-br from-card/90 to-card/40 shadow-lg backdrop-blur-md">
+      <Card className="border-border bg-card shadow-sm">
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium text-muted-foreground">{props.title}</CardTitle>
+          <CardTitle className="text-sm font-bold text-muted-foreground">{props.title}</CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-3xl font-semibold tracking-tight">{props.value}</p>

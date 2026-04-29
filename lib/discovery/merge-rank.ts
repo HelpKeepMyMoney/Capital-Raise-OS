@@ -1,4 +1,5 @@
 import type { Investor } from "@/lib/firestore/types";
+import { investorDisplayName } from "@/lib/investors/display-name";
 import type { DiscoveryFilters, RankedInvestorCandidate } from "@/lib/discovery/types";
 import { getDiscoveryProviders } from "@/lib/discovery/providers/index";
 
@@ -25,9 +26,10 @@ function matchesFilters(inv: Investor, f: DiscoveryFilters): boolean {
 
 function crmToCandidate(inv: Investor, query: string): RankedInvestorCandidate {
   const q = query.toLowerCase();
+  const displayName = investorDisplayName(inv);
   let score = 50;
   const reasons: string[] = ["In your CRM"];
-  if (inv.name.toLowerCase().includes(q) || inv.firm?.toLowerCase().includes(q)) {
+  if (displayName.toLowerCase().includes(q) || inv.firm?.toLowerCase().includes(q)) {
     score += 25;
     reasons.push("Name/firm matches query");
   }
@@ -41,7 +43,7 @@ function crmToCandidate(inv: Investor, query: string): RankedInvestorCandidate {
   }
   return {
     id: inv.id,
-    name: inv.name,
+    name: displayName,
     firm: inv.firm,
     email: inv.email,
     pipelineStage: inv.pipelineStage,

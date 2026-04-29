@@ -1,55 +1,62 @@
+import { redirectInvestorGuestsFromRaiseTools } from "@/lib/auth/guest-routes";
+import { canEditOrgData } from "@/lib/auth/rbac";
 import { requireOrgSession } from "@/lib/auth/session";
-import { getAdminFirestore } from "@/lib/firebase/admin";
-import { col } from "@/lib/firestore/paths";
+import { getMembership, listClosedTasks, listOpenTasks } from "@/lib/firestore/queries";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
+import { TasksPanel } from "@/components/tasks-panel";
 import { redirect } from "next/navigation";
-import { format } from "date-fns";
 
-export default async function TasksPage() {
+export default async function TasksPage(props: {
+  searchParams: Promise<{ filter?: string }>;
+}) {
   const ctx = await requireOrgSession();
   if (!ctx) redirect("/login");
-  const db = getAdminFirestore();
-  const snap = await db
-    .collection(col.tasks)
-    .where("organizationId", "==", ctx.orgId)
-    .orderBy("dueAt", "asc")
-    .limit(80)
-    .get();
+
+  const sp = await props.searchParams;
+  const view = sp.filter === "closed" ? "closed" : "open";
+
+  const [tasks, membership] = await Promise.all([
+    view === "closed" ? listClosedTasks(ctx.orgId) : listOpenTasks(ctx.orgId),
+    getMembership(ctx.orgId, ctx.user.uid),
+  ]);
+  redirectInvestorGuestsFromRaiseTools(membership?.role);
+  const canManage = membership != null && canEditOrgData(membership.role);
+
+  const rows = tasks.map((t) => ({
+    id: t.id,
+    title: t.title,
+    dueAt: t.dueAt,
+    status: t.status,
+    linkedInvestorId: t.linkedInvestorId,
+    isInvestorFollowUp: t.isInvestorFollowUp,
+  }));
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
         <h1 className="text-3xl font-semibold tracking-tight">Tasks & automations</h1>
-        <p className="mt-1 text-muted-foreground">
+        <p className="mt-1 text-foreground/85">
           Follow-ups, meeting tasks, and scheduled playbooks powered by Cloud Functions.
         </p>
       </div>
-      <Card className="border-white/10 bg-card/60 backdrop-blur-md">
+
+      <TasksPanel tasks={rows} canManage={canManage} view={view} />
+
+      <Card className="border-border bg-card shadow-sm">
         <CardHeader>
-          <CardTitle>Open tasks</CardTitle>
+          <CardTitle className="text-base">Scheduled automations</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
-          {snap.docs.map((doc) => {
-            const t = doc.data() as { title?: string; dueAt?: number; status?: string };
-            return (
-              <div
-                key={doc.id}
-                className="flex items-start gap-3 rounded-lg border border-white/10 p-3"
-              >
-                <Checkbox checked={t.status === "done"} disabled />
-                <div>
-                  <p className="font-medium">{t.title}</p>
-                  {t.dueAt ? (
-                    <p className="text-xs text-muted-foreground">
-                      Due {format(t.dueAt, "MMM d, yyyy")}
-                    </p>
-                  ) : null}
-                </div>
-              </div>
-            );
-          })}
-          {snap.empty ? <p className="text-sm text-muted-foreground">No tasks yet.</p> : null}
+        <CardContent className="space-y-2 font-sans text-sm text-muted-foreground">
+          <p>
+            <span className="font-medium text-foreground">Weekly fundraising digest</span> — when Firebase
+            Functions are deployed, the <code className="text-xs">weeklyFundraisingDigest</code> schedule
+            runs every Monday at 09:00 and queues a &quot;Weekly fundraising report&quot; task per
+            organization (see <code className="text-xs">functions/src/index.ts</code>).
+          </p>
+          <p>
+            Local <code className="text-xs">next dev</code> does not execute Cloud Scheduler; deploy functions
+            to Firebase for that job to run in production.
+          </p>
         </CardContent>
       </Card>
     </div>

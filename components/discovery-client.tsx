@@ -32,7 +32,7 @@ export function DiscoveryClient() {
 
   return (
     <div className="space-y-6">
-      <Card className="border-white/10 bg-card/60 backdrop-blur-md">
+      <Card className="border-border bg-card shadow-sm">
         <CardHeader>
           <CardTitle className="text-base">AI discovery</CardTitle>
         </CardHeader>
@@ -49,7 +49,7 @@ export function DiscoveryClient() {
 
       <div className="grid gap-3">
         {results.map((r) => (
-          <Card key={r.id} className="border-white/10 bg-card/50 backdrop-blur-md">
+          <Card key={r.id} className="border-border bg-card shadow-sm">
             <CardContent className="p-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
               <div>
                 <p className="font-medium">{r.name}</p>
@@ -75,7 +75,7 @@ export function DiscoveryClient() {
           </Card>
         ))}
         {!results.length && !loading ? (
-          <p className="text-sm text-muted-foreground">Run a query to merge CRM + enrichment providers.</p>
+          <p className="text-sm text-foreground/80">Run a query to merge CRM + enrichment providers.</p>
         ) : null}
       </div>
     </div>

@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
       plan_id: planId,
       custom_id: ctx.orgId,
       application_context: {
-        brand_name: "CPIN Capital Raise OS",
+        brand_name: "CPIN Capital Management System",
         locale: "en-US",
         shipping_preference: "NO_SHIPPING",
         user_action: "SUBSCRIBE_NOW",

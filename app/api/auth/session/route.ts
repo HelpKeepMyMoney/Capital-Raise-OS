@@ -4,7 +4,10 @@ import { getAdminAuth } from "@/lib/firebase/admin";
 import { sessionCookieOptions } from "@/lib/auth/session";
 
 export async function POST(req: NextRequest) {
-  const { idToken } = (await req.json()) as { idToken?: string };
+  const { idToken, organizationId: preferredOrgId } = (await req.json()) as {
+    idToken?: string;
+    organizationId?: string;
+  };
   if (!idToken) {
     return NextResponse.json({ error: "idToken required" }, { status: 400 });
   }
@@ -15,7 +18,21 @@ export async function POST(req: NextRequest) {
   const res = NextResponse.json({ ok: true, uid: decoded.uid });
   res.cookies.set(SESSION_COOKIE, sessionCookie, sessionCookieOptions());
   const orgs = decoded.orgs as Record<string, string> | undefined;
-  if (orgs && typeof orgs === "object") {
+  if (
+    typeof preferredOrgId === "string" &&
+    preferredOrgId &&
+    orgs &&
+    typeof orgs === "object" &&
+    preferredOrgId in orgs
+  ) {
+    res.cookies.set(ORG_COOKIE, preferredOrgId, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: SESSION_MAX_AGE_SEC,
+      path: "/",
+    });
+  } else if (orgs && typeof orgs === "object") {
     const keys = Object.keys(orgs);
     if (keys.length === 1) {
       res.cookies.set(ORG_COOKIE, keys[0]!, {

@@ -15,9 +15,14 @@ const PROTECTED_PREFIXES = [
   "/onboarding",
 ];
 
+function pathnameNeedsAuth(pathname: string): boolean {
+  if (pathname === "/admin" || pathname.startsWith("/admin/")) return true;
+  return PROTECTED_PREFIXES.some((p) => pathname.startsWith(p));
+}
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const needsAuth = PROTECTED_PREFIXES.some((p) => pathname.startsWith(p));
+  const needsAuth = pathnameNeedsAuth(pathname);
   if (!needsAuth) return NextResponse.next();
 
   const session = request.cookies.get(SESSION_COOKIE)?.value;
@@ -32,6 +37,8 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
+    "/admin",
+    "/admin/:path*",
     "/dashboard/:path*",
     "/investors/:path*",
     "/discovery/:path*",

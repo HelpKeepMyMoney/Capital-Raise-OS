@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -12,6 +13,7 @@ import {
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ChevronsUpDown } from "lucide-react";
+import { formatOrganizationRole } from "@/lib/auth/rbac";
 import type { Organization } from "@/lib/firestore/types";
 
 export function OrgSwitcher(props: {
@@ -37,23 +39,25 @@ export function OrgSwitcher(props: {
       <DropdownMenuTrigger
         className={cn(
           buttonVariants({ variant: "outline" }),
-          "w-full justify-between bg-background/50 data-[popup-open]:bg-background/70",
+          "w-full justify-between border-sidebar-border bg-sidebar-accent/25 text-sidebar-foreground data-[popup-open]:bg-sidebar-accent/40",
         )}
       >
-        <span className="truncate text-left text-sm font-medium">{current.name}</span>
+        <span className="truncate text-left text-sm font-medium text-sidebar-foreground">{current.name}</span>
         <ChevronsUpDown className="size-4 shrink-0 opacity-60" />
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56" align="start">
-        <DropdownMenuLabel>Organizations</DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        {props.orgs.map(({ org, role }) => (
-          <DropdownMenuItem key={org.id} onClick={() => switchOrg(org.id)}>
-            <div className="flex flex-col">
-              <span className="font-medium">{org.name}</span>
-              <span className="text-xs text-muted-foreground capitalize">{role.replace("_", " ")}</span>
-            </div>
-          </DropdownMenuItem>
-        ))}
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>Organizations</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          {props.orgs.map(({ org, role }) => (
+            <DropdownMenuItem key={org.id} onClick={() => switchOrg(org.id)}>
+              <div className="flex flex-col">
+                <span className="font-medium">{org.name}</span>
+                <span className="text-xs text-muted-foreground">{formatOrganizationRole(role)}</span>
+              </div>
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>
   );

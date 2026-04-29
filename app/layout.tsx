@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "CPIN Capital Raise OS",
+  title: "CPIN Capital Management System",
   description: "AI-powered private capital fundraising platform",
 };
 

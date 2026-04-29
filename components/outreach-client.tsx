@@ -42,7 +42,7 @@ export function OutreachClient() {
         <TabsTrigger value="inbox">Replies</TabsTrigger>
       </TabsList>
       <TabsContent value="compose">
-        <Card className="border-white/10 bg-card/60 backdrop-blur-md">
+        <Card className="border-border bg-card shadow-sm">
           <CardHeader>
             <CardTitle>Cold outreach</CardTitle>
           </CardHeader>
@@ -61,7 +61,7 @@ export function OutreachClient() {
         </Card>
       </TabsContent>
       <TabsContent value="sequences">
-        <Card className="border-white/10 bg-card/50">
+        <Card className="border-border bg-card shadow-sm">
           <CardContent className="p-6 text-sm text-muted-foreground">
             3-step follow-up builder: define delays, templates, and pause-if-replied rules (wired in
             campaigns collection + scheduled functions).
@@ -69,14 +69,14 @@ export function OutreachClient() {
         </Card>
       </TabsContent>
       <TabsContent value="templates">
-        <Card className="border-white/10 bg-card/50">
+        <Card className="border-border bg-card shadow-sm">
           <CardContent className="p-6 text-sm text-muted-foreground">
             Store reusable first lines and personalization tokens per investor field.
           </CardContent>
         </Card>
       </TabsContent>
       <TabsContent value="inbox">
-        <Card className="border-white/10 bg-card/50">
+        <Card className="border-border bg-card shadow-sm">
           <CardContent className="p-6 text-sm text-muted-foreground">
             Connect Resend inbound webhooks to classify reply sentiment and pause sequences.
           </CardContent>

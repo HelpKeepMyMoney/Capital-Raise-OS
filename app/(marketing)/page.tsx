@@ -4,13 +4,13 @@ import { cn } from "@/lib/utils";
 
 export default function MarketingPage() {
   return (
-    <div className="min-h-screen flex flex-col bg-[radial-gradient(ellipse_at_top,oklch(0.35_0.12_250/0.35),transparent_55%),radial-gradient(ellipse_at_bottom,oklch(0.3_0.1_160/0.25),transparent_50%)]">
-      <header className="flex items-center justify-between px-6 py-5 border-b border-white/10 bg-background/30 backdrop-blur-xl">
+    <div className="min-h-screen flex flex-col bg-background">
+      <header className="flex items-center justify-between px-6 py-5 border-b border-border bg-background backdrop-blur-xl">
         <div className="flex items-center gap-2">
           <div className="h-9 w-9 rounded-lg bg-primary/20 flex items-center justify-center text-sm font-bold">
             CP
           </div>
-          <span className="font-semibold tracking-tight">CPIN Capital Raise OS</span>
+          <span className="font-semibold tracking-tight">CPIN Capital Management System</span>
         </div>
         <div className="flex gap-2">
           <Link href="/login" className={cn(buttonVariants({ variant: "ghost" }))}>
@@ -25,7 +25,7 @@ export default function MarketingPage() {
         <p className="text-sm uppercase tracking-[0.2em] text-primary">Private markets operating system</p>
         <h1 className="text-4xl md:text-6xl font-semibold tracking-tight leading-tight">
           Raise capital like a{" "}
-          <span className="bg-gradient-to-r from-emerald-300 to-violet-300 bg-clip-text text-transparent">
+          <span className="bg-gradient-to-r from-white via-white to-white/85 bg-clip-text text-transparent">
             $100M
           </span>{" "}
           SaaS team
@@ -50,7 +50,8 @@ export default function MarketingPage() {
           ].map((x) => (
             <div
               key={x.t}
-              className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-md shadow-lg"
+              data-slot="card"
+              className="rounded-2xl border border-border bg-card p-5 shadow-lg text-card-foreground"
             >
               <p className="font-medium">{x.t}</p>
               <p className="text-sm text-muted-foreground mt-2">{x.d}</p>

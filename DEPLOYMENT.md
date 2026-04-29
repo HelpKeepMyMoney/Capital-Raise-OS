@@ -1,4 +1,4 @@
-# Deployment guide — CPIN Capital Raise OS
+# Deployment guide — CPIN Capital Management System
 
 ## Vercel
 

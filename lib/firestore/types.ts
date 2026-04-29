@@ -7,6 +7,7 @@ export const UserRoleSchema = z.enum([
   "analyst",
   "assistant",
   "investor_guest",
+  "sponsor",
 ]);
 export type UserRole = z.infer<typeof UserRoleSchema>;
 
@@ -41,6 +42,19 @@ export type InvestorType = z.infer<typeof InvestorTypeSchema>;
 
 export const WarmColdSchema = z.enum(["warm", "cold"]);
 export type WarmCold = z.infer<typeof WarmColdSchema>;
+
+export const InvestorCrmStatusSchema = z.enum(["active", "archived"]);
+export type InvestorCrmStatus = z.infer<typeof InvestorCrmStatusSchema>;
+
+/** Logged on activities when recording CRM touchpoints. */
+export const InvestorInteractionTypeSchema = z.enum([
+  "call",
+  "email",
+  "meeting",
+  "note",
+  "other",
+]);
+export type InvestorInteractionType = z.infer<typeof InvestorInteractionTypeSchema>;
 
 export const DealTypeSchema = z.enum([
   "startup_equity",
@@ -94,12 +108,56 @@ export type Organization = {
   createdAt: number;
 };
 
+/** Set for `investor_guest` at invite redemption; omit for staff. */
+export type InvestorAccess =
+  | { scope: "org" }
+  | { scope: "deal"; dealIds: string[]; dataRoomIds: string[] };
+
 export type OrganizationMember = {
   organizationId: string;
   userId: string;
   role: UserRole;
   joinedAt: number;
   invitedBy?: string;
+  investorAccess?: InvestorAccess;
+};
+
+export type InvestorInviteScope = "org" | "deal";
+
+export type InvestorInvitation = {
+  id: string;
+  organizationId: string;
+  tokenHash: string;
+  scope: InvestorInviteScope;
+  /** Non-empty when scope is `deal`. */
+  dealIds: string[];
+  /** Rooms whose `dealId` matched selected deals at invite time. */
+  dataRoomIds: string[];
+  /** Normalized lowercase email when invite is tied to an address. */
+  email?: string;
+  message?: string;
+  expiresAt: number;
+  createdBy: string;
+  createdAt: number;
+  revokedAt?: number;
+  acceptedAt?: number;
+  acceptedUserId?: string;
+  linkedInvestorId?: string;
+};
+
+export type DealCommitmentStatus = "active" | "withdrawn";
+
+export type DealCommitment = {
+  id: string;
+  organizationId: string;
+  dealId: string;
+  userId: string;
+  /** Whole currency units (e.g. USD dollars). */
+  amount: number;
+  currency: string;
+  status: DealCommitmentStatus;
+  createdAt: number;
+  updatedAt: number;
 };
 
 export type UserDoc = {
@@ -114,7 +172,10 @@ export type UserDoc = {
 export type Investor = {
   id: string;
   organizationId: string;
+  /** Denormalized full name for search, discovery merge, and legacy rows. */
   name: string;
+  firstName?: string;
+  lastName?: string;
   firm?: string;
   title?: string;
   email?: string;
@@ -132,10 +193,17 @@ export type Investor = {
   relationshipScore?: number;
   lastContactAt?: number;
   nextFollowUpAt?: number;
+  /** Open task synced from Next follow-up (Tasks page). */
+  followUpTaskId?: string;
   notesSummary?: string;
   documentsSharedCount?: number;
   pipelineStage: PipelineStage;
   committedAmount?: number;
+  /** Defaults to active when omitted (legacy documents). */
+  crmStatus?: InvestorCrmStatus;
+  archivedAt?: number;
+  /** Guest user UID when this CRM row is linked to an invited investor. */
+  linkedUserId?: string;
   createdAt: number;
   updatedAt: number;
 };
@@ -149,6 +217,8 @@ export type Task = {
   status: "open" | "done" | "cancelled";
   linkedInvestorId?: string;
   linkedDealId?: string;
+  /** Created when an investor profile sets Next follow-up. */
+  isInvestorFollowUp?: boolean;
   createdAt: number;
 };
 

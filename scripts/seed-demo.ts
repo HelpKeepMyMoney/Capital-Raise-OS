@@ -49,12 +49,15 @@ async function main() {
     },
   });
 
-  batch.set(db.collection("users").doc(uid), {
-    email: user.email,
-    displayName: user.displayName,
+  const userDoc: Record<string, unknown> = {
+    email: user.email ?? "",
     defaultOrganizationId: orgId,
     createdAt: now,
-  }, { merge: true });
+  };
+  if (user.displayName) {
+    userDoc.displayName = user.displayName;
+  }
+  batch.set(db.collection("users").doc(uid), userDoc, { merge: true });
 
   batch.set(db.collection("organization_members").doc(`${orgId}_${uid}`), {
     organizationId: orgId,
@@ -76,12 +79,17 @@ async function main() {
 
   for (const inv of investors) {
     const ref = db.collection("investors").doc();
+    const nameParts = inv.name.trim().split(/\s+/);
+    const firstName = nameParts[0] ?? inv.name;
+    const lastName = nameParts.length > 1 ? nameParts.slice(1).join(" ") : "";
     batch.set(ref, {
       organizationId: orgId,
       name: inv.name,
+      firstName,
+      lastName: lastName || null,
       firm: inv.firm,
       title: "Partner",
-      email: `${inv.name.split(" ")[0]!.toLowerCase()}@example.com`,
+      email: `${firstName.toLowerCase()}@example.com`,
       location: "Global",
       investorType: "vc",
       checkSizeMin: inv.checkMin,
@@ -94,6 +102,7 @@ async function main() {
       lastContactAt: now - 86400000 * 3,
       nextFollowUpAt: now + 86400000 * 2,
       pipelineStage: inv.stage,
+      crmStatus: "active",
       committedAmount: inv.stage === "committed" || inv.stage === "closed" ? inv.checkMin : 0,
       documentsSharedCount: inv.stage === "due_diligence" ? 4 : 1,
       createdAt: now,
