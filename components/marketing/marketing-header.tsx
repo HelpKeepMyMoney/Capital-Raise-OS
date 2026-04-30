@@ -67,17 +67,17 @@ export function MarketingHeader() {
       )}
     >
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 sm:gap-4 sm:px-6">
-        <Link href="/" className="flex min-w-0 shrink-0 items-center gap-3" aria-label="CPIN home">
+        <Link href="/" className="flex min-w-0 shrink-0 items-center gap-3" aria-label="CapitalOS home">
           <Image
             src="/cpin-logo.jpg"
-            alt="CPIN"
+            alt="CapitalOS"
             width={140}
             height={42}
             className={cn("w-auto object-contain object-left transition-[height] duration-200", scrolled ? "h-8 max-h-9" : "h-9 max-h-10")}
             priority
           />
           <span className="font-heading font-semibold tracking-tight text-foreground truncate max-w-[220px] sm:max-w-none">
-            CPIN
+            CapitalOS
           </span>
         </Link>
 
