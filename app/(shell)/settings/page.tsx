@@ -42,6 +42,12 @@ export default async function SettingsPage() {
             />
           ) : null}
           <Link
+            href="/settings/esign"
+            className={cn(buttonVariants({ size: "sm", variant: "outline" }), "inline-flex")}
+          >
+            E-sign templates
+          </Link>
+          <Link
             href="/settings/billing"
             className={cn(buttonVariants({ size: "sm" }), "inline-flex")}
           >

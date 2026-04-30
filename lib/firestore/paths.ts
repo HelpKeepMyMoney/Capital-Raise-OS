@@ -18,6 +18,9 @@ export const col = {
   investorInvitations: "investor_invitations",
   dealCommitments: "deal_commitments",
   signingRequests: "signing_requests",
+  mndaSigningRequests: "mnda_signing_requests",
+  signableTemplates: "signable_templates",
+  esignEnvelopes: "esign_envelopes",
 } as const;
 
 export function memberDocId(orgId: string, uid: string) {

@@ -27,7 +27,11 @@ type Props = {
 };
 
 function statusBadges(room: SerializedDataRoom) {
-  const badges: { label: string; variant?: "secondary" | "default" | "outline" | "destructive" }[] = [];
+  const badges: {
+    label: string;
+    variant?: "secondary" | "default" | "outline" | "destructive";
+    className?: string;
+  }[] = [];
   if (room.archived) badges.push({ label: "Archived", variant: "secondary" });
   else if (room.visibility === "invite_only") badges.push({ label: "Invite only", variant: "outline" });
   if (room.ndaRequired && !badges.some((b) => b.label === "Archived")) {
@@ -35,6 +39,9 @@ function statusBadges(room: SerializedDataRoom) {
   }
   if (!badges.some((b) => b.label === "NDA") && !room.archived && room.visibility !== "invite_only") {
     badges.push({ label: "Open", variant: "outline" });
+  }
+  if (room.investorDocsLockedByNda && !room.archived) {
+    badges.push({ label: "NDA signing required", variant: "outline", className: "border-amber-500/50 bg-amber-50 text-amber-950 dark:bg-amber-950/35 dark:text-amber-50" });
   }
   return badges;
 }
@@ -78,7 +85,11 @@ export function RoomCard(props: Props) {
 
         <div className="flex flex-wrap gap-1.5">
           {badges.map((b) => (
-            <Badge key={b.label + (b.variant ?? "")} variant={b.variant ?? "secondary"} className="text-[10px] font-medium">
+            <Badge
+              key={b.label + (b.variant ?? "")}
+              variant={b.variant ?? "secondary"}
+              className={cn("text-[10px] font-medium", b.className)}
+            >
               {b.label}
             </Badge>
           ))}

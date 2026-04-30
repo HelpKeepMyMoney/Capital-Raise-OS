@@ -139,6 +139,8 @@ type Props = {
   documents: SerializedRoomDocument[];
   selectedRoomId: string;
   canManage: boolean;
+  /** Investor cannot open previews until mutual NDA is completed (matched by session email). */
+  investorDocsLockedByNda?: boolean;
   uploading: boolean;
   uploadProgress?: number | null;
   /** Room list for move-to-room */
@@ -372,7 +374,22 @@ export function DocumentManager(props: Props) {
         <Progress value={uploadPct} className="h-1 rounded-full" />
       ) : null}
 
-      {props.canManage ? (
+      {!props.canManage && props.investorDocsLockedByNda ? (
+        <div
+          role="alert"
+          className="rounded-xl border border-amber-500/40 bg-amber-50 px-4 py-6 text-sm text-amber-950 dark:border-amber-400/35 dark:bg-amber-950/40 dark:text-amber-50"
+        >
+          <p className="font-semibold">Mutual NDA required</p>
+          <p className="mt-2 text-amber-950/90 dark:text-amber-50/95">
+            You can&apos;t preview or download files in this room until the mutual NDA for your email address is completed.
+            Contact the sponsor if you haven&apos;t received the signing link.
+          </p>
+        </div>
+      ) : null}
+
+      {!props.canManage && props.investorDocsLockedByNda ? null : (
+        <>
+          {props.canManage ? (
         <>
           <div className="flex flex-wrap items-center gap-2">
             <input
@@ -609,6 +626,8 @@ export function DocumentManager(props: Props) {
           </TableBody>
         </Table>
       </ScrollArea>
+        </>
+      )}
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent className="sm:max-w-md rounded-2xl">

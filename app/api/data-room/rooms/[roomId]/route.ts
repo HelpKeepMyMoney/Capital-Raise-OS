@@ -28,6 +28,7 @@ export async function PATCH(
     description: string | null;
     ndaRequired: boolean;
     ndaTemplateRef: string | null;
+    signableTemplateId: string | null;
     visibility: DataRoomVisibility;
     downloadAllowed: boolean;
     watermarkDocs: boolean;
@@ -83,6 +84,13 @@ export async function PATCH(
       body.ndaTemplateRef === null || body.ndaTemplateRef === ""
         ? null
         : String(body.ndaTemplateRef).slice(0, 500);
+  }
+
+  if (body.signableTemplateId !== undefined) {
+    updates.signableTemplateId =
+      body.signableTemplateId === null || body.signableTemplateId === ""
+        ? null
+        : String(body.signableTemplateId).trim();
   }
 
   if (body.visibility !== undefined) {

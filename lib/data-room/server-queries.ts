@@ -4,7 +4,17 @@ import type { InvestorInvitation } from "@/lib/firestore/types";
 
 export type InviteRow = Pick<
   InvestorInvitation,
-  "id" | "scope" | "dealIds" | "dataRoomIds" | "email" | "expiresAt" | "createdAt" | "revokedAt" | "acceptedAt" | "message"
+  | "id"
+  | "scope"
+  | "dealIds"
+  | "dataRoomIds"
+  | "email"
+  | "expiresAt"
+  | "createdAt"
+  | "revokedAt"
+  | "acceptedAt"
+  | "message"
+  | "linkedInvestorId"
 >;
 
 export async function listInvestorInvitationsForOrganization(orgId: string, limit = 100): Promise<InviteRow[]> {
@@ -28,6 +38,7 @@ export async function listInvestorInvitationsForOrganization(orgId: string, limi
       revokedAt: row.revokedAt,
       acceptedAt: row.acceptedAt,
       message: row.message,
+      linkedInvestorId: typeof row.linkedInvestorId === "string" ? row.linkedInvestorId : undefined,
     };
   });
 }

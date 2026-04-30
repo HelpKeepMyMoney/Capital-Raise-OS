@@ -12,6 +12,7 @@ export type SerializedDataRoom = {
   visibility?: "open" | "invite_only";
   archived?: boolean;
   ndaTemplateRef?: string | null;
+  signableTemplateId?: string | null;
   downloadAllowed?: boolean;
   watermarkDocs?: boolean;
   expiresAt?: number;
@@ -19,6 +20,8 @@ export type SerializedDataRoom = {
   welcomeMessage?: string;
   createdAt?: number;
   updatedAt?: number;
+  /** Set server-side for `investor_guest` when documents are withheld until NDA envelope is completed. */
+  investorDocsLockedByNda?: boolean;
 };
 
 export type SerializedRoomDocument = {

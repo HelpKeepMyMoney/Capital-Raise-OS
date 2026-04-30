@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import type { SerializedDataRoom } from "@/components/data-room/types";
@@ -12,17 +13,35 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { EsignSendPanel } from "@/components/data-room/esign-send-panel";
 
 type Props = {
   room: SerializedDataRoom;
   deals: SerializedDealLite[];
   canManage: boolean;
+  esignTemplateLibraryConfigured?: boolean;
+};
+
+type RoomSettingsForm = {
+  name: string;
+  dealId: string;
+  description: string;
+  ndaRequired: boolean;
+  visibility: "open" | "invite_only";
+  downloadAllowed: boolean;
+  watermarkDocs: boolean;
+  expiresAt: string;
+  requireLogin: boolean;
+  welcomeMessage: string;
+  signableTemplateId: string;
 };
 
 export function RoomSettings(props: Props) {
   const router = useRouter();
   const [saving, setSaving] = React.useState(false);
-  const [form, setForm] = React.useState({
+  const [templates, setTemplates] = React.useState<{ id: string; name: string }[]>([]);
+
+  const [form, setForm] = React.useState<RoomSettingsForm>({
     name: props.room.name,
     dealId: props.room.dealId ?? "",
     description: props.room.description ?? "",
@@ -33,8 +52,21 @@ export function RoomSettings(props: Props) {
     expiresAt: props.room.expiresAt ? new Date(props.room.expiresAt).toISOString().slice(0, 10) : "",
     requireLogin: props.room.requireLogin === true,
     welcomeMessage: props.room.welcomeMessage ?? "",
-    ndaTemplateRef: props.room.ndaTemplateRef ?? "",
+    signableTemplateId: props.room.signableTemplateId ?? "",
   });
+
+  React.useEffect(() => {
+    if (!props.canManage) return;
+    void (async () => {
+      try {
+        const res = await fetch("/api/esign/templates");
+        const j = (await res.json()) as { templates?: { id: string; name: string }[] };
+        if (res.ok && j.templates) setTemplates(j.templates);
+      } catch {
+        /* ignore */
+      }
+    })();
+  }, [props.canManage]);
 
   React.useEffect(() => {
     setForm({
@@ -48,7 +80,7 @@ export function RoomSettings(props: Props) {
       expiresAt: props.room.expiresAt ? new Date(props.room.expiresAt).toISOString().slice(0, 10) : "",
       requireLogin: props.room.requireLogin === true,
       welcomeMessage: props.room.welcomeMessage ?? "",
-      ndaTemplateRef: props.room.ndaTemplateRef ?? "",
+      signableTemplateId: props.room.signableTemplateId ?? "",
     });
   }, [props.room]);
 
@@ -73,7 +105,7 @@ export function RoomSettings(props: Props) {
           expiresAt,
           requireLogin: form.requireLogin,
           welcomeMessage: form.welcomeMessage.trim() || null,
-          ndaTemplateRef: form.ndaTemplateRef.trim() || null,
+          signableTemplateId: form.signableTemplateId.trim() || null,
         }),
       });
       const data = (await res.json()) as { error?: string };
@@ -92,6 +124,8 @@ export function RoomSettings(props: Props) {
       <p className="text-sm text-muted-foreground">Only team members can change room settings.</p>
     );
   }
+
+  const hasNdaTemplate = Boolean(form.signableTemplateId.trim());
 
   return (
     <Card className="rounded-2xl border-border shadow-sm">
@@ -167,16 +201,54 @@ export function RoomSettings(props: Props) {
           <Checkbox checked={form.ndaRequired} onCheckedChange={(v) => setForm((f) => ({ ...f, ndaRequired: v === true }))} />
           NDA required before access
         </label>
-        <div className="space-y-2">
-          <Label htmlFor="nda-ref">NDA template reference (SignWell / provider)</Label>
-          <Input
-            id="nda-ref"
-            className="rounded-xl"
-            placeholder="Template ID or URI (optional)"
-            value={form.ndaTemplateRef}
-            onChange={(e) => setForm((f) => ({ ...f, ndaTemplateRef: e.target.value }))}
-          />
-          <p className="text-[11px] text-muted-foreground">Wire your e-sign workflow; execution comes from the NDA pipeline.</p>
+
+        <div className="rounded-2xl border border-border/80 bg-muted/25 p-4 space-y-3">
+          <div className="space-y-1">
+            <h3 className="text-sm font-semibold text-foreground">Electronic signatures (e-sign)</h3>
+            <p className="text-xs text-muted-foreground">
+              Upload PDFs and draw fields in the template library, then link a template to this room. Investors sign via
+              magic link.
+            </p>
+            <Button variant="outline" size="sm" className="mt-1 rounded-lg" asChild>
+              <Link href="/settings/esign">Open e-sign template library</Link>
+            </Button>
+          </div>
+          <div className="space-y-2 pt-1 border-t border-border/60">
+            <Label>NDA / agreement PDF for this room</Label>
+            <Select
+              value={form.signableTemplateId.trim() || "__none"}
+              onValueChange={(v) =>
+                setForm((f) => ({
+                  ...f,
+                  signableTemplateId: v == null || v === "__none" ? "" : v,
+                }))
+              }
+            >
+            <SelectTrigger className="rounded-xl">
+              <SelectValue placeholder="Choose template" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none">None</SelectItem>
+              {templates.map((t) => (
+                <SelectItem key={t.id} value={t.id}>
+                  {t.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-[11px] text-muted-foreground">
+            {props.esignTemplateLibraryConfigured
+              ? "Pick a template from your org library, or create one in the e-sign template library."
+              : "Create your first template in the e-sign template library (link above), then return here to select it."}
+          </p>
+        </div>
+
+        <EsignSendPanel
+          dataRoomId={props.room.id}
+          roomName={props.room.name}
+          ndaRequired={form.ndaRequired}
+          hasNdaTemplate={hasNdaTemplate}
+        />
         </div>
 
         <label className="flex items-center gap-2 text-sm">

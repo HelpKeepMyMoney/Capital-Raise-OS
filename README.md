@@ -4,6 +4,19 @@ AI-powered private capital platform: investor CRM, discovery, outreach, data roo
 
 ## Changelog
 
+### Native e-sign (template library, public signing) — SignWell removal
+
+- **SignWell removed:** Deleted **`app/api/esign/signwell/create`**, **`app/api/webhooks/signwell`**, and **`lib/esign/signwell.ts`**. Drop SignWell-specific env vars from deployment; signing is first-party.
+- **Tokenized signing links:** Server mints short-lived HMAC tokens (**`lib/esign/tokens.ts`**, **`ESIGN_TOKEN_SECRET`** in **`.env.example`** — required in production, min 16 characters). Public **`/sign?token=...`** (**`app/sign/`**) is **not** behind auth middleware so investors/LPs can sign from email links.
+- **Templates API:** **`GET`/`POST`** **`/api/esign/templates`** (org-scoped list + create); **`GET`/`PATCH`/`POST` (PDF upload)** **`/api/esign/templates/[id]`**; **`GET`** PDF bytes **`/api/esign/templates/[id]/file`**; **`DELETE`** archives the template (`archived: true`), clears **`subscriptionSignableTemplateId`** when it matches, removes source PDF from Storage (**`ignoreNotFound`**). Archived templates are hidden from the list and blocked for **new** envelope creation; **`loadTemplate`** rejects archived rows while **`loadTemplateForSigning`** still resolves field defs for in-flight envelopes (**`lib/esign/envelope-service.ts`**).
+- **Org subscription template:** **`PATCH`** **`/api/organizations/[id]/esign-settings`** sets which **`SignableTemplate`** powers deal subscription packets. **Settings → E-sign** (**`app/(shell)/settings/esign/`**, **`components/settings/esign-settings-client.tsx`**) lists templates, creates them, picks subscription template, and embeds **`EsignTemplateFieldEditor`**.
+- **Field editor UX (**`components/settings/esign-template-field-editor.tsx`**):** PDF.js preview; drag on page to draw new boxes; **move** (drag box body) and **resize** (handles); **sponsor vs investor** assignees use distinct **violet vs sky** overlay colors with legend; **Required** checkbox; field types include **signature** (PNG burn-in via **`pdf-lib`** in **`lib/esign/native/`**). Rubber-band preview while drawing.
+- **Envelope service & APIs:** **`lib/esign/envelope-service.ts`** (NDA + subscription flows, working/final PDF paths, **`completeSignerStep`**); **`POST`** **`/api/esign/envelopes`**; **`GET`** **`/api/esign/sign-session`**; **`POST`** **`/api/esign/sign-complete`**; **`POST`** **`/api/esign/subscription/create`**. Validation: **`lib/esign/field-validate.ts`**; template JSON schema: **`lib/esign/template-schema.ts`**.
+- **Signing UI:** **`components/esign/esign-sign-client.tsx`** (fields, consent, signature capture, role-aware labels).
+- **Data room:** Rooms may reference **`signableTemplateId`** (**`RoomSettings`**, room APIs). **Investor** flows: NDA gate / send panel (**`components/data-room/esign-send-panel.tsx`**, **`lib/data-room/investor-nda-gate.ts`**), **`InvestorAccessTable`** / **`InvestorPreview`** updates, **`sign-url`** route behavior for investor access. Types: **`components/data-room/types.ts`**, Firestore **`DataRoom`**.
+- **Other product wiring:** **`components/deal-guest-signing.tsx`**, **`app/(shell)/portal/page.tsx`**, **`app/invite/[token]/invite-client.tsx`**, **`app/api/invitations`** and related helpers (**`lib/invitations/*`**).
+- **UI / infra:** **`components/ui/button.tsx`** uses **`@radix-ui/react-slot`** for **`asChild`**. **`next.config.ts`** — larger **`experimental.proxyClientMaxBodySize`** for PDF uploads. **`package.json`** — **`pdf-lib`**, **`pdfjs-dist`**. **`firestore.indexes.json`** and **`lib/firestore/types.ts`**, **`paths.ts`**, **`queries.ts`** — **`signable_templates`**, **`esign_envelopes`**, etc. **`lib/organizations/delete-organization.ts`** cascades template collection.
+
 ### Client org plan & marketing pricing
 
 - **Org subscription `client` (`lib/firestore/types.ts` — `SubscriptionPlanSchema`):** Complimentary tier for qualifying **The BNIC Network LLC** / **Help Keep My Money LLC** client businesses. **Entitlements** mirror **`pro`** (**`lib/billing/entitlements.ts`**). **`canUseAiCopilot`** treats **`client`** like **`pro`** (**`lib/billing/features.ts`**). **Not** a **`PublicPlanId`** — no PayPal checkout; platform admins set **plan** via **`/admin` → Edit organization**.
@@ -126,7 +139,7 @@ Premium sponsor workspace for diligence: header actions, six KPI cards (from Fir
    cp .env.example .env.local
    ```
 
-   Fill in Firebase **client** keys (`NEXT_PUBLIC_*`) and **Admin** service account fields (`FIREBASE_*`).
+   Fill in Firebase **client** keys (`NEXT_PUBLIC_*`) and **Admin** service account fields (`FIREBASE_*`). For native e-sign links, set **`ESIGN_TOKEN_SECRET`** (see **`.env.example`**).
 
 2. Install dependencies:
 
@@ -156,14 +169,15 @@ Premium sponsor workspace for diligence: header actions, six KPI cards (from Fir
 
 ## Project structure
 
-- `app/(shell)/` — authenticated product (dashboard, CRM, modules; includes dynamic **investors/[id]**, **deals/[id]**, **deals/new**)
+- `app/(shell)/` — authenticated product (dashboard, CRM, modules; includes dynamic **investors/[id]**, **deals/[id]**, **deals/new**, **settings/esign**)
 - `app/(platform-admin)/` — platform super-admin (`/admin`; **`PLATFORM_ADMIN_UIDS`**); dashboard + **`components/platform-admin/`**; **`app/api/platform-admin/`** user/org/list routes (see Changelog → Platform admin)
 - `app/(marketing)/` — public marketing homepage (SEO metadata in layout); `app/api/contact/` — POST marketing contact (Firestore + Resend)
 - `app/(auth)/` — login, signup, forgot-password
 - `app/onboarding/` — create first organization (session without org)
 - `app/invite/[token]/` — redeem investor invitation links
-- `app/api/` — session auth, **`platform-admin`** (users/orgs CRUD — see Changelog), discovery, outreach, data room (rooms `GET`/`POST`/`PATCH`, documents, sign-url, **invitations**, **activity**), **deals** (`PATCH /api/deals/[id]`, **telemetry**), **tasks** (`GET`/`POST`, **`PATCH /api/tasks/[id]`**, **`/api/tasks/[id]/comments`**), **organizations** (`PATCH /api/organizations/[id]`, **`POST .../delete`**), invitations, AI chat, PayPal billing, webhooks
-- `components/data-room/` — Data Room UI modules; `components/deals/` — Deal Room UI; **`components/marketing/`** — public landing sections; **`components/tasks/`** — Tasks Workflow Center UI; **`components/settings/`** — org settings / delete; **`components/platform-admin/`** — `/admin` dashboard UI; `lib/data-room/` — metrics, kind labels, server queries; **`lib/deals/`** — deal patch schema, narrative helpers, telemetry aggregation, formatting; **`lib/marketing/`** — marketing constants & contact schema; **`lib/tasks/`** — task workflow helpers; **`lib/organizations/`** — org patch, deletion cascade, slug helpers; **`lib/platform-admin/`** — admin API guards & schemas
+- `app/sign/` — public native e-sign flow (token query param; no session required)
+- `app/api/` — session auth, **`platform-admin`**, discovery, outreach, data room, deals, tasks, organizations, invitations, AI chat, PayPal billing, webhooks, **`esign/*`** (templates, template file, envelopes, sign-session, sign-complete, subscription create), **`organizations/[id]/esign-settings`**
+- `components/data-room/` — Data Room UI modules; `components/deals/` — Deal Room UI; **`components/marketing/`** — public landing sections; **`components/tasks/`** — Tasks Workflow Center UI; **`components/settings/`** — org settings, **e-sign template client & field editor**, delete org; **`components/esign/`** — public signing client; **`components/platform-admin/`** — `/admin` dashboard UI; `lib/data-room/` — metrics, kind labels, server queries, **investor NDA gate**; **`lib/deals/`** — deal patch schema, narrative helpers, telemetry aggregation, formatting; **`lib/marketing/`** — marketing constants & contact schema; **`lib/tasks/`** — task workflow helpers; **`lib/organizations/`** — org patch, deletion cascade, slug helpers; **`lib/platform-admin/`** — admin API guards & schemas; **`lib/esign/`** — native e-sign (envelope service, tokens, field validation, PDF helpers, template schema)
 - `lib/` — Firebase, Firestore types/queries, **`lib/billing/`** (PayPal-backed **`PublicPlanId`**, **`lib/billing/entitlements.ts`**, **`lib/billing/features.ts`**; comp **`client`** plan is admin-only — see Changelog), discovery merge, analytics helpers, auth (RBAC, guests, platform admin), **`lib/email/password-set-mail`** (welcome / forgot-password links), invitations, PayPal, billing
 - `functions/` — Firebase Cloud Functions (member → custom claims sync, scheduled digest)
 - `scripts/seed-demo.ts` — demo org, investors, tasks, emails

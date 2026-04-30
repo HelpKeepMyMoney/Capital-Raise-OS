@@ -28,6 +28,7 @@ type Props = {
   lastLoginAtMs: number | null;
   workspaceTab?: string;
   onWorkspaceTabChange?: (tab: string) => void;
+  esignTemplateLibraryConfigured?: boolean;
 };
 
 export function RoomWorkspace(props: Props) {
@@ -117,6 +118,7 @@ export function RoomWorkspace(props: Props) {
             documents={filteredDocs}
             selectedRoomId={props.room.id}
             canManage={props.canManage}
+            investorDocsLockedByNda={props.room.investorDocsLockedByNda}
             uploading={false}
             uploadProgress={null}
           />
@@ -130,7 +132,12 @@ export function RoomWorkspace(props: Props) {
           </TabsContent>
         ) : null}
         <TabsContent value="settings" className="mt-4 focus-visible:outline-none">
-          <RoomSettings room={props.room} deals={props.deals} canManage={props.canManage} />
+          <RoomSettings
+            room={props.room}
+            deals={props.deals}
+            canManage={props.canManage}
+            esignTemplateLibraryConfigured={props.esignTemplateLibraryConfigured}
+          />
         </TabsContent>
       </Tabs>
     </div>

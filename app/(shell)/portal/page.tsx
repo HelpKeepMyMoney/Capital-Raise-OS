@@ -86,11 +86,11 @@ export default async function PortalHomePage() {
       <section className="rounded-2xl border border-border/80 bg-muted/20 p-6">
         <div className="flex items-center gap-2 text-sm font-semibold">
           <FileSignature className="size-4" />
-          Subscription documents (SignWell)
+          Subscription documents (e-sign)
         </div>
         <p className="mt-2 text-sm text-muted-foreground">
-          When your sponsor sends a subscription packet, open the deal page and use{" "}
-          <strong>Commit capital</strong> and signing tools. Status updates sync from SignWell webhooks.
+          When your sponsor enables subscription templates in settings, open the deal page and use{" "}
+          <strong>Commit capital</strong> and signing tools. Completion updates your commitment on file.
         </p>
       </section>
     </div>

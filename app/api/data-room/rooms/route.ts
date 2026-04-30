@@ -54,6 +54,7 @@ export async function POST(req: NextRequest) {
     ndaRequired?: boolean;
     dealId?: string | null;
     description?: string | null;
+    signableTemplateId?: string | null;
   };
   const name = typeof body.name === "string" ? body.name.trim() : "";
   if (!name) return NextResponse.json({ error: "Name is required" }, { status: 400 });
@@ -72,6 +73,12 @@ export async function POST(req: NextRequest) {
   const description =
     typeof body.description === "string" ? body.description.trim().slice(0, 4000) : undefined;
 
+  let signableTemplateId: string | undefined;
+  if (body.signableTemplateId != null) {
+    const raw = typeof body.signableTemplateId === "string" ? body.signableTemplateId.trim() : "";
+    if (raw) signableTemplateId = raw;
+  }
+
   const id = randomUUID();
   const now = Date.now();
 
@@ -88,6 +95,7 @@ export async function POST(req: NextRequest) {
   };
   if (dealId) payload.dealId = dealId;
   if (description) payload.description = description;
+  if (signableTemplateId) payload.signableTemplateId = signableTemplateId;
 
   await db.collection(col.dataRooms).doc(id).set(payload);
 
@@ -99,5 +107,12 @@ export async function POST(req: NextRequest) {
     payload: { name, ndaRequired },
   });
 
-  return NextResponse.json({ id, name, ndaRequired, dealId: dealId ?? null, createdAt: now });
+  return NextResponse.json({
+    id,
+    name,
+    ndaRequired,
+    dealId: dealId ?? null,
+    createdAt: now,
+    ...(signableTemplateId ? { signableTemplateId } : {}),
+  });
 }

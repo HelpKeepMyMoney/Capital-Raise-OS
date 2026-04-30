@@ -102,6 +102,8 @@ export type Organization = {
     logoUrl?: string;
     primaryColor?: string;
   };
+  /** Native e-sign: `SignableTemplate` id for LP subscription packet PDF. */
+  subscriptionSignableTemplateId?: string | null;
   settings?: {
     defaultNdaRequired?: boolean;
     emailFromName?: string;
@@ -414,10 +416,96 @@ export type SigningRequest = {
   organizationId: string;
   dealId: string;
   userId: string;
+  /** @deprecated Legacy external document id; native flows omit. */
   signwellDocumentId?: string;
+  /** Native e-sign envelope document id when stored in `esign_envelopes`. */
+  nativeEnvelopeId?: string;
   status: SigningRequestStatus;
   lastEventAt?: number;
   signingUrl?: string;
+  /** When sponsor must complete fields before LP can sign */
+  awaitingSponsorPrep?: boolean;
+  /** LP can forward this URL to the sponsor when sponsor fields exist */
+  sponsorSigningUrl?: string;
+  createdAt: number;
+  updatedAt: number;
+};
+
+/** Sponsor-initiated mutual NDA envelope (legacy rows may include deprecated external ids). */
+export type MndaSigningRequest = {
+  id: string;
+  organizationId: string;
+  dataRoomId: string;
+  dealId?: string | null;
+  createdByUid: string;
+  investorEmail: string;
+  investorName: string;
+  signwellDocumentId?: string;
+  sponsorSigningUrl?: string;
+  investorSigningUrl?: string;
+  status: SigningRequestStatus;
+  lastEventAt?: number;
+  createdAt: number;
+  updatedAt: number;
+};
+
+export type EsignFieldAssignee = "sponsor" | "investor";
+
+export type EsignFieldType = "text" | "date" | "signature";
+
+export type EsignFieldRectNorm = { x: number; y: number; w: number; h: number };
+
+export type EsignTemplateField = {
+  id: string;
+  label?: string;
+  fieldType: EsignFieldType;
+  pageIndex: number;
+  rectNorm: EsignFieldRectNorm;
+  assignee: EsignFieldAssignee;
+  required?: boolean;
+};
+
+export type SignableTemplate = {
+  id: string;
+  organizationId: string;
+  name: string;
+  storagePath: string;
+  esignFields: EsignTemplateField[];
+  createdAt: number;
+  updatedAt: number;
+  archived?: boolean;
+};
+
+export type EsignEnvelopeContext =
+  | { kind: "data_room_nda"; dataRoomId: string }
+  | { kind: "deal_subscription"; dealId: string; userId: string }
+  | { kind: "ad_hoc"; label?: string };
+
+export type EsignSignerRole = "sponsor" | "investor" | "lp";
+
+export type EsignEnvelope = {
+  id: string;
+  organizationId: string;
+  signableTemplateId: string;
+  context: EsignEnvelopeContext;
+  status: SigningRequestStatus;
+  createdByUid: string;
+  /** Lowercase trimmed email for investor party when applicable */
+  investorEmail?: string;
+  investorEmailNorm?: string;
+  investorName?: string;
+  sponsorSigningUrl?: string;
+  investorSigningUrl?: string;
+  /** LP subscription signing URL */
+  lpSigningUrl?: string;
+  workingPdfStoragePath?: string;
+  finalPdfStoragePath?: string;
+  /** Who must sign next */
+  nextSignerRole?: EsignSignerRole;
+  /** After sponsor-only field burn for subscription flows */
+  subscriptionPrepComplete?: boolean;
+  sponsorEmailNorm?: string;
+  lastEventAt?: number;
   createdAt: number;
   updatedAt: number;
 };
@@ -434,8 +522,10 @@ export type DataRoom = {
   name: string;
   description?: string;
   ndaRequired: boolean;
-  /** Optional SignWell / e-sign template reference (NDA workflow). */
+  /** @deprecated Prefer `signableTemplateId` for native e-sign. */
   ndaTemplateRef?: string | null;
+  /** `SignableTemplate` id when `ndaRequired` (native e-sign NDA). */
+  signableTemplateId?: string | null;
   visibility?: DataRoomVisibility;
   downloadAllowed?: boolean;
   watermarkDocs?: boolean;

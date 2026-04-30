@@ -5,6 +5,7 @@ import type {
   DataRoom,
   Deal,
   DealCommitment,
+  EsignEnvelope,
   Investor,
   InvestorInvitation,
   InvestorAccess,
@@ -532,14 +533,37 @@ export async function listOrganizationMembers(orgId: string): Promise<Organizati
   return out;
 }
 
-/** Latest SignWell signing request for this LP + deal. */
+/** Latest subscription envelope / signing request for this LP + deal. */
 export async function getSigningRequest(
   orgId: string,
   dealId: string,
   userId: string,
 ): Promise<SigningRequest | null> {
   const db = getAdminFirestore();
-  const d = await db.collection(col.signingRequests).doc(signingRequestDocId(orgId, dealId, userId)).get();
+  const id = signingRequestDocId(orgId, dealId, userId);
+  const ed = await db.collection(col.esignEnvelopes).doc(id).get();
+  if (ed.exists) {
+    const e = ed.data() as EsignEnvelope;
+    if (e.context.kind !== "deal_subscription") return null;
+    if (e.context.dealId !== dealId || e.context.userId !== userId) return null;
+    let signingUrl: string | undefined;
+    if (e.nextSignerRole === "lp") signingUrl = e.lpSigningUrl;
+    if (e.nextSignerRole === "sponsor") signingUrl = e.sponsorSigningUrl;
+    return {
+      id,
+      organizationId: orgId,
+      dealId,
+      userId,
+      nativeEnvelopeId: id,
+      status: e.status,
+      signingUrl,
+      awaitingSponsorPrep: e.nextSignerRole === "sponsor",
+      createdAt: e.createdAt,
+      updatedAt: e.updatedAt,
+    };
+  }
+
+  const d = await db.collection(col.signingRequests).doc(id).get();
   if (!d.exists) return null;
   const data = d.data() as Omit<SigningRequest, "id">;
   return { id: d.id, ...data };

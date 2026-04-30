@@ -85,9 +85,23 @@ export function InvestorPreview(props: Props) {
   const faqs = resolveDealFaqItems(props.deal?.faqs);
 
   const loginUnavailable = props.lastLoginAtMs == null;
+  const ndaLocked = Boolean(props.room.investorDocsLockedByNda);
 
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr),280px]">
+      {ndaLocked ? (
+        <div
+          role="alert"
+          className="rounded-2xl border border-amber-500/40 bg-amber-50 px-5 py-4 text-sm text-amber-950 lg:col-span-2 dark:border-amber-400/35 dark:bg-amber-950/40 dark:text-amber-50"
+        >
+          <p className="font-semibold">Mutual NDA required before you can open diligence files</p>
+          <p className="mt-2 leading-relaxed text-amber-950/90 dark:text-amber-50/95">
+            This room requires a completed mutual NDA. Your sponsor sends a signing link — use{" "}
+            <span className="font-medium">the same email you use here</span> so completion matches your account.
+            After both parties finish signing, refresh this page; materials will unlock automatically.
+          </p>
+        </div>
+      ) : null}
       <Card className="overflow-hidden rounded-2xl border-border shadow-sm">
         <div className="border-b border-border bg-gradient-to-br from-primary/10 via-card to-card px-8 py-10">
           <p className="text-xs font-semibold uppercase tracking-widest text-primary">Investor portal</p>
@@ -100,15 +114,21 @@ export function InvestorPreview(props: Props) {
           <section className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h4 className="text-sm font-semibold text-foreground">Key documents</h4>
-              <button
-                type="button"
-                onClick={props.onOpenDocuments}
-                className="text-xs font-medium text-primary underline-offset-4 hover:underline"
-              >
-                Open Documents tab
-              </button>
+              {!ndaLocked ? (
+                <button
+                  type="button"
+                  onClick={props.onOpenDocuments}
+                  className="text-xs font-medium text-primary underline-offset-4 hover:underline"
+                >
+                  Open Documents tab
+                </button>
+              ) : null}
             </div>
-            {keyDocs.length === 0 ? (
+            {ndaLocked ? (
+              <p className="rounded-xl border border-dashed border-amber-500/35 bg-muted/40 px-4 py-8 text-center text-sm text-muted-foreground">
+                Files are locked until your NDA is completed.
+              </p>
+            ) : keyDocs.length === 0 ? (
               <p className="text-sm text-muted-foreground">No documents in this room yet.</p>
             ) : (
               <ul className="divide-y divide-border rounded-xl border border-border">
@@ -126,13 +146,17 @@ export function InvestorPreview(props: Props) {
 
           <section className="space-y-3">
             <h4 className="text-sm font-semibold text-foreground">Recent updates</h4>
-            {loginUnavailable ? (
+            {ndaLocked ? null : loginUnavailable ? (
               <p className="text-xs text-muted-foreground">
                 Last sign-in time wasn&apos;t available; showing updates from roughly the last 90 days (including deal notes and new
                 files).
               </p>
             ) : null}
-            {recentRows.length === 0 ? (
+            {ndaLocked ? (
+              <p className="text-sm text-muted-foreground">
+                Document activity is hidden until the NDA is complete.
+              </p>
+            ) : recentRows.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 {loginUnavailable
                   ? "No deal notes or new uploads showed up in roughly the last 90 days. Open the Documents tab for the full library."

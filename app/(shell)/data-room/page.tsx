@@ -3,6 +3,10 @@ import { canEditOrgData } from "@/lib/auth/rbac";
 import { requireOrgSession } from "@/lib/auth/session";
 import { getUserLastSignInMs } from "@/lib/auth/user-metadata";
 import { DataRoomShell } from "@/components/data-room/data-room-shell";
+import {
+  listInvestorCompletedNdaRoomIds,
+  normalizeInvestorEmailForNda,
+} from "@/lib/data-room/investor-nda-gate";
 import { getAdminFirestore } from "@/lib/firebase/admin";
 import { buildInvestorGuestMetrics, computeDataRoomMetrics } from "@/lib/data-room/metrics";
 import type { InviteRow } from "@/lib/data-room/server-queries";
@@ -24,6 +28,8 @@ export default async function DataRoomPage(props: {
   if (!ctx) redirect("/login");
   const membership = await getMembership(ctx.orgId, ctx.user.uid);
   const canManage = membership != null && canEditOrgData(membership.role);
+
+  const lastLoginAtMs = await getUserLastSignInMs(ctx.user.uid);
 
   const sp = props.searchParams ? await props.searchParams : {};
   const dealParam = typeof sp.deal === "string" ? sp.deal.trim() : "";
@@ -48,6 +54,12 @@ export default async function DataRoomPage(props: {
       archived: Boolean(x.archived),
       ndaTemplateRef:
         typeof x.ndaTemplateRef === "string" ? x.ndaTemplateRef : x.ndaTemplateRef === null ? null : undefined,
+      signableTemplateId:
+        typeof x.signableTemplateId === "string"
+          ? x.signableTemplateId
+          : x.signableTemplateId === null
+            ? null
+            : undefined,
       downloadAllowed: x.downloadAllowed === undefined ? undefined : Boolean(x.downloadAllowed),
       watermarkDocs: x.watermarkDocs === undefined ? undefined : Boolean(x.watermarkDocs),
       expiresAt: typeof x.expiresAt === "number" ? x.expiresAt : undefined,
@@ -58,7 +70,21 @@ export default async function DataRoomPage(props: {
     };
   });
 
-  const rooms = filterDataRoomsForMember(roomsRaw, membership);
+  const ndaGuestEmailNorm =
+    membership?.role === "investor_guest" ? normalizeInvestorEmailForNda(ctx.user.email) : "";
+  const completedNdaRoomIds =
+    membership?.role === "investor_guest" && ndaGuestEmailNorm
+      ? await listInvestorCompletedNdaRoomIds(db, ctx.orgId, ndaGuestEmailNorm)
+      : new Set<string>();
+
+  let rooms = filterDataRoomsForMember(roomsRaw, membership);
+  rooms = rooms.map((r) => ({
+    ...r,
+    investorDocsLockedByNda:
+      membership?.role === "investor_guest" &&
+      Boolean(r.ndaRequired) &&
+      (!ndaGuestEmailNorm || !completedNdaRoomIds.has(r.id)),
+  }));
 
   let documents: SerializedRoomDocument[] = docsSnap.docs.map((d) => {
     const x = d.data() as Record<string, unknown>;
@@ -83,6 +109,14 @@ export default async function DataRoomPage(props: {
 
   documents = filterDocumentsForMember(documents, membership, roomsRaw);
 
+  if (membership?.role === "investor_guest") {
+    const withheld = rooms.filter((r) => r.investorDocsLockedByNda).map((r) => r.id);
+    if (withheld.length) {
+      const w = new Set(withheld);
+      documents = documents.filter((d) => !w.has(d.dataRoomId));
+    }
+  }
+
   const metrics = canManage
     ? await computeDataRoomMetrics(ctx.orgId)
     : buildInvestorGuestMetrics(rooms, documents);
@@ -100,7 +134,8 @@ export default async function DataRoomPage(props: {
     roomDealMap[did] = await getDeal(ctx.orgId, did);
   }
 
-  const lastLoginAtMs = await getUserLastSignInMs(ctx.user.uid);
+  const tplSnap = await db.collection(col.signableTemplates).where("organizationId", "==", ctx.orgId).limit(1).get();
+  const esignTemplateLibraryConfigured = !tplSnap.empty;
 
   return (
     <div className="mx-auto max-w-[1400px] space-y-6 px-4 pb-12 pt-6 md:px-6 lg:px-8">
@@ -122,6 +157,7 @@ export default async function DataRoomPage(props: {
         canManage={canManage}
         initialDealFilterId={initialDealFilterId}
         lastLoginAtMs={lastLoginAtMs}
+        esignTemplateLibraryConfigured={esignTemplateLibraryConfigured}
       />
     </div>
   );

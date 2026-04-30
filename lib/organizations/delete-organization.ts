@@ -107,7 +107,10 @@ export async function deleteOrganizationFirestore(db: Firestore, orgId: string):
   await deleteTasksWithComments(db, orgId);
 
   const flatCollections: string[] = [
+    col.signableTemplates,
+    col.esignEnvelopes,
     col.signingRequests,
+    col.mndaSigningRequests,
     col.dealCommitments,
     col.deals,
     col.activities,

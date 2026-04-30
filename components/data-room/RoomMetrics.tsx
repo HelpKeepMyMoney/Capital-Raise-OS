@@ -85,7 +85,7 @@ export function RoomMetrics(props: Props) {
         label="NDAs Pending"
         value={metrics.ndasPending === 0 ? "—" : metrics.ndasPending}
         delay={3}
-        micro="SignWell integration — workflow tracked here soon."
+        micro="Native e-sign — counts come from envelopes in this org."
       />
       <MetricCell
         icon={<TrendingUp className="h-4 w-4" />}

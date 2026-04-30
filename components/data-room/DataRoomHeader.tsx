@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { FolderPlus, UserPlus, Upload } from "lucide-react";
+import { FolderPlus, UserPlus, Upload, FileSignature } from "lucide-react";
 type Props = {
   canManage: boolean;
   onNewRoom: () => void;
@@ -21,6 +22,12 @@ export function DataRoomHeader(props: Props) {
       </div>
       {props.canManage ? (
         <div className="flex flex-shrink-0 flex-wrap items-center gap-2">
+          <Button variant="outline" className="gap-2 rounded-xl border-border bg-card shadow-sm" asChild>
+            <Link href="/settings/esign">
+              <FileSignature className="h-4 w-4" />
+              E-sign templates
+            </Link>
+          </Button>
           <Button variant="outline" className="gap-2 rounded-xl border-border bg-card shadow-sm" onClick={props.onInvite}>
             <UserPlus className="h-4 w-4" />
             Invite investor

@@ -39,7 +39,7 @@ export function DealGuestSigning(props: {
   async function requestPacket() {
     setLoading(true);
     try {
-      const res = await fetch("/api/esign/signwell/create", {
+      const res = await fetch("/api/esign/subscription/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ dealId: props.dealId }),
@@ -50,17 +50,14 @@ export function DealGuestSigning(props: {
         message?: string;
         error?: string;
         id?: string;
-        signwellDocumentId?: string;
+        nativeEnvelopeId?: string;
         signingUrl?: string | null;
+        sponsorSigningUrl?: string | null;
+        awaitingSponsorPrep?: boolean;
         status?: SigningRequestStatus;
       };
       if (!res.ok) {
         throw new Error(json.error ?? "Could not start signing");
-      }
-      if (json.mode === "stub") {
-        toast.message(json.message ?? "SignWell inactive");
-        router.refresh();
-        return;
       }
       const now = Date.now();
       setRow({
@@ -68,17 +65,21 @@ export function DealGuestSigning(props: {
         organizationId: props.orgId,
         dealId: props.dealId,
         userId: props.userId,
-        signwellDocumentId: json.signwellDocumentId,
+        nativeEnvelopeId: json.nativeEnvelopeId,
         signingUrl: json.signingUrl ?? undefined,
+        sponsorSigningUrl: json.sponsorSigningUrl ?? undefined,
+        awaitingSponsorPrep: json.awaitingSponsorPrep,
         status: json.status ?? "sent",
         createdAt: row?.createdAt ?? now,
         updatedAt: now,
       });
-      if (json.signingUrl) {
+      if (json.awaitingSponsorPrep) {
+        toast.message("Your sponsor must complete the sponsor signing step before you can sign. Refresh after they finish.");
+      } else if (json.signingUrl) {
         window.open(json.signingUrl, "_blank", "noopener,noreferrer");
         toast.success("Opening subscription documents…");
       } else {
-        toast.message("Packet created — open the signing link from your email if no window opened.");
+        toast.message("Packet created — check back shortly.");
       }
       router.refresh();
     } catch (e) {
@@ -93,6 +94,7 @@ export function DealGuestSigning(props: {
     row.status === "draft" ||
     row.status === "declined" ||
     row.status === "error" ||
+    row.awaitingSponsorPrep ||
     (row.status === "sent" && !row.signingUrl);
 
   return (
@@ -106,11 +108,34 @@ export function DealGuestSigning(props: {
           </Badge>
         </div>
         <p className="text-sm text-muted-foreground">
-          E-sign via SignWell. Your sponsor configures the subscription template; you sign in a secure
-          browser window.
+          Native e-sign: your sponsor links a subscription PDF in settings; you sign in a secure browser window.
         </p>
       </CardHeader>
       <CardContent className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+        {row?.awaitingSponsorPrep && row.sponsorSigningUrl ? (
+          <div className="w-full rounded-xl border border-border/80 bg-muted/30 p-3 text-sm">
+            <p className="font-medium text-foreground">Sponsor must sign first</p>
+            <p className="mt-1 text-muted-foreground">
+              Send this link to your sponsor so they can complete their fields. Your signing link will be ready
+              after they finish.
+            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <code className="max-w-full truncate rounded-md bg-muted px-2 py-1 text-xs">{row.sponsorSigningUrl}</code>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="rounded-lg"
+                onClick={() => {
+                  void navigator.clipboard.writeText(row.sponsorSigningUrl ?? "");
+                  toast.success("Sponsor link copied");
+                }}
+              >
+                Copy sponsor link
+              </Button>
+            </div>
+          </div>
+        ) : null}
         {row?.signingUrl && row.status !== "completed" && row.status !== "declined" ? (
           <a
             href={row.signingUrl}

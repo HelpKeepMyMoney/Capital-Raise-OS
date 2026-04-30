@@ -8,6 +8,10 @@ import { col } from "@/lib/firestore/paths";
 import type { InvestorInviteScope } from "@/lib/firestore/types";
 import { getDeal, getMembership } from "@/lib/firestore/queries";
 import { generateInviteToken, hashInviteToken } from "@/lib/invitations/token";
+import {
+  escapeHtmlForEmail,
+  invitationsTransactionalFrom,
+} from "@/lib/invitations/invite-email-shared";
 import { listDataRoomIdsForDeals } from "@/lib/invitations/data-rooms";
 import { writeAuditLog } from "@/lib/audit";
 
@@ -16,14 +20,6 @@ function appBaseUrl(req: NextRequest): string {
     process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ??
     req.headers.get("origin") ??
     "http://localhost:3000"
-  );
-}
-
-function fromAddress(): string {
-  return (
-    process.env.RESEND_FROM ??
-    process.env.OUTREACH_FROM_EMAIL ??
-    "CPIN <onboarding@resend.dev>"
   );
 }
 
@@ -137,12 +133,12 @@ export async function POST(req: NextRequest) {
 
       const subject = `Invitation to view ${scope === "deal" ? "a deal" : "the investor portal"} — ${orgName}`;
       const html = `
-        <p>You’ve been invited to the ${escapeHtml(orgName)} workspace on CPIN Capital Management System.</p>
+        <p>You’ve been invited to the ${escapeHtmlForEmail(orgName)} workspace on CPIN Capital Management System.</p>
         <p><a href="${inviteUrl}">Accept invitation</a></p>
         <p style="color:#666;font-size:12px">This link expires in ${expiresInDays} days.</p>
       `.trim();
 
-      await sendTransactionalEmail({ from: fromAddress(), to: email, subject, html });
+      await sendTransactionalEmail({ from: invitationsTransactionalFrom(), to: email, subject, html });
     } catch (e) {
       const message = e instanceof Error ? e.message : "Email failed";
       console.error("[invitations] email", e);
@@ -159,8 +155,4 @@ export async function POST(req: NextRequest) {
     inviteToken: rawToken,
     id,
   });
-}
-
-function escapeHtml(s: string) {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
