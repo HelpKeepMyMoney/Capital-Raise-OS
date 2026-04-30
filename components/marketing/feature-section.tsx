@@ -27,7 +27,7 @@ export function FeatureSection(props: {
       ) : null}
       <h2
         id={`${id}-heading`}
-        className="font-heading text-3xl font-semibold tracking-tight text-foreground sm:text-[2rem]"
+        className="font-heading text-[1.85rem] font-semibold tracking-tight text-foreground sm:text-[2.125rem] lg:text-[2.25rem]"
       >
         {headline}
       </h2>
@@ -68,7 +68,7 @@ export function FeatureSection(props: {
     <section
       id={id}
       aria-labelledby={`${id}-heading`}
-      className="scroll-mt-28 border-b border-border/60 py-16 sm:py-20 lg:py-24 dark:border-border/40"
+      className="scroll-mt-28 border-b border-border/60 py-20 sm:py-24 lg:py-28 dark:border-border/40"
     >
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
         <div className="grid gap-10 lg:grid-cols-2 lg:gap-14 lg:items-center">

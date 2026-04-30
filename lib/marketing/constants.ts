@@ -1,6 +1,11 @@
 /** HubSpot scheduler for demo requests */
 export const BOOK_DEMO_HREF = "https://meetings-na2.hubspot.com/mevans";
 
+/** BNIC operator / legal (marketing footer) */
+export const BNIC_ABOUT_HREF = "https://www.thebnic.com/#about";
+export const BNIC_PRIVACY_HREF = "https://www.thebnic.com/privacy";
+export const BNIC_TERMS_HREF = "https://www.thebnic.com/terms-and-conditions";
+
 /** Public folder screenshot paths (spaces encoded for next/image reliability) */
 export const SCREENSHOT = {
   hero: encodeURI("/Screenshot 1.png"),

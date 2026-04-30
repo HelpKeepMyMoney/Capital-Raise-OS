@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid input", details: parsed.error.flatten() }, { status: 400 });
   }
 
-  const { name, email, company, message, website } = parsed.data;
+  const { name, email, company, raiseSize, message, website } = parsed.data;
 
   if ((website ?? "").trim() !== "") {
     return genericOk();
@@ -85,6 +85,7 @@ export async function POST(req: NextRequest) {
         name,
         email: emailNormalized,
         company: company?.trim() || null,
+        raiseSize: raiseSize ?? null,
         message,
         createdAt: FieldValue.serverTimestamp(),
         source: "marketing",
@@ -105,6 +106,7 @@ export async function POST(req: NextRequest) {
     <p><strong>Name:</strong> ${escapeHtml(name)}</p>
     <p><strong>Email:</strong> ${escapeHtml(emailNormalized)}</p>
     ${company?.trim() ? `<p><strong>Company:</strong> ${escapeHtml(company.trim())}</p>` : ""}
+    ${raiseSize ? `<p><strong>Raise size:</strong> ${escapeHtml(raiseSize)}</p>` : ""}
     <hr />
     <pre style="white-space:pre-wrap;font-family:inherit">${escapeHtml(message)}</pre>
   </div>`;

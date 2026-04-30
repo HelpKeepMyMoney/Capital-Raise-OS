@@ -14,7 +14,7 @@ export function PricingSection() {
       title: "Starter",
       price: "$79",
       period: "/mo",
-      desc: "Best for solo sponsors and first time raises.",
+      desc: "For solo sponsors and first time raises.",
       features: [
         "Investor CRM",
         "1 Active Deal Room",
@@ -28,7 +28,7 @@ export function PricingSection() {
       title: "Growth",
       price: "$199",
       period: "/mo",
-      desc: "Best for active sponsors and repeat capital raisers.",
+      desc: "For active sponsors and repeat capital raisers.",
       features: [
         "Unlimited Investors",
         "Multiple Active Deal Rooms",
@@ -82,7 +82,7 @@ export function PricingSection() {
               className={cn(
                 "relative flex flex-col rounded-2xl border p-8 shadow-md",
                 p.highlighted
-                  ? "border-primary/55 bg-card ring-2 ring-primary/35 shadow-[0_24px_64px_-20px_oklch(0.48_0.18_258/0.45)] dark:shadow-[0_24px_64px_-20px_oklch(0.62_0.14_258/0.25)]"
+                  ? "border-primary/50 bg-card ring-2 ring-primary/45 shadow-[0_28px_72px_-18px_oklch(0.48_0.18_258/0.5)] dark:border-primary/55 dark:shadow-[0_28px_72px_-18px_oklch(0.62_0.14_258/0.35)]"
                   : "border-border/80 bg-card",
               )}
             >
@@ -111,21 +111,23 @@ export function PricingSection() {
                 </ul>
               </div>
               <div className="mt-10">
-                <Link
-                  href="/signup"
-                  className={cn(
-                    buttonVariants({ size: "lg", className: "w-full rounded-xl" }),
-                  )}
-                >
-                  Start Free Trial
-                </Link>
+                <motion.div whileHover={{ scale: reduced ? 1 : 1.02 }} whileTap={{ scale: reduced ? 1 : 0.99 }}>
+                  <Link
+                    href="/signup"
+                    className={cn(
+                      buttonVariants({ size: "lg", className: "w-full rounded-xl" }),
+                    )}
+                  >
+                    Start Free Trial
+                  </Link>
+                </motion.div>
               </div>
             </motion.article>
           ))}
         </div>
 
         <p className="mt-10 text-center text-sm leading-relaxed text-muted-foreground">
-          Need white label, custom onboarding, or team rollout?{" "}
+          Need white label, onboarding, or team rollout?{" "}
           <a
             href={BOOK_DEMO_HREF}
             target="_blank"
@@ -134,7 +136,6 @@ export function PricingSection() {
           >
             Book a Demo
           </a>
-          .
         </p>
       </div>
     </section>

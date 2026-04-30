@@ -1,19 +1,19 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "CPIN | Raise Capital Like an Institution",
+  title: "CPIN | Raise More Capital. Close Faster.",
   description:
-    "CPIN helps sponsors, funds, and private issuers raise capital with investor CRM, deal rooms, data rooms, and workflow automation.",
+    "Investor CRM, deal rooms, data rooms, and workflows for sponsors, funds, syndicators, and private issuers — raise and close capital from one platform.",
   openGraph: {
-    title: "CPIN | Raise Capital Like an Institution",
+    title: "CPIN | Raise More Capital. Close Faster.",
     description:
-      "CPIN helps sponsors, funds, and private issuers raise capital with investor CRM, deal rooms, data rooms, and workflow automation.",
+      "Investor CRM, deal rooms, data rooms, and workflows for sponsors, funds, syndicators, and private issuers — raise and close capital from one platform.",
   },
   twitter: {
     card: "summary_large_image",
-    title: "CPIN | Raise Capital Like an Institution",
+    title: "CPIN | Raise More Capital. Close Faster.",
     description:
-      "CPIN helps sponsors, funds, and private issuers raise capital with investor CRM, deal rooms, data rooms, and workflow automation.",
+      "Investor CRM, deal rooms, data rooms, and workflows for sponsors, funds, syndicators, and private issuers — raise and close capital from one platform.",
   },
 };
 
