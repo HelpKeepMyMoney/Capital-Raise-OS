@@ -6,7 +6,7 @@ AI-powered private capital platform: investor CRM, discovery, outreach, data roo
 
 ### Auth — forgot password
 
-- **`/forgot-password`:** Email/password users can request a Firebase reset link (**`sendPasswordResetEmail`**). **`components/forgot-password-form.tsx`** pre-fills **`email`** from the query string and preserves **`invite`** / **`next`** for return navigation.
+- **`/forgot-password`:** Email/password users request a reset link via **`POST /api/auth/forgot-password`**: Firebase Admin **`generatePasswordResetLink`** plus **Resend** when **`RESEND_API_KEY`** is set; otherwise the client falls back to **`sendPasswordResetEmail`**. **`components/forgot-password-form.tsx`** pre-fills **`email`** from the query string and preserves **`invite`** / **`next`** for return navigation.
 - **`components/login-form.tsx`:** **Forgot password?** link passes through email (when entered), invite, and next params.
 
 Configure **Firebase Console → Authentication → Templates → Password reset** as needed; **authorized domains** must include your deployed origin (e.g. **`your-app.vercel.app`**) so reset links work in production.

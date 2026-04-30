@@ -46,6 +46,8 @@ turbopack: { root: __dirname },
 1. Verify your sending domain in Resend.
 2. Set `RESEND_API_KEY` and `RESEND_FROM` (e.g. `CPIN <hello@yourdomain.com>`).
 
+Password reset emails use **Firebase Admin** (`generatePasswordResetLink`) plus **Resend** when `RESEND_API_KEY` is set (recommended for deliverability). Set **`NEXT_PUBLIC_APP_URL`** so the reset link’s continue URL matches production. If `RESEND_API_KEY` is omitted, the app falls back to Firebase’s built-in client email (often filtered or unreliable without Resend).
+
 ## Google Analytics 4 & GTM
 
 1. Create a GTM container; add a GA4 Configuration tag.

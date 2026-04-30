@@ -28,12 +28,37 @@ export function ForgotPasswordForm() {
     e.preventDefault();
     setLoading(true);
     try {
-      const auth = getFirebaseAuth();
       const trimmed = email.trim().toLowerCase();
-      await sendPasswordResetEmail(auth, trimmed, {
-        url: `${window.location.origin}/login`,
-        handleCodeInApp: false,
+
+      const res = await fetch("/api/auth/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: trimmed }),
       });
+      const payload = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        useClientFirebase?: boolean;
+        error?: string;
+      };
+
+      if (!res.ok && payload.error) {
+        toast.error(payload.error);
+        return;
+      }
+
+      if (payload.useClientFirebase) {
+        const auth = getFirebaseAuth();
+        await sendPasswordResetEmail(auth, trimmed, {
+          url: `${window.location.origin}/login`,
+          handleCodeInApp: false,
+        });
+      }
+
+      if (!res.ok && !payload.useClientFirebase) {
+        toast.error(payload.error ?? `Request failed (${res.status})`);
+        return;
+      }
+
       setSent(true);
     } catch (err) {
       const fb = err as FirebaseError;
