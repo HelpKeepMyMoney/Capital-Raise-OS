@@ -29,6 +29,32 @@ export async function getOrganization(orgId: string): Promise<Organization | nul
   return { id: d.id, ...(d.data() as Omit<Organization, "id">) };
 }
 
+const BATCH_GET_USERS = 100;
+
+export async function listOrganizationsForAdmin(limit = 500): Promise<Organization[]> {
+  const db = getAdminFirestore();
+  const snap = await db.collection(col.organizations).limit(limit).get();
+  const list = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Organization, "id">) }));
+  list.sort((a, b) => a.name.localeCompare(b.name));
+  return list;
+}
+
+/** UIDs among `uids` that have `users/{uid}` in Firestore. */
+export async function batchUsersProfileDocExist(uids: string[]): Promise<Set<string>> {
+  const out = new Set<string>();
+  if (!uids.length) return out;
+  const db = getAdminFirestore();
+  for (let i = 0; i < uids.length; i += BATCH_GET_USERS) {
+    const chunk = uids.slice(i, i + BATCH_GET_USERS);
+    const refs = chunk.map((uid) => db.collection(col.users).doc(uid));
+    const snaps = await db.getAll(...refs);
+    for (const s of snaps) {
+      if (s.exists) out.add(s.id);
+    }
+  }
+  return out;
+}
+
 export async function listUserOrganizations(
   uid: string,
 ): Promise<{ org: Organization; role: string }[]> {

@@ -4,6 +4,16 @@ AI-powered private capital platform: investor CRM, discovery, outreach, data roo
 
 ## Changelog
 
+### Platform admin dashboard & APIs
+
+- **`/admin` (`app/(platform-admin)/`):** Guarded layout via **`requirePlatformAdmin`** (**`PLATFORM_ADMIN_UIDS`** on the Firebase Auth user UID). Tabs for **Organizations** and **Users** (**`components/platform-admin/platform-admin-dashboard.tsx`**).
+- **Organizations:** **`GET`/`POST`** **`/api/platform-admin/organizations`**; **`PATCH`** **`.../organizations/[orgId]`** (name, slug, subscription merge); **`POST`** **`.../[orgId]/delete`** with name confirmation (same cascade as tenant org delete); **`GET`** **`.../organizations/[orgId]/linkables`** for deal/room picks when assigning memberships.
+- **Users:** **`GET`** paginated **`/api/platform-admin/users`** (includes **`hasProfileDoc`**); **`POST`** creates Auth user + Firestore **`users`** doc and sends **welcome / set-password** mail via **`lib/email/password-set-mail.ts`** when **`RESEND_API_KEY`** is set (**`PlatformAdminCreateUserSchema`**).
+- **User lifecycle:** **`PATCH`** **`.../users/[uid]`**; **`POST`** **`.../users/[uid]/deactivate`** (disable + strip memberships); **`POST`** **`.../users/[uid]/strip-memberships`** only.
+- **Memberships:** **`POST`** **`.../users/[uid]/organizations`** (role + optional **`investorAccess`** deal scope); **`PATCH`/`DELETE`** **`.../users/[uid]/organizations/[orgId]`**. **Create** and **Manage user** share one **Dialog** and the same **`MembershipAssignmentPicker`**: you can pick org and role before **Create & email**; the server creates the user then assigns membership. **Skip — assign later** is the default so new accounts are not auto-joined to the first org.
+- **`lib/auth/sync-org-claims.ts`:** Helpers to sync **`organization_claims`** and default-org consistency from Firestore (e.g. **`syncUserOrgClaimsFromFirestore`**). Used by **`app/api/invitations/redeem/route.ts`** and platform-admin membership routes.
+- **`lib/platform-admin/`:** **`requirePlatformAdminApi`** for route handlers**,** Zod schemas**,** **`listOrganizationsForAdmin`** in **`lib/firestore/queries.ts`**, audit logging on mutating ops.
+
 ### Auth — forgot password
 
 - **`/forgot-password`:** Email/password users request a reset link via **`POST /api/auth/forgot-password`**: Firebase Admin **`generatePasswordResetLink`** plus **Resend** when **`RESEND_API_KEY`** is set; otherwise the client falls back to **`sendPasswordResetEmail`**. **`components/forgot-password-form.tsx`** pre-fills **`email`** from the query string and preserves **`invite`** / **`next`** for return navigation.
@@ -137,14 +147,14 @@ Premium sponsor workspace for diligence: header actions, six KPI cards (from Fir
 ## Project structure
 
 - `app/(shell)/` — authenticated product (dashboard, CRM, modules; includes dynamic **investors/[id]**, **deals/[id]**, **deals/new**)
-- `app/(platform-admin)/` — platform super-admin (`/admin`) when UIDs are listed in `PLATFORM_ADMIN_UIDS`
+- `app/(platform-admin)/` — platform super-admin (`/admin`; **`PLATFORM_ADMIN_UIDS`**); dashboard + **`components/platform-admin/`**; **`app/api/platform-admin/`** user/org/list routes (see Changelog → Platform admin)
 - `app/(marketing)/` — public marketing homepage (SEO metadata in layout); `app/api/contact/` — POST marketing contact (Firestore + Resend)
 - `app/(auth)/` — login, signup, forgot-password
 - `app/onboarding/` — create first organization (session without org)
 - `app/invite/[token]/` — redeem investor invitation links
-- `app/api/` — session auth, discovery, outreach, data room (rooms `GET`/`POST`/`PATCH`, documents, sign-url, **invitations**, **activity**), **deals** (`PATCH /api/deals/[id]`, **telemetry**), **tasks** (`GET`/`POST`, **`PATCH /api/tasks/[id]`**, **`/api/tasks/[id]/comments`**), **organizations** (`PATCH /api/organizations/[id]`, **`POST .../delete`**), invitations, AI chat, PayPal billing, webhooks
-- `components/data-room/` — Data Room UI modules; `components/deals/` — Deal Room UI; **`components/marketing/`** — public landing sections; **`components/tasks/`** — Tasks Workflow Center UI; **`components/settings/`** — org settings / delete; `lib/data-room/` — metrics, kind labels, server queries; **`lib/deals/`** — deal patch schema, narrative helpers, telemetry aggregation, formatting; **`lib/marketing/`** — marketing constants & contact schema; **`lib/tasks/`** — task workflow helpers; **`lib/organizations/`** — org patch, deletion cascade, slug helpers
-- `lib/` — Firebase, Firestore types/queries, discovery merge, analytics helpers, auth (RBAC, guests, platform admin), invitations, PayPal, billing
+- `app/api/` — session auth, **`platform-admin`** (users/orgs CRUD — see Changelog), discovery, outreach, data room (rooms `GET`/`POST`/`PATCH`, documents, sign-url, **invitations**, **activity**), **deals** (`PATCH /api/deals/[id]`, **telemetry**), **tasks** (`GET`/`POST`, **`PATCH /api/tasks/[id]`**, **`/api/tasks/[id]/comments`**), **organizations** (`PATCH /api/organizations/[id]`, **`POST .../delete`**), invitations, AI chat, PayPal billing, webhooks
+- `components/data-room/` — Data Room UI modules; `components/deals/` — Deal Room UI; **`components/marketing/`** — public landing sections; **`components/tasks/`** — Tasks Workflow Center UI; **`components/settings/`** — org settings / delete; **`components/platform-admin/`** — `/admin` dashboard UI; `lib/data-room/` — metrics, kind labels, server queries; **`lib/deals/`** — deal patch schema, narrative helpers, telemetry aggregation, formatting; **`lib/marketing/`** — marketing constants & contact schema; **`lib/tasks/`** — task workflow helpers; **`lib/organizations/`** — org patch, deletion cascade, slug helpers; **`lib/platform-admin/`** — admin API guards & schemas
+- `lib/` — Firebase, Firestore types/queries, discovery merge, analytics helpers, auth (RBAC, guests, platform admin), **`lib/email/password-set-mail`** (welcome / forgot-password links), invitations, PayPal, billing
 - `functions/` — Firebase Cloud Functions (member → custom claims sync, scheduled digest)
 - `scripts/seed-demo.ts` — demo org, investors, tasks, emails
 

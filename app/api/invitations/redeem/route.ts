@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { getAdminAuth } from "@/lib/firebase/admin";
-import type { Auth } from "firebase-admin/auth";
 import { getAdminFirestore } from "@/lib/firebase/admin";
+import { syncUserOrgClaimsFromFirestore } from "@/lib/auth/sync-org-claims";
 import { col, memberDocId } from "@/lib/firestore/paths";
 import type { InvestorAccess } from "@/lib/firestore/types";
 import { findInvitationByTokenHash } from "@/lib/firestore/queries";
@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
   const memberRef = db.collection(col.organizationMembers).doc(memberDocId(orgId, uid));
   const existing = await memberRef.get();
   if (existing.exists) {
-    await syncCustomClaims(uid, auth);
+    await syncUserOrgClaimsFromFirestore(uid);
     return NextResponse.json({
       ok: true,
       alreadyMember: true,
@@ -128,7 +128,7 @@ export async function POST(req: NextRequest) {
 
   await batch.commit();
 
-  await syncCustomClaims(uid, auth);
+  await syncUserOrgClaimsFromFirestore(uid);
 
   await writeAuditLog({
     organizationId: orgId,
@@ -145,19 +145,4 @@ export async function POST(req: NextRequest) {
     redirectTo: inv.scope === "deal" && inv.dealIds[0] ? `/deals/${inv.dealIds[0]}` : "/deals",
     /** Client should call `getIdToken(true)`, then `POST /api/auth/session` with `organizationId`. */
   });
-}
-
-async function syncCustomClaims(uid: string, auth: Auth) {
-  const userRecord = await auth.getUser(uid);
-  const prev = userRecord.customClaims ?? {};
-  const orgsSnap = await getAdminFirestore()
-    .collection(col.organizationMembers)
-    .where("userId", "==", uid)
-    .get();
-  const orgs = { ...(typeof prev.orgs === "object" ? (prev.orgs as Record<string, string>) : {}) };
-  for (const d of orgsSnap.docs) {
-    const x = d.data() as { organizationId?: string; role?: string };
-    if (x.organizationId && x.role) orgs[x.organizationId] = x.role;
-  }
-  await auth.setCustomUserClaims(uid, { ...prev, orgs });
 }

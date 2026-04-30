@@ -24,7 +24,7 @@ export default async function PlatformAdminLayout({
         </span>
         <PlatformAdminHeaderExtras />
       </header>
-      <main className="mx-auto max-w-5xl p-4 md:p-8">{children}</main>
+      <main className="mx-auto max-w-7xl p-4 md:p-8">{children}</main>
     </div>
   );
 }
