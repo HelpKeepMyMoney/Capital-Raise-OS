@@ -1,6 +1,7 @@
 "use client";
 
 import type { SerializedDataRoom, SerializedRoomDocument } from "@/components/data-room/types";
+import { resolveDealFaqItems } from "@/components/deals/faq-section";
 import type { Deal } from "@/lib/firestore/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
@@ -81,7 +82,7 @@ export function InvestorPreview(props: Props) {
     return buildRecentRows(props.deal, props.documentsForRoom, boundaryMs);
   }, [props.deal, props.documentsForRoom, props.lastLoginAtMs]);
 
-  const faqs = props.deal?.faqs?.filter((f) => f.q?.trim() || f.a?.trim()) ?? [];
+  const faqs = resolveDealFaqItems(props.deal?.faqs);
 
   const loginUnavailable = props.lastLoginAtMs == null;
 
@@ -168,14 +169,12 @@ export function InvestorPreview(props: Props) {
             )}
           </section>
 
-          <section className="space-y-3">
+          <section id="faq" className="scroll-mt-28 space-y-3">
             <h4 className="text-sm font-semibold text-foreground">FAQ</h4>
             {!props.room.dealId || !props.deal ? (
               <p className="text-sm text-muted-foreground">
                 Link a deal in Settings to show diligence FAQs when they&apos;re configured on the deal record.
               </p>
-            ) : faqs.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No FAQs published on the linked deal yet.</p>
             ) : (
               <div className="space-y-2">
                 {faqs.map((f, i) => (

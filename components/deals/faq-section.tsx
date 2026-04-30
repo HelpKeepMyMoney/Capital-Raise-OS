@@ -1,6 +1,7 @@
+import Link from "next/link";
 import { cn } from "@/lib/utils";
 
-const DEFAULT_FAQ: { q: string; a: string }[] = [
+export const DEFAULT_DEAL_FAQ: { q: string; a: string }[] = [
   {
     q: "How do I invest?",
     a: "Use “Commit capital” or “Express interest” on this page. The sponsor team will follow up with allocation and subscription documents as appropriate.",
@@ -27,18 +28,36 @@ const DEFAULT_FAQ: { q: string; a: string }[] = [
   },
 ];
 
+/** Same logic for deal room and data-room investor preview: custom FAQs when set, else defaults. */
+export function resolveDealFaqItems(items?: { q: string; a: string }[]): { q: string; a: string }[] {
+  const filtered = items?.filter((f) => f.q?.trim() || f.a?.trim()) ?? [];
+  return filtered.length > 0 ? filtered : DEFAULT_DEAL_FAQ;
+}
+
 export function FaqSection(props: {
   items?: { q: string; a: string }[];
+  /** When set, links to the matching diligence-room FAQ block (same deal’s data room). */
+  diligenceRoomFaqHref?: string;
   className?: string;
 }) {
-  const items =
-    props.items && props.items.length > 0 ? props.items : DEFAULT_FAQ;
+  const items = resolveDealFaqItems(props.items);
 
   return (
     <section id="faq" className={cn("scroll-mt-24 space-y-3", props.className)}>
       <div>
         <h2 className="font-heading text-2xl font-bold tracking-tight">FAQ</h2>
         <p className="mt-1 text-sm text-muted-foreground">Common questions from investors.</p>
+        {props.diligenceRoomFaqHref ? (
+          <p className="mt-2 text-sm">
+            <Link
+              href={props.diligenceRoomFaqHref}
+              className="font-medium text-primary underline-offset-4 hover:underline"
+            >
+              View this FAQ in the diligence room
+            </Link>
+            <span className="text-muted-foreground"> — for reviewers browsing materials.</span>
+          </p>
+        ) : null}
       </div>
       <div className="divide-y divide-border/80 rounded-2xl border border-border/80 bg-card">
         {items.map((f, i) => (

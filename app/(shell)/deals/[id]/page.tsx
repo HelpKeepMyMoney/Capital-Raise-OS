@@ -246,7 +246,15 @@ export default async function DealDetailPage(props: { params: Promise<{ id: stri
 
         <TermsGrid deal={deal} />
 
-        <DealDocuments dealId={deal.id} documents={roomDocs} />
+        <DealDocuments
+          dealId={deal.id}
+          documents={roomDocs}
+          faqHref={
+            hasDataRoom
+              ? `/data-room?deal=${encodeURIComponent(deal.id)}#faq`
+              : "#faq"
+          }
+        />
 
         {deal.investorUpdates && deal.investorUpdates.length > 0 ? (
           <Card className="rounded-2xl border-border/80 shadow-sm">
@@ -273,7 +281,12 @@ export default async function DealDetailPage(props: { params: Promise<{ id: stri
           </Card>
         ) : null}
 
-        <FaqSection items={deal.faqs} />
+        <FaqSection
+          items={deal.faqs}
+          diligenceRoomFaqHref={
+            hasDataRoom ? `/data-room?deal=${encodeURIComponent(deal.id)}#faq` : undefined
+          }
+        />
 
         {guest ? (
           <>

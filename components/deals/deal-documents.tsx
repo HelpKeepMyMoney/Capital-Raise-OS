@@ -28,8 +28,11 @@ function pickSummaryDocument(
 export function DealDocuments(props: {
   dealId: string;
   documents: Pick<RoomDocument, "id" | "name" | "kind" | "dataRoomId">[];
+  /** When set (e.g. linked data room exists), “Ask questions” jumps to that room’s FAQ; else in-page #faq. */
+  faqHref?: string;
   className?: string;
 }) {
+  const faqHref = props.faqHref ?? "#faq";
   const preview = props.documents.slice(0, 5);
   const [summaryPending, setSummaryPending] = React.useState(false);
 
@@ -112,7 +115,7 @@ export function DealDocuments(props: {
               {summaryPending ? "Preparing…" : "Download summary"}
             </Button>
             <a
-              href="#faq"
+              href={faqHref}
               className={cn(buttonVariants({ variant: "ghost" }), "inline-flex items-center gap-2 rounded-xl")}
             >
               <HelpCircle className="size-4" />
