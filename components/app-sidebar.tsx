@@ -144,11 +144,11 @@ export function AppSidebar(props: {
           <Link
             href={guest ? "/portal" : "/dashboard"}
             className="flex h-10 max-w-[148px] shrink-0 items-center overflow-hidden rounded-xl ring-1 ring-sidebar-primary/25 ring-offset-2 ring-offset-sidebar"
-            aria-label="CapitalOS home"
+            aria-label="CapitalOS by CPIN home"
           >
             <Image
               src="/cpin-logo.jpg"
-              alt="CapitalOS"
+              alt="CapitalOS by CPIN"
               width={148}
               height={40}
               className="h-10 w-auto max-w-[148px] object-contain object-left"
@@ -156,7 +156,7 @@ export function AppSidebar(props: {
             />
           </Link>
           <div className="min-w-0">
-            <p className="font-heading text-sm font-semibold leading-tight tracking-tight">CapitalOS</p>
+            <p className="font-heading text-sm font-semibold leading-tight tracking-tight">CapitalOS by CPIN</p>
             <p className="mt-0.5 truncate text-[11px] leading-snug text-sidebar-foreground/65">
               Operating system for private capital
             </p>

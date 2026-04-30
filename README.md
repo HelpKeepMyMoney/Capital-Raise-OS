@@ -1,6 +1,6 @@
-# CapitalOS
+# CapitalOS by CPIN
 
-AI-powered private capital platform: investor CRM, discovery, outreach, data rooms, deal room, tasks, analytics, AI copilot, and PayPal subscriptions — built with **Next.js (App Router)**, **Firebase** (Auth, Firestore, Storage), **Resend**, **OpenAI / Anthropic**, and **Vercel**.
+AI-powered private capital platform: investor CRM, discovery, outreach, data rooms, deal room, tasks, analytics, AI copilot, and PayPal subscriptions — built with **Next.js (App Router)**, **Firebase** (Auth, Firestore, Storage), **Resend**, **OpenAI / Anthropic**, and **Vercel**. The **marketing header** and **app sidebar** label the product **CapitalOS by CPIN**; some SEO/marketing strings still use **CPIN** alone (see `app/(marketing)/layout.tsx`).
 
 ## Changelog
 
@@ -11,7 +11,7 @@ AI-powered private capital platform: investor CRM, discovery, outreach, data roo
 
 ### Branding and sign-out UX
 
-- **Product label:** The marketing header (**`components/marketing/marketing-header.tsx`**) and app sidebar (**`components/app-sidebar.tsx`**) show **CapitalOS** next to the logo (accessible name and **`alt`** text aligned).
+- **Product label:** The marketing header (**`components/marketing/marketing-header.tsx`**) and app sidebar (**`components/app-sidebar.tsx`**) show **CapitalOS by CPIN** next to the logo (accessible name and **`alt`** text aligned).
 - **Sign out:** Log out (**`components/shell-layout-client.tsx`**) and platform admin log out (**`components/platform-admin-header.tsx`**) call **`POST /api/auth/logout`** then redirect to the marketing home page **`/`** instead of **`/login`**.
 
 ### Platform admin dashboard & APIs
