@@ -15,6 +15,8 @@ type Props = {
   roomName: string;
   ndaRequired: boolean;
   hasNdaTemplate: boolean;
+  /** Template id from the room settings form (used even before Save settings). */
+  signableTemplateId: string;
 };
 
 export function EsignSendPanel(props: Props) {
@@ -62,6 +64,7 @@ export function EsignSendPanel(props: Props) {
           dataRoomId: props.dataRoomId,
           investorEmail: email,
           investorName: investorName.trim() || undefined,
+          signableTemplateId: props.signableTemplateId.trim() || undefined,
         }),
       });
       const json = (await res.json()) as {
@@ -127,6 +130,7 @@ export function EsignSendPanel(props: Props) {
         </div>
         <p className="text-[11px] text-muted-foreground">
           Sponsor signs first when the template has sponsor fields; otherwise the investor link is active immediately.
+          Uses the template selected above (save room settings to store it as this room&apos;s default).
         </p>
         <Button
           type="button"

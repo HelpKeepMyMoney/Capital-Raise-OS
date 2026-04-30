@@ -3,8 +3,7 @@ import { z } from "zod";
 import { canEditOrgData } from "@/lib/auth/rbac";
 import { requireOrgSession } from "@/lib/auth/session";
 import { getAdminBucket, getAdminFirestore } from "@/lib/firebase/admin";
-import { invitationsTransactionalFrom } from "@/lib/invitations/invite-email-shared";
-import { sendTransactionalEmail } from "@/lib/email/resend";
+import { sendEsignEnvelopeCreatedEmails } from "@/lib/esign/envelope-notify";
 import { getOrganization, getMembership } from "@/lib/firestore/queries";
 import {
   createAdhocEnvelope,
@@ -20,6 +19,8 @@ const CreateBodySchema = z.discriminatedUnion("kind", [
     dataRoomId: z.string().min(1),
     investorEmail: z.string().email(),
     investorName: z.string().max(200).optional(),
+    /** Optional when the room form has a template selected but settings were not saved yet. */
+    signableTemplateId: z.string().uuid().optional(),
   }),
   z.object({
     kind: z.literal("deal_subscription"),
@@ -85,19 +86,16 @@ export async function POST(req: NextRequest) {
       label: body.label,
     });
 
-    if (investorUrl && process.env.RESEND_API_KEY) {
-      try {
-        const org = await getOrganization(ctx.orgId);
-        await sendTransactionalEmail({
-          from: invitationsTransactionalFrom(),
-          to: body.investorEmail.trim().toLowerCase(),
-          subject: `Documents to sign — ${org?.name ?? "CapitalOS"}`,
-          html: `<p>Please complete your signature:</p><p><a href="${investorUrl}">Open signing page</a></p>`,
-        });
-      } catch {
-        /* optional */
-      }
-    }
+    const orgAdhoc = await getOrganization(ctx.orgId);
+    await sendEsignEnvelopeCreatedEmails({
+      orgName: orgAdhoc?.name ?? "CapitalOS",
+      sponsorEmail,
+      investorEmail: body.investorEmail.trim().toLowerCase(),
+      investorName: invName,
+      sponsorUrl,
+      investorUrl,
+      context: { kind: "ad_hoc", label: body.label },
+    });
 
     return NextResponse.json({
       ok: true,
@@ -116,10 +114,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Enable NDA required for this room first" }, { status: 400 });
   }
 
-  const templateId =
+  const fromRoom =
     typeof room.signableTemplateId === "string" && room.signableTemplateId.trim()
       ? room.signableTemplateId.trim()
       : null;
+  const fromBody =
+    body.kind === "data_room_nda" &&
+    typeof body.signableTemplateId === "string" &&
+    body.signableTemplateId.trim()
+      ? body.signableTemplateId.trim()
+      : null;
+  const templateId = fromBody ?? fromRoom;
   if (!templateId) {
     return NextResponse.json({ error: "Link a signable template on the data room (Settings)" }, { status: 400 });
   }
@@ -148,19 +153,16 @@ export async function POST(req: NextRequest) {
     investorName,
   });
 
-  if (investorUrl && process.env.RESEND_API_KEY) {
-    try {
-      const org = await getOrganization(ctx.orgId);
-      await sendTransactionalEmail({
-        from: invitationsTransactionalFrom(),
-        to: investorEmail,
-        subject: `Documents to sign — ${org?.name ?? "CapitalOS"}`,
-        html: `<p>Please complete your signature:</p><p><a href="${investorUrl}">Open signing page</a></p>`,
-      });
-    } catch {
-      /* optional */
-    }
-  }
+  const org = await getOrganization(ctx.orgId);
+  await sendEsignEnvelopeCreatedEmails({
+    orgName: org?.name ?? "CapitalOS",
+    sponsorEmail,
+    investorEmail,
+    investorName,
+    sponsorUrl,
+    investorUrl,
+    context: { kind: "data_room", roomName: room.name },
+  });
 
   return NextResponse.json({
     ok: true,

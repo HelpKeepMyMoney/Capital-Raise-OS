@@ -128,7 +128,11 @@ export function RoomWorkspace(props: Props) {
         </TabsContent>
         {props.canManage ? (
           <TabsContent value="investors" className="mt-4 focus-visible:outline-none">
-            <InvestorAccessTable invitations={props.invitations} selectedDealId={props.selectedDealId ?? props.room.dealId} />
+            <InvestorAccessTable
+              invitations={props.invitations}
+              selectedDealId={props.selectedDealId ?? props.room.dealId}
+              selectedRoomId={props.room.id}
+            />
           </TabsContent>
         ) : null}
         <TabsContent value="settings" className="mt-4 focus-visible:outline-none">

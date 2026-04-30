@@ -1,6 +1,6 @@
 import { getAdminFirestore } from "@/lib/firebase/admin";
 import { col } from "@/lib/firestore/paths";
-import type { InvestorInvitation } from "@/lib/firestore/types";
+import type { EsignEnvelope, InvestorInvitation } from "@/lib/firestore/types";
 
 export type InviteRow = Pick<
   InvestorInvitation,
@@ -15,23 +15,58 @@ export type InviteRow = Pick<
   | "acceptedAt"
   | "message"
   | "linkedInvestorId"
->;
+> & {
+  ndaSignedAt?: number;
+  ndaEnvelopeId?: string;
+};
 
 export async function listInvestorInvitationsForOrganization(orgId: string, limit = 100): Promise<InviteRow[]> {
   const db = getAdminFirestore();
-  const snap = await db
-    .collection(col.investorInvitations)
-    .where("organizationId", "==", orgId)
-    .orderBy("createdAt", "desc")
-    .limit(limit)
-    .get();
+  const [snap, envSnap] = await Promise.all([
+    db
+      .collection(col.investorInvitations)
+      .where("organizationId", "==", orgId)
+      .orderBy("createdAt", "desc")
+      .limit(limit)
+      .get(),
+    db.collection(col.esignEnvelopes).where("organizationId", "==", orgId).limit(500).get(),
+  ]);
+
+  const latestNdaByRoomAndEmail = new Map<string, { envelopeId: string; signedAt: number }>();
+  for (const d of envSnap.docs) {
+    const env = d.data() as Omit<EsignEnvelope, "id">;
+    if (env.context.kind !== "data_room_nda") continue;
+    if (env.status !== "completed") continue;
+    const email = env.investorEmailNorm?.trim().toLowerCase();
+    const roomId = env.context.dataRoomId?.trim();
+    if (!email || !roomId) continue;
+    const key = `${roomId}::${email}`;
+    const signedAt = env.updatedAt ?? env.lastEventAt ?? env.createdAt ?? 0;
+    const prev = latestNdaByRoomAndEmail.get(key);
+    if (!prev || signedAt > prev.signedAt) {
+      latestNdaByRoomAndEmail.set(key, { envelopeId: d.id, signedAt });
+    }
+  }
+
   return snap.docs.map((d) => {
     const row = d.data() as Omit<InvestorInvitation, "id">;
+    const emailNorm = row.email?.trim().toLowerCase() ?? "";
+    const roomIds = row.dataRoomIds ?? [];
+    let ndaSignedAt: number | undefined;
+    let ndaEnvelopeId: string | undefined;
+    for (const roomId of roomIds) {
+      const hit = latestNdaByRoomAndEmail.get(`${roomId}::${emailNorm}`);
+      if (hit && (ndaSignedAt == null || hit.signedAt > ndaSignedAt)) {
+        ndaSignedAt = hit.signedAt;
+        ndaEnvelopeId = hit.envelopeId;
+      }
+    }
+
     return {
       id: d.id,
       scope: row.scope,
       dealIds: row.dealIds ?? [],
-      dataRoomIds: row.dataRoomIds ?? [],
+      dataRoomIds: roomIds,
       email: row.email,
       expiresAt: row.expiresAt,
       createdAt: row.createdAt,
@@ -39,6 +74,8 @@ export async function listInvestorInvitationsForOrganization(orgId: string, limi
       acceptedAt: row.acceptedAt,
       message: row.message,
       linkedInvestorId: typeof row.linkedInvestorId === "string" ? row.linkedInvestorId : undefined,
+      ndaSignedAt,
+      ndaEnvelopeId,
     };
   });
 }

@@ -22,6 +22,9 @@ export type SerializedDataRoom = {
   updatedAt?: number;
   /** Set server-side for `investor_guest` when documents are withheld until NDA envelope is completed. */
   investorDocsLockedByNda?: boolean;
+  /** Latest completed native NDA metadata for this viewer in this room. */
+  investorNdaSignedAt?: number;
+  investorNdaEnvelopeId?: string;
 };
 
 export type SerializedRoomDocument = {

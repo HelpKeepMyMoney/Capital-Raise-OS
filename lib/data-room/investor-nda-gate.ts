@@ -48,3 +48,40 @@ export async function listInvestorCompletedNdaRoomIds(
   }
   return out;
 }
+
+export type InvestorNdaCompletion = {
+  envelopeId: string;
+  signedAt: number;
+};
+
+/** Latest completed native NDA envelope per room for this investor email. */
+export async function listInvestorLatestCompletedNdaByRoom(
+  db: Firestore,
+  organizationId: string,
+  investorEmailNorm: string,
+): Promise<Map<string, InvestorNdaCompletion>> {
+  const out = new Map<string, InvestorNdaCompletion>();
+  if (!investorEmailNorm) return out;
+
+  const snap = await db
+    .collection(col.esignEnvelopes)
+    .where("organizationId", "==", organizationId)
+    .where("investorEmailNorm", "==", investorEmailNorm)
+    .where("status", "==", "completed")
+    .limit(300)
+    .get();
+
+  for (const d of snap.docs) {
+    const x = d.data() as EsignEnvelope;
+    if (x.context.kind !== "data_room_nda") continue;
+    const roomId = x.context.dataRoomId;
+    if (typeof roomId !== "string" || roomId.length === 0) continue;
+    if (!x.finalPdfStoragePath?.trim()) continue;
+    const signedAt = x.updatedAt ?? x.lastEventAt ?? x.createdAt ?? 0;
+    const prev = out.get(roomId);
+    if (!prev || signedAt > prev.signedAt) {
+      out.set(roomId, { envelopeId: d.id, signedAt });
+    }
+  }
+  return out;
+}

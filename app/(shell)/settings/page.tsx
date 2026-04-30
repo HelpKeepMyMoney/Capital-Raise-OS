@@ -5,11 +5,14 @@ import {
 } from "@/lib/auth/rbac";
 import { requireOrgSession } from "@/lib/auth/session";
 import { DeleteOrganizationSection } from "@/components/settings/delete-organization-section";
+import { OrganizationContactForm } from "@/components/settings/organization-contact-form";
 import { OrganizationSettingsForm } from "@/components/settings/organization-settings-form";
+import { SettingsMainPanel } from "@/components/settings/settings-main-panel";
+import { UserContactProfileForm } from "@/components/settings/user-contact-profile-form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { getMembership, getOrganization } from "@/lib/firestore/queries";
+import { getMembership, getOrganization, getUserDoc } from "@/lib/firestore/queries";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -21,6 +24,7 @@ export default async function SettingsPage() {
   const org = await getOrganization(ctx.orgId);
   const canEditOrg = membership ? canEditOrganizationProfileRole(membership.role) : false;
   const canDeleteOrg = membership ? canDeleteOrganizationRole(membership.role) : false;
+  const userDoc = await getUserDoc(ctx.user.uid);
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -28,40 +32,56 @@ export default async function SettingsPage() {
         <h1 className="text-3xl font-semibold tracking-tight">Settings</h1>
         <p className="mt-1 text-foreground/85">Organization, branding, integrations, and API keys.</p>
       </div>
-      <Card className="border-border bg-card shadow-sm">
-        <CardHeader>
-          <CardTitle>Organization</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {org ? (
-            <OrganizationSettingsForm
-              organizationId={org.id}
-              initialName={org.name}
-              initialSlug={org.slug}
-              canEdit={canEditOrg}
-            />
-          ) : null}
-          <Link
-            href="/settings/esign"
-            className={cn(buttonVariants({ size: "sm", variant: "outline" }), "inline-flex")}
-          >
-            E-sign templates
-          </Link>
-          <Link
-            href="/settings/billing"
-            className={cn(buttonVariants({ size: "sm" }), "inline-flex")}
-          >
-            Billing & subscriptions
-          </Link>
-          {org ? (
-            <DeleteOrganizationSection
-              organizationId={org.id}
-              organizationName={org.name}
-              canDelete={canDeleteOrg}
-            />
-          ) : null}
-        </CardContent>
-      </Card>
+      <SettingsMainPanel
+        organizationSection={
+          <>
+            {org ? (
+              <OrganizationSettingsForm
+                organizationId={org.id}
+                initialName={org.name}
+                initialSlug={org.slug}
+                canEdit={canEditOrg}
+              />
+            ) : null}
+            {org ? (
+              <OrganizationContactForm
+                organizationId={org.id}
+                orgName={org.name}
+                orgSlug={org.slug}
+                initialContact={org.contact}
+                canEdit={canEditOrg}
+              />
+            ) : null}
+            <Link
+              href="/settings/billing"
+              className={cn(buttonVariants({ size: "sm" }), "inline-flex")}
+            >
+              Billing & subscriptions
+            </Link>
+            {org ? (
+              <DeleteOrganizationSection
+                organizationId={org.id}
+                organizationName={org.name}
+                canDelete={canDeleteOrg}
+              />
+            ) : null}
+          </>
+        }
+        profileSection={
+          <UserContactProfileForm
+            accountEmail={ctx.user.email ?? userDoc?.email ?? ""}
+            initialDisplayName={userDoc?.displayName ?? ctx.user.name}
+            initialPhone={userDoc?.phone}
+            initialTitle={userDoc?.title}
+            initialStreet1={userDoc?.street1}
+            initialStreet2={userDoc?.street2}
+            initialCity={userDoc?.city}
+            initialRegion={userDoc?.region}
+            initialPostalCode={userDoc?.postalCode}
+            initialCountry={userDoc?.country}
+          />
+        }
+      />
       <Card className="border-border bg-card shadow-sm">
         <CardHeader>
           <CardTitle>Integrations</CardTitle>

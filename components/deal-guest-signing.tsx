@@ -157,7 +157,15 @@ export function DealGuestSigning(props: {
           </Button>
         ) : null}
         {row?.status === "completed" ? (
-          <p className="text-sm text-muted-foreground">Subscription documents are on file.</p>
+          <>
+            <p className="text-sm text-muted-foreground">Subscription documents are on file.</p>
+            <a
+              href={`/api/esign/subscription/final-document?dealId=${encodeURIComponent(props.dealId)}`}
+              className={cn(buttonVariants({ variant: "outline", size: "sm" }), "rounded-xl")}
+            >
+              Download signed PDF
+            </a>
+          </>
         ) : null}
         <Link
           href="/portal/commitments"

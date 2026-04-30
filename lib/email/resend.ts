@@ -18,6 +18,7 @@ export async function sendTransactionalEmail(opts: {
   html: string;
   replyTo?: string;
   headers?: Record<string, string>;
+  attachments?: Array<{ filename: string; content: string | Buffer }>;
 }) {
   const resend = getResend();
   const { data, error } = await resend.emails.send({
@@ -27,6 +28,7 @@ export async function sendTransactionalEmail(opts: {
     html: opts.html,
     replyTo: opts.replyTo,
     headers: opts.headers,
+    attachments: opts.attachments,
   });
   if (error) throw new Error(error.message);
   return data;

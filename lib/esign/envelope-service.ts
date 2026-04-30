@@ -11,6 +11,7 @@ import type {
 } from "@/lib/firestore/types";
 import { mintEsignToken } from "@/lib/esign/tokens";
 import { finalizePdfWithSignature } from "@/lib/esign/native/pdf";
+import { buildSignFieldPrefill, mergePrefillWithClientForDefs } from "@/lib/esign/sign-prefill";
 import { fieldsForRole, hasAssigneeFields, validateFieldPayload } from "@/lib/esign/field-validate";
 import type { Firestore } from "firebase-admin/firestore";
 
@@ -100,6 +101,20 @@ function newExp(): number {
   return Math.floor(Date.now() / 1000) + TOKEN_TTL_SEC;
 }
 
+/** Firestore rejects `undefined` in document data (nested objects included). */
+function stripUndefinedDeep(value: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(value)) {
+    if (v === undefined) continue;
+    if (v !== null && typeof v === "object" && !Array.isArray(v)) {
+      out[k] = stripUndefinedDeep(v as Record<string, unknown>);
+    } else {
+      out[k] = v;
+    }
+  }
+  return out;
+}
+
 function roleForNext(
   template: SignableTemplate,
   kind: "data_room_nda" | "deal_subscription" | "ad_hoc",
@@ -161,7 +176,7 @@ export async function createNdaEnvelope(params: {
     updatedAt: now,
   };
 
-  await db.collection(col.esignEnvelopes).doc(id).set(row);
+  await db.collection(col.esignEnvelopes).doc(id).set(stripUndefinedDeep(row as Record<string, unknown>));
 
   return {
     envelope: { id, ...(row as Omit<EsignEnvelope, "id">) },
@@ -220,7 +235,7 @@ export async function createSubscriptionEnvelope(params: {
     updatedAt: now,
   };
 
-  await db.collection(col.esignEnvelopes).doc(docId).set(row);
+  await db.collection(col.esignEnvelopes).doc(docId).set(stripUndefinedDeep(row as Record<string, unknown>));
 
   return {
     envelope: { id: docId, ...(row as Omit<EsignEnvelope, "id">) },
@@ -248,7 +263,9 @@ export async function createAdhocEnvelope(params: {
   await copyTemplatePdfToWorking(bucket, template.storagePath, workingPath);
 
   const next = roleForNext(template, "ad_hoc");
-  const ctx: EsignEnvelopeContext = { kind: "ad_hoc", label };
+  const ctx: EsignEnvelopeContext = label?.trim()
+    ? { kind: "ad_hoc", label: label.trim() }
+    : { kind: "ad_hoc" };
   const investorEmailNorm = investorEmail.trim().toLowerCase();
 
   const exp = newExp();
@@ -278,7 +295,7 @@ export async function createAdhocEnvelope(params: {
     updatedAt: now,
   };
 
-  await db.collection(col.esignEnvelopes).doc(id).set(row);
+  await db.collection(col.esignEnvelopes).doc(id).set(stripUndefinedDeep(row as Record<string, unknown>));
 
   return {
     envelope: { id, ...(row as Omit<EsignEnvelope, "id">) },
@@ -296,6 +313,8 @@ type CompleteSignerInput = {
   consent: boolean;
   signerName: string;
   signerEmail: string;
+  /** Session UID when authenticated signer identity matches sign-complete rules (LP / subscription sponsor / matched email). */
+  prefillSessionUid?: string | null;
 };
 
 export async function completeSignerStep(input: CompleteSignerInput): Promise<
@@ -328,7 +347,11 @@ export async function completeSignerStep(input: CompleteSignerInput): Promise<
   }
 
   const defs = fieldsForRole(template.esignFields, input.role);
-  const val = validateFieldPayload(defs, input.fieldValues);
+  const serverPrefill = await buildSignFieldPrefill(input.db, env, input.role, {
+    prefillSessionUid: input.prefillSessionUid,
+  });
+  const mergedValues = mergePrefillWithClientForDefs(defs, serverPrefill, input.fieldValues);
+  const val = validateFieldPayload(defs, mergedValues);
   if (!val.ok) return { ok: false, error: val.error, status: 400 };
 
   const bucket = getAdminBucket();

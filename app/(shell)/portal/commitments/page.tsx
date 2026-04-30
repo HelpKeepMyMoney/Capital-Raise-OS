@@ -60,6 +60,14 @@ export default async function PortalCommitmentsPage() {
                   >
                     Deal page
                   </Link>
+                  {r.docStatus === "complete" ? (
+                    <a
+                      href={`/api/esign/subscription/final-document?dealId=${encodeURIComponent(r.dealId)}`}
+                      className={cn(buttonVariants({ variant: "outline", size: "sm" }), "rounded-lg")}
+                    >
+                      Download signed PDF
+                    </a>
+                  ) : null}
                 </div>
               </li>
             );

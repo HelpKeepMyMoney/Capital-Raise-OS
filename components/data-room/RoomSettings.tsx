@@ -248,6 +248,7 @@ export function RoomSettings(props: Props) {
           roomName={props.room.name}
           ndaRequired={form.ndaRequired}
           hasNdaTemplate={hasNdaTemplate}
+          signableTemplateId={form.signableTemplateId}
         />
         </div>
 

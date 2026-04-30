@@ -15,6 +15,7 @@ import type {
   RoomDocument,
   SigningRequest,
   Task,
+  UserDoc,
 } from "@/lib/firestore/types";
 function mapDocs<T extends { id: string }>(
   snap: FirebaseFirestore.QuerySnapshot,
@@ -28,6 +29,13 @@ export async function getOrganization(orgId: string): Promise<Organization | nul
   const d = await db.collection(col.organizations).doc(orgId).get();
   if (!d.exists) return null;
   return { id: d.id, ...(d.data() as Omit<Organization, "id">) };
+}
+
+export async function getUserDoc(uid: string): Promise<(UserDoc & { id: string }) | null> {
+  const db = getAdminFirestore();
+  const d = await db.collection(col.users).doc(uid).get();
+  if (!d.exists) return null;
+  return { id: d.id, ...(d.data() as UserDoc) };
 }
 
 const BATCH_GET_USERS = 100;

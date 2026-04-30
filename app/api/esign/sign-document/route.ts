@@ -1,13 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyEsignToken } from "@/lib/esign/tokens";
-import { getAdminFirestore } from "@/lib/firebase/admin";
+import { getAdminBucket, getAdminFirestore } from "@/lib/firebase/admin";
 import { col } from "@/lib/firestore/paths";
 import type { EsignEnvelope } from "@/lib/firestore/types";
-import { resolvePrefillSessionUid } from "@/lib/auth/sign-prefill-session";
-import { loadTemplateForSigning } from "@/lib/esign/envelope-service";
-import { buildSignFieldPrefill } from "@/lib/esign/sign-prefill";
-import { fieldsForRole } from "@/lib/esign/field-validate";
 
+/** Serves the current working PDF for an active signing session (token auth only). */
 export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get("token")?.trim() ?? "";
   if (!token) return NextResponse.json({ error: "token required" }, { status: 400 });
@@ -26,27 +23,21 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Already completed" }, { status: 410 });
   }
 
-  const template = await loadTemplateForSigning(db, env.organizationId, env.signableTemplateId);
-  if (!template) return NextResponse.json({ error: "Template missing" }, { status: 500 });
+  const storagePath = env.workingPdfStoragePath;
+  if (!storagePath) return NextResponse.json({ error: "No document" }, { status: 404 });
 
-  const fields = fieldsForRole(template.esignFields, payload.r).map((f) => ({
-    id: f.id,
-    label: f.label ?? f.id,
-    fieldType: f.fieldType,
-    required: f.required !== false,
-    pageIndex: f.pageIndex,
-    rectNorm: f.rectNorm,
-  }));
-
-  const prefillSessionUid = await resolvePrefillSessionUid(req, env, payload.r);
-  const prefill = await buildSignFieldPrefill(db, env, payload.r, { prefillSessionUid });
-
-  return NextResponse.json({
-    envelopeId: env.id,
-    role: payload.r,
-    templateName: template.name,
-    fields,
-    contextKind: env.context.kind,
-    prefill,
-  });
+  try {
+    const bucket = getAdminBucket();
+    const [buf] = await bucket.file(storagePath).download();
+    return new NextResponse(new Uint8Array(buf), {
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": 'inline; filename="agreement.pdf"',
+        "Cache-Control": "private, no-store",
+      },
+    });
+  } catch (e) {
+      console.error("[esign sign-document]", e);
+      return NextResponse.json({ error: "Could not load document" }, { status: 500 });
+    }
 }

@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { EsignFieldAssignee, EsignFieldType, EsignTemplateField } from "@/lib/firestore/types";
+import { ESIGN_PDF_VIEW_SCALE } from "@/components/esign/sign-pdf-layer";
 
 type PdfjsModule = typeof import("pdfjs-dist");
 
@@ -283,8 +284,7 @@ export function EsignTemplateFieldEditor(props: {
     const page = await pdf.getPage(pageIdx + 1);
     if (token !== drawTokenRef.current) return;
 
-    const scale = 1.25;
-    const vp = page.getViewport({ scale });
+    const vp = page.getViewport({ scale: ESIGN_PDF_VIEW_SCALE });
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
@@ -540,6 +540,26 @@ export function EsignTemplateFieldEditor(props: {
         )}
       </div>
 
+      <details className="rounded-xl border border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+        <summary className="cursor-pointer font-medium text-foreground">Merge field IDs (auto-fill)</summary>
+        <p className="mt-2 mb-1">
+          Use these exact <strong className="text-foreground">Field id</strong> values on text or date fields. Signature
+          placement boxes ignore merge data.
+        </p>
+        <ul className="list-disc pl-4 space-y-1 font-mono text-[11px]">
+          <li className="list-none font-sans text-muted-foreground mb-1">Sponsor assignee — organization (Settings → Organization contact):</li>
+          <li>org.legalName, org.street1, org.street2, org.city, org.region, org.postalCode, org.country, org.phone</li>
+          <li>org.contact.name, org.contact.title, org.contact.email, org.contact.phone</li>
+          <li className="list-none font-sans text-muted-foreground mt-2 mb-1">Sponsor assignee — signing user profile:</li>
+          <li>
+            user.displayName, user.email, user.phone, user.title, user.street1, user.street2, user.city, user.region,
+            user.postalCode, user.country
+          </li>
+          <li className="list-none font-sans text-muted-foreground mt-2 mb-1">Investor / LP assignee:</li>
+          <li>investor.name, investor.email</li>
+        </ul>
+      </details>
+
       {hasSourcePdf && pageCount > 0 ? (
         <div className="flex flex-wrap items-center gap-2">
           <Button
@@ -574,7 +594,11 @@ export function EsignTemplateFieldEditor(props: {
       <div className="flex flex-col gap-6 lg:flex-row">
         <div className="max-h-[70vh] overflow-auto rounded-lg border border-border bg-muted/30 p-2">
           <div className="relative inline-block">
-            <canvas ref={canvasRef} className="block max-w-full" />
+            {/*
+              Do not use max-w-full on the canvas: it scales the bitmap without changing the overlay
+              size, so rectNorm coords are saved against the wrong aspect/scale and signing misaligns.
+            */}
+            <canvas ref={canvasRef} className="block max-w-none" />
             {hasSourcePdf && pageCount > 0 ? (
               <div
                 ref={overlayRef}

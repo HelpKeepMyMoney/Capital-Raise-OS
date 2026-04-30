@@ -46,6 +46,7 @@ import { cn } from "@/lib/utils";
 type Props = {
   invitations: InviteRow[];
   selectedDealId?: string;
+  selectedRoomId?: string;
 };
 
 type OrgMemberOption = {
@@ -286,6 +287,9 @@ export function InvestorAccessTable(props: Props) {
   }
 
   let rows = props.invitations;
+  if (props.selectedRoomId) {
+    rows = rows.filter((inv) => inv.dataRoomIds.length === 0 || inv.dataRoomIds.includes(props.selectedRoomId!));
+  }
   if (props.selectedDealId) {
     rows = rows.filter(
       (inv) => inv.scope === "deal" && inv.dealIds.includes(props.selectedDealId!),
@@ -341,7 +345,13 @@ export function InvestorAccessTable(props: Props) {
                       </Badge>
                     </TableCell>
                     <TableCell className="hidden text-xs text-muted-foreground md:table-cell">
-                      —
+                      {inv.ndaSignedAt ? (
+                        <span title={new Date(inv.ndaSignedAt).toLocaleString()}>
+                          Signed {new Date(inv.ndaSignedAt).toLocaleDateString()}
+                        </span>
+                      ) : (
+                        "—"
+                      )}
                     </TableCell>
                     <TableCell className="hidden text-xs text-muted-foreground lg:table-cell">
                       —
@@ -410,6 +420,19 @@ export function InvestorAccessTable(props: Props) {
                             onClick={() => openSendMessage(inv)}
                           >
                             Send message…
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            disabled={!inv.ndaEnvelopeId}
+                            onClick={() => {
+                              if (!inv.ndaEnvelopeId) return;
+                              window.open(
+                                `/api/esign/envelopes/${encodeURIComponent(inv.ndaEnvelopeId)}/final-document`,
+                                "_blank",
+                                "noopener,noreferrer",
+                              );
+                            }}
+                          >
+                            Download signed NDA
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             disabled={!crmOk || rowBusy}

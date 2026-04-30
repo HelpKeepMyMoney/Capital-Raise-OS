@@ -7,7 +7,9 @@ import { col } from "@/lib/firestore/paths";
 import type { EsignEnvelope } from "@/lib/firestore/types";
 import { verifyEsignToken } from "@/lib/esign/tokens";
 import { completeSignerStep } from "@/lib/esign/envelope-service";
-import { getMembership } from "@/lib/firestore/queries";
+import { sendEsignCompletedEmails, sendEsignInvestorTurnEmail } from "@/lib/esign/envelope-notify";
+import { getMembership, getOrganization } from "@/lib/firestore/queries";
+import { getAdminBucket } from "@/lib/firebase/admin";
 
 export async function POST(req: NextRequest) {
   const json = (await req.json()) as {
@@ -48,6 +50,7 @@ export async function POST(req: NextRequest) {
 
   let signerEmail = "";
   let signerName = "";
+  let prefillSessionUid: string | null = null;
 
   const ctx = env.context;
 
@@ -66,6 +69,7 @@ export async function POST(req: NextRequest) {
     }
     signerEmail = sessionEmail;
     signerName = bodyName || sessionEmail.split("@")[0] || "Investor";
+    prefillSessionUid = sessionUid;
   } else if (payload.r === "sponsor" && ctx.kind === "deal_subscription") {
     if (!sessionUid) {
       return NextResponse.json({ error: "Sign in as a sponsor team member to complete this step." }, { status: 401 });
@@ -81,6 +85,7 @@ export async function POST(req: NextRequest) {
     if (!sessionEmail) return NextResponse.json({ error: "Account email missing" }, { status: 400 });
     signerEmail = sessionEmail;
     signerName = bodyName || sessionEmail.split("@")[0] || "Sponsor";
+    prefillSessionUid = sessionUid;
   } else if (payload.r === "sponsor") {
     const norm = env.sponsorEmailNorm?.trim().toLowerCase();
     const email = (sessionEmail ?? bodyEmail).trim().toLowerCase();
@@ -92,6 +97,7 @@ export async function POST(req: NextRequest) {
     }
     signerEmail = email;
     signerName = bodyName || email.split("@")[0] || "Sponsor";
+    if (sessionUid && sessionEmail && sessionEmail === norm) prefillSessionUid = sessionUid;
   } else if (payload.r === "investor") {
     const norm = env.investorEmailNorm?.trim().toLowerCase();
     const email = (sessionEmail ?? bodyEmail).trim().toLowerCase();
@@ -100,6 +106,7 @@ export async function POST(req: NextRequest) {
     }
     signerEmail = email;
     signerName = bodyName || email.split("@")[0] || "Investor";
+    if (sessionUid && sessionEmail && sessionEmail === norm) prefillSessionUid = sessionUid;
   }
 
   const result = await completeSignerStep({
@@ -111,10 +118,54 @@ export async function POST(req: NextRequest) {
     consent: Boolean(json.consent),
     signerName,
     signerEmail,
+    prefillSessionUid,
   });
 
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: result.status ?? 400 });
+  }
+
+  if (!result.completed && result.nextUrl && payload.r === "sponsor") {
+    const ndaCtx = env.context;
+    if (ndaCtx.kind === "data_room_nda" || ndaCtx.kind === "ad_hoc") {
+      const to = env.investorEmailNorm?.trim() || env.investorEmail?.trim();
+      if (to) {
+        try {
+          const org = await getOrganization(env.organizationId);
+          await sendEsignInvestorTurnEmail({
+            orgName: org?.name ?? "CapitalOS",
+            investorEmail: to.toLowerCase(),
+            investorName: env.investorName,
+            signingUrl: result.nextUrl,
+          });
+        } catch (e) {
+          console.error("[esign sign-complete investor turn email]", e);
+        }
+      }
+    }
+  }
+
+  if (result.completed) {
+    try {
+      const latestSnap = await db.collection(col.esignEnvelopes).doc(env.id).get();
+      const latest = latestSnap.exists ? ({ id: latestSnap.id, ...(latestSnap.data() as Omit<EsignEnvelope, "id">) }) : env;
+      const finalPath = latest.finalPdfStoragePath?.trim();
+      if (finalPath) {
+        const bucket = getAdminBucket();
+        const [buf] = await bucket.file(finalPath).download();
+        const org = await getOrganization(env.organizationId);
+        await sendEsignCompletedEmails({
+          orgName: org?.name ?? "CapitalOS",
+          sponsorEmail: latest.sponsorEmailNorm ?? null,
+          investorEmail: latest.investorEmailNorm ?? latest.investorEmail ?? null,
+          investorName: latest.investorName,
+          pdfAttachmentName: `signed-${latest.id}.pdf`,
+          pdfBytes: new Uint8Array(buf),
+        });
+      }
+    } catch (e) {
+      console.error("[esign sign-complete completed email]", e);
+    }
   }
 
   return NextResponse.json({

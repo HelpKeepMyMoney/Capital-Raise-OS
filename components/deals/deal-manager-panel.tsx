@@ -155,7 +155,7 @@ export function DealManagerPanel(props: {
           <InvitePanel dealId={props.deal.id} />
         </TabsContent>
         <TabsContent value="commitments" className="mt-0">
-          <CommitmentsTable rows={props.commitments} />
+          <CommitmentsTable rows={props.commitments} dealId={props.deal.id} />
         </TabsContent>
         <TabsContent value="updates" className="mt-0">
           <PublishInvestorUpdateForm dealId={props.deal.id} />

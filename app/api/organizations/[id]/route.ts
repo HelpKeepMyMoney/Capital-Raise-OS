@@ -5,6 +5,7 @@ import { requireOrgSession } from "@/lib/auth/session";
 import { OrganizationPatchBodySchema } from "@/lib/organizations/patch-organization";
 import { getAdminFirestore } from "@/lib/firebase/admin";
 import { col } from "@/lib/firestore/paths";
+import { stripUndefinedDeep } from "@/lib/object/strip-undefined-deep";
 import { getMembership, getOrganization } from "@/lib/firestore/queries";
 
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
@@ -39,7 +40,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     );
   }
 
-  const { name, slug } = parsed.data;
+  const { name, slug, contact } = parsed.data;
   const db = getAdminFirestore();
   if (slug !== org.slug) {
     const dup = await db.collection(col.organizations).where("slug", "==", slug).limit(2).get();
@@ -49,17 +50,21 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     }
   }
 
-  await db.collection(col.organizations).doc(orgId).update({
-    name,
-    slug,
-  });
+  const patch: Record<string, unknown> = { name, slug };
+  const auditKeys = ["name", "slug"] as string[];
+  if (contact !== undefined) {
+    patch.contact = stripUndefinedDeep(contact) as Record<string, unknown>;
+    auditKeys.push("contact");
+  }
+
+  await db.collection(col.organizations).doc(orgId).update(patch);
 
   await writeAuditLog({
     organizationId: orgId,
     actorId: session.user.uid,
     action: "organization.update",
     resource: `${col.organizations}/${orgId}`,
-    payload: { keys: ["name", "slug"] },
+    payload: { keys: auditKeys },
   });
 
   return NextResponse.json({ ok: true, id: orgId, name, slug });

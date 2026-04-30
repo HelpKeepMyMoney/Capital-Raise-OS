@@ -111,6 +111,46 @@ export function InvestorPreview(props: Props) {
           <p className="mt-4 max-w-2xl text-sm leading-relaxed text-muted-foreground">{welcome}</p>
         </div>
         <CardContent className="space-y-8 p-8">
+          {props.room.ndaRequired ? (
+            <section className="space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h4 className="text-sm font-semibold text-foreground">Mutual NDA</h4>
+                {props.room.investorNdaSignedAt ? (
+                  <Badge variant="secondary" className="rounded-full">
+                    Signed {new Date(props.room.investorNdaSignedAt).toLocaleDateString()}
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="rounded-full">
+                    Pending
+                  </Badge>
+                )}
+              </div>
+              <div className="rounded-xl border border-border bg-muted/20 px-4 py-3 text-sm">
+                {props.room.investorNdaSignedAt ? (
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-muted-foreground">
+                      Signed on{" "}
+                      <span className="font-medium text-foreground">
+                        {new Date(props.room.investorNdaSignedAt).toLocaleString()}
+                      </span>
+                      .
+                    </p>
+                    <a
+                      href={`/api/esign/room-nda/final-document?roomId=${encodeURIComponent(props.room.id)}`}
+                      className={cn(buttonVariants({ variant: "outline", size: "sm" }), "rounded-lg")}
+                    >
+                      Download signed NDA
+                    </a>
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground">
+                    The NDA must be signed by both parties before the final document is available here.
+                  </p>
+                )}
+              </div>
+            </section>
+          ) : null}
+
           <section className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h4 className="text-sm font-semibold text-foreground">Key documents</h4>

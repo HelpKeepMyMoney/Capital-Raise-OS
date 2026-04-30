@@ -1,4 +1,6 @@
 import type { DealCommitment } from "@/lib/firestore/types";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 export type CommitmentRow = DealCommitment & { contactEmail?: string };
 
@@ -10,7 +12,7 @@ function statusLabel(c: DealCommitment): string {
   return "Soft circle";
 }
 
-export function CommitmentsTable(props: { rows: CommitmentRow[] }) {
+export function CommitmentsTable(props: { rows: CommitmentRow[]; dealId: string }) {
   if (props.rows.length === 0) {
     return <p className="text-sm text-muted-foreground">No active commitments yet.</p>;
   }
@@ -27,6 +29,7 @@ export function CommitmentsTable(props: { rows: CommitmentRow[] }) {
             <th className="px-4 py-3 font-medium">Source</th>
             <th className="px-4 py-3 font-medium">Last contact</th>
             <th className="px-4 py-3 font-medium">Next step</th>
+            <th className="px-4 py-3 font-medium">Document</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-border/80 bg-card">
@@ -44,6 +47,18 @@ export function CommitmentsTable(props: { rows: CommitmentRow[] }) {
               <td className="px-4 py-3 text-muted-foreground">—</td>
               <td className="px-4 py-3 text-muted-foreground">
                 {c.docStatus === "pending" ? "Follow on docs" : "—"}
+              </td>
+              <td className="px-4 py-3">
+                {c.docStatus === "complete" ? (
+                  <a
+                    href={`/api/esign/subscription/final-document?dealId=${encodeURIComponent(props.dealId)}&userId=${encodeURIComponent(c.userId)}`}
+                    className={cn(buttonVariants({ variant: "outline", size: "sm" }), "rounded-lg")}
+                  >
+                    Download signed PDF
+                  </a>
+                ) : (
+                  <span className="text-muted-foreground">—</span>
+                )}
               </td>
             </tr>
           ))}

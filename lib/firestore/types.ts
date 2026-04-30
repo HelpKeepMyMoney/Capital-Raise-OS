@@ -94,10 +94,35 @@ export type OrgSubscription = {
   currentPeriodEnd?: number;
 };
 
+/** Mailing / entity address lines shared by org contact and user profile. */
+export type PostalAddressFields = {
+  street1?: string;
+  street2?: string;
+  city?: string;
+  region?: string;
+  postalCode?: string;
+  country?: string;
+};
+
+export type OrgContactPerson = {
+  name?: string;
+  title?: string;
+  email?: string;
+  phone?: string;
+};
+
+export type OrgContact = PostalAddressFields & {
+  legalName?: string;
+  /** Organization main phone (distinct from contact person phone). */
+  phone?: string;
+  contactPerson?: OrgContactPerson;
+};
+
 export type Organization = {
   id: string;
   name: string;
   slug: string;
+  contact?: OrgContact;
   branding?: {
     logoUrl?: string;
     primaryColor?: string;
@@ -178,8 +203,13 @@ export type UserDoc = {
   photoURL?: string;
   defaultOrganizationId?: string;
   twoFactorEnabled?: boolean;
-  createdAt: number;
-};
+  /** Personal phone for certificates / e-sign merge fields. */
+  phone?: string;
+  /** Job title for merge fields. */
+  title?: string;
+} & PostalAddressFields & {
+    createdAt: number;
+  };
 
 export type Investor = {
   id: string;

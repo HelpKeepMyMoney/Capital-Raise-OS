@@ -5,6 +5,7 @@ import { getUserLastSignInMs } from "@/lib/auth/user-metadata";
 import { DataRoomShell } from "@/components/data-room/data-room-shell";
 import {
   listInvestorCompletedNdaRoomIds,
+  listInvestorLatestCompletedNdaByRoom,
   normalizeInvestorEmailForNda,
 } from "@/lib/data-room/investor-nda-gate";
 import { getAdminFirestore } from "@/lib/firebase/admin";
@@ -76,6 +77,10 @@ export default async function DataRoomPage(props: {
     membership?.role === "investor_guest" && ndaGuestEmailNorm
       ? await listInvestorCompletedNdaRoomIds(db, ctx.orgId, ndaGuestEmailNorm)
       : new Set<string>();
+  const completedNdaByRoom =
+    membership?.role === "investor_guest" && ndaGuestEmailNorm
+      ? await listInvestorLatestCompletedNdaByRoom(db, ctx.orgId, ndaGuestEmailNorm)
+      : new Map<string, { envelopeId: string; signedAt: number }>();
 
   let rooms = filterDataRoomsForMember(roomsRaw, membership);
   rooms = rooms.map((r) => ({
@@ -84,6 +89,8 @@ export default async function DataRoomPage(props: {
       membership?.role === "investor_guest" &&
       Boolean(r.ndaRequired) &&
       (!ndaGuestEmailNorm || !completedNdaRoomIds.has(r.id)),
+    investorNdaSignedAt: completedNdaByRoom.get(r.id)?.signedAt,
+    investorNdaEnvelopeId: completedNdaByRoom.get(r.id)?.envelopeId,
   }));
 
   let documents: SerializedRoomDocument[] = docsSnap.docs.map((d) => {

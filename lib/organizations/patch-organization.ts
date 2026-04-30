@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { OrgContactSchema } from "@/lib/contact/schemas";
 
 export const OrganizationPatchBodySchema = z
   .object({
@@ -20,6 +21,7 @@ export const OrganizationPatchBodySchema = z
             "Use lowercase letters, numbers, and single hyphens only",
           ),
       ),
+    contact: OrgContactSchema.optional(),
   })
   .strict();
 
