@@ -76,9 +76,11 @@ export const DealStatusSchema = z.enum([
 ]);
 export type DealStatus = z.infer<typeof DealStatusSchema>;
 
+/** Comp `client`: same entitlement limits as Pro; no PayPal plan — assigned by admins for BNIC Network / HKMM clients. */
 export const SubscriptionPlanSchema = z.enum([
   "starter",
   "pro",
+  "client",
   "capital_team",
   "enterprise",
   "none",

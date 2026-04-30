@@ -6,7 +6,7 @@ export function effectivePlan(plan: SubscriptionPlan | undefined): SubscriptionP
 
 export function canUseAiCopilot(plan: SubscriptionPlan | undefined): boolean {
   const p = effectivePlan(plan);
-  return p === "pro" || p === "capital_team" || p === "enterprise";
+  return p === "pro" || p === "client" || p === "capital_team" || p === "enterprise";
 }
 
 export function canWhiteLabelPortal(plan: SubscriptionPlan | undefined): boolean {

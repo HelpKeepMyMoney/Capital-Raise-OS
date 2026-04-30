@@ -4,6 +4,11 @@ AI-powered private capital platform: investor CRM, discovery, outreach, data roo
 
 ## Changelog
 
+### Client org plan & marketing pricing
+
+- **Org subscription `client` (`lib/firestore/types.ts` — `SubscriptionPlanSchema`):** Complimentary tier for qualifying **The BNIC Network LLC** / **Help Keep My Money LLC** client businesses. **Entitlements** mirror **`pro`** (**`lib/billing/entitlements.ts`**). **`canUseAiCopilot`** treats **`client`** like **`pro`** (**`lib/billing/features.ts`**). **Not** a **`PublicPlanId`** — no PayPal checkout; platform admins set **plan** via **`/admin` → Edit organization**.
+- **`components/marketing/pricing-section.tsx`:** Third tier card **Client** ($0): subtitle “Offered for free to existing clients,” same bullet list as **Growth**, **Contact us** → **`/#contact`**, wider **`max-w-7xl`** three-column grid on large screens.
+
 ### Branding and sign-out UX
 
 - **Product label:** The marketing header (**`components/marketing/marketing-header.tsx`**) and app sidebar (**`components/app-sidebar.tsx`**) show **CapitalOS** next to the logo (accessible name and **`alt`** text aligned).
@@ -159,7 +164,7 @@ Premium sponsor workspace for diligence: header actions, six KPI cards (from Fir
 - `app/invite/[token]/` — redeem investor invitation links
 - `app/api/` — session auth, **`platform-admin`** (users/orgs CRUD — see Changelog), discovery, outreach, data room (rooms `GET`/`POST`/`PATCH`, documents, sign-url, **invitations**, **activity**), **deals** (`PATCH /api/deals/[id]`, **telemetry**), **tasks** (`GET`/`POST`, **`PATCH /api/tasks/[id]`**, **`/api/tasks/[id]/comments`**), **organizations** (`PATCH /api/organizations/[id]`, **`POST .../delete`**), invitations, AI chat, PayPal billing, webhooks
 - `components/data-room/` — Data Room UI modules; `components/deals/` — Deal Room UI; **`components/marketing/`** — public landing sections; **`components/tasks/`** — Tasks Workflow Center UI; **`components/settings/`** — org settings / delete; **`components/platform-admin/`** — `/admin` dashboard UI; `lib/data-room/` — metrics, kind labels, server queries; **`lib/deals/`** — deal patch schema, narrative helpers, telemetry aggregation, formatting; **`lib/marketing/`** — marketing constants & contact schema; **`lib/tasks/`** — task workflow helpers; **`lib/organizations/`** — org patch, deletion cascade, slug helpers; **`lib/platform-admin/`** — admin API guards & schemas
-- `lib/` — Firebase, Firestore types/queries, discovery merge, analytics helpers, auth (RBAC, guests, platform admin), **`lib/email/password-set-mail`** (welcome / forgot-password links), invitations, PayPal, billing
+- `lib/` — Firebase, Firestore types/queries, **`lib/billing/`** (PayPal-backed **`PublicPlanId`**, **`lib/billing/entitlements.ts`**, **`lib/billing/features.ts`**; comp **`client`** plan is admin-only — see Changelog), discovery merge, analytics helpers, auth (RBAC, guests, platform admin), **`lib/email/password-set-mail`** (welcome / forgot-password links), invitations, PayPal, billing
 - `functions/` — Firebase Cloud Functions (member → custom claims sync, scheduled digest)
 - `scripts/seed-demo.ts` — demo org, investors, tasks, emails
 
