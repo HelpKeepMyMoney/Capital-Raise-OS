@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import type { FirebaseError } from "firebase/app";
@@ -17,6 +18,7 @@ export function LoginForm() {
   const search = useSearchParams();
   const next = search.get("next") ?? "/dashboard";
   const inviteToken = search.get("invite")?.trim() ?? "";
+  const nextParam = search.get("next");
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [loading, setLoading] = React.useState(false);
@@ -49,6 +51,16 @@ export function LoginForm() {
   }, [inviteToken]);
 
   const emailReadOnly = Boolean(lockedInviteEmail);
+
+  const forgotPasswordHref = React.useMemo(() => {
+    const qs = new URLSearchParams();
+    const trimmed = email.trim();
+    if (trimmed) qs.set("email", trimmed);
+    if (inviteToken) qs.set("invite", inviteToken);
+    if (nextParam?.trim()) qs.set("next", nextParam.trim());
+    const q = qs.toString();
+    return q ? `/forgot-password?${q}` : "/forgot-password";
+  }, [email, inviteToken, nextParam]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -146,6 +158,14 @@ export function LoginForm() {
         <Button type="submit" className="w-full" disabled={loading || (inviteLoading && !!inviteToken)}>
           {loading ? "Signing in…" : "Sign in"}
         </Button>
+        <p className="text-center text-sm">
+          <Link
+            href={forgotPasswordHref}
+            className="font-medium text-link underline underline-offset-4 hover:text-link-hover"
+          >
+            Forgot password?
+          </Link>
+        </p>
       </form>
     </div>
   );

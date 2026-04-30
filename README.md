@@ -4,6 +4,13 @@ AI-powered private capital platform: investor CRM, discovery, outreach, data roo
 
 ## Changelog
 
+### Auth — forgot password
+
+- **`/forgot-password`:** Email/password users can request a Firebase reset link (**`sendPasswordResetEmail`**). **`components/forgot-password-form.tsx`** pre-fills **`email`** from the query string and preserves **`invite`** / **`next`** for return navigation.
+- **`components/login-form.tsx`:** **Forgot password?** link passes through email (when entered), invite, and next params.
+
+Configure **Firebase Console → Authentication → Templates → Password reset** as needed; **authorized domains** must include your deployed origin (e.g. **`your-app.vercel.app`**) so reset links work in production.
+
 ### Marketing site conversion refresh (latest)
 
 - **SEO / metadata (`app/(marketing)/layout.tsx`):** Title **CPIN | Raise More Capital. Close Faster.** with refreshed descriptions for Open Graph and Twitter (syndicators and private issuers called out).
@@ -132,7 +139,7 @@ Premium sponsor workspace for diligence: header actions, six KPI cards (from Fir
 - `app/(shell)/` — authenticated product (dashboard, CRM, modules; includes dynamic **investors/[id]**, **deals/[id]**, **deals/new**)
 - `app/(platform-admin)/` — platform super-admin (`/admin`) when UIDs are listed in `PLATFORM_ADMIN_UIDS`
 - `app/(marketing)/` — public marketing homepage (SEO metadata in layout); `app/api/contact/` — POST marketing contact (Firestore + Resend)
-- `app/(auth)/` — login / signup
+- `app/(auth)/` — login, signup, forgot-password
 - `app/onboarding/` — create first organization (session without org)
 - `app/invite/[token]/` — redeem investor invitation links
 - `app/api/` — session auth, discovery, outreach, data room (rooms `GET`/`POST`/`PATCH`, documents, sign-url, **invitations**, **activity**), **deals** (`PATCH /api/deals/[id]`, **telemetry**), **tasks** (`GET`/`POST`, **`PATCH /api/tasks/[id]`**, **`/api/tasks/[id]/comments`**), **organizations** (`PATCH /api/organizations/[id]`, **`POST .../delete`**), invitations, AI chat, PayPal billing, webhooks
