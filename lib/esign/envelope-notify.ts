@@ -78,6 +78,39 @@ export async function sendEsignEnvelopeCreatedEmails(args: {
   }
 }
 
+/** Investor requested subscription docs — sponsor must sign first (deal subscription flow). */
+export async function sendDealSubscriptionSponsorSigningEmail(args: {
+  orgName: string;
+  sponsorEmails: string[];
+  sponsorSigningUrl: string;
+  dealName: string;
+  investorLabel: string;
+}): Promise<void> {
+  if (!process.env.RESEND_API_KEY || args.sponsorEmails.length === 0) return;
+
+  const from = invitationsTransactionalFrom();
+  const deal = escapeHtmlForEmail(args.dealName.trim() || "Deal");
+  const inv = escapeHtmlForEmail(args.investorLabel.trim() || "An investor");
+  const org = escapeHtmlForEmail(args.orgName);
+
+  const href = args.sponsorSigningUrl.replace(/"/g, "&quot;");
+
+  try {
+    await sendTransactionalEmail({
+      from,
+      to: args.sponsorEmails.length === 1 ? args.sponsorEmails[0]! : args.sponsorEmails,
+      subject: `Subscription packet — your signature needed — ${args.orgName}`,
+      html: `<p>An investor requested subscription documents on <strong>${deal}</strong> (${org}).</p>
+<p><strong>${inv}</strong> is waiting while you complete the sponsor signing step first.</p>
+<p>After you finish, they will receive an email with their personal signing link.</p>
+<p><a href="${href}">Open sponsor signing page</a></p>
+<p style="font-size:13px;color:#666">If the button does not work, paste this URL into your browser:<br/>${href}</p>`,
+    });
+  } catch (e) {
+    console.error("[deal subscription sponsor kickoff email]", e);
+  }
+}
+
 /** When the sponsor finishes and the investor’s signing link becomes active (NDA / ad hoc). */
 export async function sendEsignInvestorTurnEmail(args: {
   orgName: string;

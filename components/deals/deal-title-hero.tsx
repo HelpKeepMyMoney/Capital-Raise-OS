@@ -11,6 +11,7 @@ import { fmtUsd } from "@/lib/deals/format";
 import type { Deal } from "@/lib/firestore/types";
 import { trackDealTelemetry } from "@/components/deals/deal-telemetry";
 import { ExpressInterestButton } from "@/components/express-interest-button";
+import { RequestSubscriptionPacketButton } from "@/components/deals/request-subscription-packet-button";
 
 export function DealTitleHero(props: {
   deal: Deal;
@@ -168,6 +169,11 @@ export function DealTitleHero(props: {
                   <Wallet className="size-4" />
                   Commit capital
                 </Link>
+                <RequestSubscriptionPacketButton
+                  dealId={d.id}
+                  variant="outline"
+                  label="Request subscription packet"
+                />
                 {showBook && d.calendarBookingUrl ? (
                   <a
                     href={d.calendarBookingUrl}

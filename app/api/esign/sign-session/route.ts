@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { SESSION_COOKIE } from "@/lib/constants";
+import { getAdminAuth, getAdminFirestore } from "@/lib/firebase/admin";
 import { verifyEsignToken } from "@/lib/esign/tokens";
-import { getAdminFirestore } from "@/lib/firebase/admin";
 import { col } from "@/lib/firestore/paths";
 import type { EsignEnvelope } from "@/lib/firestore/types";
 import { resolvePrefillSessionUid } from "@/lib/auth/sign-prefill-session";
@@ -41,6 +42,17 @@ export async function GET(req: NextRequest) {
   const prefillSessionUid = await resolvePrefillSessionUid(req, env, payload.r);
   const prefill = await buildSignFieldPrefill(db, env, payload.r, { prefillSessionUid });
 
+  let sessionEmailHint: string | null = null;
+  const rawSession = req.cookies.get(SESSION_COOKIE)?.value;
+  if (rawSession) {
+    try {
+      const dec = await getAdminAuth().verifySessionCookie(rawSession, true);
+      sessionEmailHint = dec.email?.trim().toLowerCase() ?? null;
+    } catch {
+      sessionEmailHint = null;
+    }
+  }
+
   return NextResponse.json({
     envelopeId: env.id,
     role: payload.r,
@@ -48,5 +60,6 @@ export async function GET(req: NextRequest) {
     fields,
     contextKind: env.context.kind,
     prefill,
+    sessionEmailHint,
   });
 }

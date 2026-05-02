@@ -7,6 +7,7 @@ import { Wallet, Calendar } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useDealPageViewTelemetry } from "@/components/deals/deal-telemetry";
+import { RequestSubscriptionPacketButton } from "@/components/deals/request-subscription-packet-button";
 
 export function DealDetailShell(props: {
   dealId: string;
@@ -70,7 +71,7 @@ export function DealDetailShell(props: {
                   </span>
                 </div>
               </div>
-              <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:justify-end">
+              <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:justify-end">
                 {props.showBookCall && props.calendarBookingUrl ? (
                   <a
                     href={props.calendarBookingUrl}
@@ -95,6 +96,11 @@ export function DealDetailShell(props: {
                   <Wallet className="mr-2 size-4" />
                   Commit capital
                 </Link>
+                <RequestSubscriptionPacketButton
+                  dealId={props.dealId}
+                  variant="outline"
+                  label="Request subscription packet"
+                />
               </div>
             </div>
           </motion.div>

@@ -10,6 +10,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import type { SigningRequest, SigningRequestStatus } from "@/lib/firestore/types";
 import { cn } from "@/lib/utils";
+import {
+  postSubscriptionPacketRequest,
+  subscriptionPacketToast,
+} from "@/components/deals/request-subscription-packet-button";
 
 function labelForStatus(s: SigningRequestStatus | "none"): string {
   const m: Record<string, string> = {
@@ -33,33 +37,20 @@ export function DealGuestSigning(props: {
   const router = useRouter();
   const [row, setRow] = React.useState<SigningRequest | null>(props.initial);
   const [loading, setLoading] = React.useState(false);
+  const [sponsorNotifyOk, setSponsorNotifyOk] = React.useState<boolean | null>(null);
+
+  React.useEffect(() => {
+    setRow(props.initial);
+  }, [props.initial]);
 
   const status: SigningRequestStatus | "none" = row?.status ?? "none";
 
   async function requestPacket() {
     setLoading(true);
     try {
-      const res = await fetch("/api/esign/subscription/create", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dealId: props.dealId }),
-      });
-      const json = (await res.json()) as {
-        ok?: boolean;
-        mode?: string;
-        message?: string;
-        error?: string;
-        id?: string;
-        nativeEnvelopeId?: string;
-        signingUrl?: string | null;
-        sponsorSigningUrl?: string | null;
-        awaitingSponsorPrep?: boolean;
-        status?: SigningRequestStatus;
-      };
-      if (!res.ok) {
-        throw new Error(json.error ?? "Could not start signing");
-      }
+      const json = await postSubscriptionPacketRequest(props.dealId);
       const now = Date.now();
+      setSponsorNotifyOk(json.sponsorNotificationSent ?? null);
       setRow({
         id: json.id ?? row?.id ?? "",
         organizationId: props.orgId,
@@ -73,14 +64,7 @@ export function DealGuestSigning(props: {
         createdAt: row?.createdAt ?? now,
         updatedAt: now,
       });
-      if (json.awaitingSponsorPrep) {
-        toast.message("Your sponsor must complete the sponsor signing step before you can sign. Refresh after they finish.");
-      } else if (json.signingUrl) {
-        window.open(json.signingUrl, "_blank", "noopener,noreferrer");
-        toast.success("Opening subscription documents…");
-      } else {
-        toast.message("Packet created — check back shortly.");
-      }
+      subscriptionPacketToast(json);
       router.refresh();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Signing failed");
@@ -108,32 +92,46 @@ export function DealGuestSigning(props: {
           </Badge>
         </div>
         <p className="text-sm text-muted-foreground">
-          Native e-sign: your sponsor links a subscription PDF in settings; you sign in a secure browser window.
+          Your sponsor attaches the subscription PDF in settings. When sponsor fields exist, they sign first; you will
+          receive an email with your signing link when it is your turn.
         </p>
       </CardHeader>
       <CardContent className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-        {row?.awaitingSponsorPrep && row.sponsorSigningUrl ? (
+        {row?.awaitingSponsorPrep ? (
           <div className="w-full rounded-xl border border-border/80 bg-muted/30 p-3 text-sm">
-            <p className="font-medium text-foreground">Sponsor must sign first</p>
+            <p className="font-medium text-foreground">Sponsor signs first</p>
             <p className="mt-1 text-muted-foreground">
-              Send this link to your sponsor so they can complete their fields. Your signing link will be ready
-              after they finish.
+              {sponsorNotifyOk === false
+                ? "We could not email your sponsor automatically (add a contact email in the workspace profile or ensure email is configured). Share the signing link below with your sponsor. After they finish, you will receive an email with your signing link."
+                : sponsorNotifyOk === true
+                  ? "We emailed your sponsor team a link to sign. After they finish, you will receive an email with your personal signing link."
+                  : "Your sponsor must complete their signing step first. After they finish, you will receive an email with your personal signing link."}
             </p>
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              <code className="max-w-full truncate rounded-md bg-muted px-2 py-1 text-xs">{row.sponsorSigningUrl}</code>
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                className="rounded-lg"
-                onClick={() => {
-                  void navigator.clipboard.writeText(row.sponsorSigningUrl ?? "");
-                  toast.success("Sponsor link copied");
-                }}
+            {row.sponsorSigningUrl ? (
+              <details
+                className="mt-2"
+                open={sponsorNotifyOk === false}
               >
-                Copy sponsor link
-              </Button>
-            </div>
+                <summary className="cursor-pointer text-xs text-muted-foreground underline-offset-4 hover:underline">
+                  Share signing link manually
+                </summary>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <code className="max-w-full truncate rounded-md bg-muted px-2 py-1 text-xs">{row.sponsorSigningUrl}</code>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    className="rounded-lg"
+                    onClick={() => {
+                      void navigator.clipboard.writeText(row.sponsorSigningUrl ?? "");
+                      toast.success("Sponsor link copied");
+                    }}
+                  >
+                    Copy link
+                  </Button>
+                </div>
+              </details>
+            ) : null}
           </div>
         ) : null}
         {row?.signingUrl && row.status !== "completed" && row.status !== "declined" ? (

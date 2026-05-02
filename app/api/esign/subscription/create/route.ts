@@ -2,10 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { memberCanAccessDeal } from "@/lib/auth/investor-access";
 import { isInvestorGuestRole } from "@/lib/auth/rbac";
 import { requireOrgSession } from "@/lib/auth/session";
+import { sendDealSubscriptionSponsorSigningEmail } from "@/lib/esign/envelope-notify";
+import { resolveDealSubscriptionSponsorEmails } from "@/lib/esign/subscription-sponsor-emails";
 import { createSubscriptionEnvelope, loadTemplate } from "@/lib/esign/envelope-service";
-import { getAdminBucket, getAdminFirestore } from "@/lib/firebase/admin";
+import { getAdminAuth, getAdminBucket, getAdminFirestore } from "@/lib/firebase/admin";
 import { col, signingRequestDocId } from "@/lib/firestore/paths";
-import { getMembership, getOrganization } from "@/lib/firestore/queries";
+import { getDeal, getMembership, getOrganization } from "@/lib/firestore/queries";
 import type { EsignEnvelope } from "@/lib/firestore/types";
 
 export async function POST(req: NextRequest) {
@@ -59,6 +61,26 @@ export async function POST(req: NextRequest) {
       let signingUrl: string | null = null;
       if (e.nextSignerRole === "lp") signingUrl = e.lpSigningUrl ?? null;
       if (e.nextSignerRole === "sponsor") signingUrl = e.sponsorSigningUrl ?? null;
+
+      let sponsorNotificationSent = false;
+      if (e.nextSignerRole === "sponsor" && e.sponsorSigningUrl && org) {
+        const sponsorEmails = await resolveDealSubscriptionSponsorEmails(org);
+        const authUser = await getAdminAuth().getUser(ctx.user.uid);
+        const investorLabel =
+          authUser.displayName?.trim() || authUser.email?.trim() || "Investor";
+        const dealRow = await getDeal(ctx.orgId, dealId);
+        const dealName = dealRow?.name?.trim() || "Deal";
+        await sendDealSubscriptionSponsorSigningEmail({
+          orgName: org.name,
+          sponsorEmails,
+          sponsorSigningUrl: e.sponsorSigningUrl,
+          dealName,
+          investorLabel,
+        });
+        sponsorNotificationSent =
+          sponsorEmails.length > 0 && Boolean(process.env.RESEND_API_KEY?.trim());
+      }
+
       return NextResponse.json({
         ok: true,
         id: docId,
@@ -66,6 +88,7 @@ export async function POST(req: NextRequest) {
         signingUrl,
         sponsorSigningUrl: e.sponsorSigningUrl ?? null,
         awaitingSponsorPrep: e.nextSignerRole === "sponsor",
+        sponsorNotificationSent,
         status: e.status,
       });
     }
@@ -80,6 +103,25 @@ export async function POST(req: NextRequest) {
       template,
     });
 
+    let sponsorNotificationSent = false;
+    if (awaitingSponsorPrep && envelope.sponsorSigningUrl && org) {
+      const sponsorEmails = await resolveDealSubscriptionSponsorEmails(org);
+      const authUser = await getAdminAuth().getUser(ctx.user.uid);
+      const investorLabel =
+        authUser.displayName?.trim() || authUser.email?.trim() || "Investor";
+      const dealRow = await getDeal(ctx.orgId, dealId);
+      const dealName = dealRow?.name?.trim() || "Deal";
+      await sendDealSubscriptionSponsorSigningEmail({
+        orgName: org.name,
+        sponsorEmails,
+        sponsorSigningUrl: envelope.sponsorSigningUrl,
+        dealName,
+        investorLabel,
+      });
+      sponsorNotificationSent =
+        sponsorEmails.length > 0 && Boolean(process.env.RESEND_API_KEY?.trim());
+    }
+
     return NextResponse.json({
       ok: true,
       id: envelope.id,
@@ -87,6 +129,7 @@ export async function POST(req: NextRequest) {
       signingUrl: signingUrl ?? null,
       sponsorSigningUrl: envelope.sponsorSigningUrl ?? null,
       awaitingSponsorPrep,
+      sponsorNotificationSent,
       status: envelope.status,
     });
   } catch (e) {

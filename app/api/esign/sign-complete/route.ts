@@ -1,16 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ORG_COOKIE, SESSION_COOKIE } from "@/lib/constants";
-import { canEditOrgData } from "@/lib/auth/rbac";
-import { getAdminAuth } from "@/lib/firebase/admin";
-import { getAdminFirestore } from "@/lib/firebase/admin";
+import { SESSION_COOKIE } from "@/lib/constants";
+import { userHasStaffAccessToOrg } from "@/lib/auth/org-staff-access";
+import { getAdminAuth, getAdminBucket, getAdminFirestore } from "@/lib/firebase/admin";
 import { col } from "@/lib/firestore/paths";
 import type { EsignEnvelope } from "@/lib/firestore/types";
 import { verifyEsignToken } from "@/lib/esign/tokens";
 import { completeSignerStep } from "@/lib/esign/envelope-service";
 import { sendEsignCompletedEmails, sendEsignInvestorTurnEmail } from "@/lib/esign/envelope-notify";
-import { getMembership, getOrganization } from "@/lib/firestore/queries";
-import { getAdminBucket } from "@/lib/firebase/admin";
-
+import { getOrganization } from "@/lib/firestore/queries";
 export async function POST(req: NextRequest) {
   const json = (await req.json()) as {
     token?: string;
@@ -71,21 +68,59 @@ export async function POST(req: NextRequest) {
     signerName = bodyName || sessionEmail.split("@")[0] || "Investor";
     prefillSessionUid = sessionUid;
   } else if (payload.r === "sponsor" && ctx.kind === "deal_subscription") {
-    if (!sessionUid) {
-      return NextResponse.json({ error: "Sign in as a sponsor team member to complete this step." }, { status: 401 });
+    const orgId = env.organizationId;
+    const auth = getAdminAuth();
+
+    let resolvedUid: string | null = null;
+    let resolvedEmail: string | null = null;
+
+    if (sessionUid && sessionEmail) {
+      if (await userHasStaffAccessToOrg(sessionUid, orgId)) {
+        resolvedUid = sessionUid;
+        resolvedEmail = sessionEmail;
+      }
     }
-    const orgCookie = req.cookies.get(ORG_COOKIE)?.value;
-    if (!orgCookie || orgCookie !== env.organizationId) {
-      return NextResponse.json({ error: "Switch to the correct organization and try again." }, { status: 403 });
+
+    if (!resolvedUid) {
+      const tryEmail = (bodyEmail || sessionEmail || "").trim().toLowerCase();
+      if (!tryEmail) {
+        return NextResponse.json(
+          {
+            error:
+              "Enter the email on your CapitalOS sponsor account in the field above, or open this link in the same browser where you are logged in (Settings → ensure the correct workspace is selected).",
+          },
+          { status: 401 },
+        );
+      }
+      let record: { uid: string } | null = null;
+      try {
+        const u = await auth.getUserByEmail(tryEmail);
+        record = { uid: u.uid };
+      } catch {
+        record = null;
+      }
+      if (!record) {
+        return NextResponse.json(
+          { error: "No CapitalOS account found for that email. Use the address you sign in with." },
+          { status: 403 },
+        );
+      }
+      if (!(await userHasStaffAccessToOrg(record.uid, orgId))) {
+        return NextResponse.json(
+          {
+            error:
+              "Your account is not authorized for this organization in CapitalOS. Confirm you use your sponsor login email, or ask an admin to add you to this workspace with a sponsor role.",
+          },
+          { status: 403 },
+        );
+      }
+      resolvedUid = record.uid;
+      resolvedEmail = tryEmail;
     }
-    const mem = await getMembership(env.organizationId, sessionUid);
-    if (!mem || !canEditOrgData(mem.role)) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-    if (!sessionEmail) return NextResponse.json({ error: "Account email missing" }, { status: 400 });
-    signerEmail = sessionEmail;
-    signerName = bodyName || sessionEmail.split("@")[0] || "Sponsor";
-    prefillSessionUid = sessionUid;
+
+    signerEmail = resolvedEmail ?? "";
+    signerName = bodyName || signerEmail.split("@")[0] || "Sponsor";
+    prefillSessionUid = resolvedUid;
   } else if (payload.r === "sponsor") {
     const norm = env.sponsorEmailNorm?.trim().toLowerCase();
     const email = (sessionEmail ?? bodyEmail).trim().toLowerCase();
@@ -141,6 +176,22 @@ export async function POST(req: NextRequest) {
         } catch (e) {
           console.error("[esign sign-complete investor turn email]", e);
         }
+      }
+    } else if (ndaCtx.kind === "deal_subscription") {
+      try {
+        const lpUser = await getAdminAuth().getUser(ndaCtx.userId);
+        const to = lpUser.email?.trim().toLowerCase();
+        if (to) {
+          const org = await getOrganization(env.organizationId);
+          await sendEsignInvestorTurnEmail({
+            orgName: org?.name ?? "CapitalOS",
+            investorEmail: to,
+            investorName: lpUser.displayName ?? undefined,
+            signingUrl: result.nextUrl,
+          });
+        }
+      } catch (e) {
+        console.error("[esign sign-complete subscription investor turn email]", e);
       }
     }
   }

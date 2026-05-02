@@ -1,10 +1,10 @@
 import type { NextRequest } from "next/server";
-import { SESSION_COOKIE, ORG_COOKIE } from "@/lib/constants";
+import { SESSION_COOKIE } from "@/lib/constants";
 import { canEditOrgData } from "@/lib/auth/rbac";
+import { userHasStaffAccessToOrg } from "@/lib/auth/org-staff-access";
 import { getAdminAuth } from "@/lib/firebase/admin";
 import { col } from "@/lib/firestore/paths";
 import type { EsignEnvelope, EsignSignerRole } from "@/lib/firestore/types";
-import { getMembership } from "@/lib/firestore/queries";
 import type { Firestore } from "firebase-admin/firestore";
 
 /**
@@ -29,11 +29,7 @@ export async function resolvePrefillSessionUid(
     }
 
     if (role === "sponsor" && ctx.kind === "deal_subscription") {
-      const orgCookie = req.cookies.get(ORG_COOKIE)?.value;
-      if (!orgCookie || orgCookie !== env.organizationId) return null;
-      const mem = await getMembership(env.organizationId, uid);
-      if (!mem || !canEditOrgData(mem.role)) return null;
-      return uid;
+      return (await userHasStaffAccessToOrg(uid, env.organizationId)) ? uid : null;
     }
 
     if (role === "sponsor") {

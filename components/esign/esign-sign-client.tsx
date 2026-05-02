@@ -19,6 +19,8 @@ type SessionInfo = {
   fields: PlacedSignField[];
   contextKind: string;
   prefill?: Record<string, string>;
+  /** Logged-in user email from session cookie (for sponsor/investor prefill) */
+  sessionEmailHint?: string | null;
 };
 
 const PDF_EMBED_FRAGMENT = "#view=FitH&navpanes=0";
@@ -56,14 +58,19 @@ export function EsignSignClient(props: { initialToken: string }) {
     let cancelled = false;
     void (async () => {
       try {
-        const res = await fetch(`/api/esign/sign-session?token=${encodeURIComponent(token)}`);
-        const json = (await res.json()) as SessionInfo & { error?: string };
+        const res = await fetch(`/api/esign/sign-session?token=${encodeURIComponent(token)}`, {
+          credentials: "include",
+        });
+        const json = (await res.json()) as SessionInfo & { error?: string; sessionEmailHint?: string | null };
         if (!res.ok) {
           throw new Error(json.error ?? "Could not load signing session");
         }
         if (!cancelled) {
           const s = json as SessionInfo;
           setSession(s);
+          if (typeof json.sessionEmailHint === "string" && json.sessionEmailHint.trim()) {
+            setSignerEmail(json.sessionEmailHint.trim().toLowerCase());
+          }
           const initial: Record<string, string> = {};
           if (s.prefill) {
             for (const f of s.fields) {
@@ -93,7 +100,9 @@ export function EsignSignClient(props: { initialToken: string }) {
     let cancelled = false;
     void (async () => {
       try {
-        const res = await fetch(`/api/esign/sign-document?token=${encodeURIComponent(token)}`);
+        const res = await fetch(`/api/esign/sign-document?token=${encodeURIComponent(token)}`, {
+          credentials: "include",
+        });
         if (!res.ok) throw new Error("Could not load PDF preview");
         const buf = await res.arrayBuffer();
         const doc = await loadPdfDocumentFromBuffer(buf);
@@ -172,7 +181,12 @@ export function EsignSignClient(props: { initialToken: string }) {
       toast.error("Confirm consent to continue");
       return;
     }
-    if ((session.role === "sponsor" || session.role === "investor") && !signerEmail.trim()) {
+    const emailFromDom =
+      typeof document !== "undefined"
+        ? (document.getElementById("esign-signer-email") as HTMLInputElement | null)?.value?.trim() ?? ""
+        : "";
+    const effectiveSignerEmail = signerEmail.trim() || emailFromDom;
+    if ((session.role === "sponsor" || session.role === "investor") && !effectiveSignerEmail) {
       toast.error("Enter your email (must match the invited address)");
       return;
     }
@@ -181,13 +195,14 @@ export function EsignSignClient(props: { initialToken: string }) {
       const signaturePngBase64 = await canvasToPngBase64();
       const res = await fetch("/api/esign/sign-complete", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           token,
           fieldValues: values,
           signaturePngBase64,
           consent: true,
-          signerEmail: signerEmail.trim() || undefined,
+          signerEmail: effectiveSignerEmail || undefined,
           signerName: signerName.trim() || undefined,
         }),
       });
@@ -285,7 +300,7 @@ export function EsignSignClient(props: { initialToken: string }) {
             <div className="space-y-2">
               <Label htmlFor="se">Your email</Label>
               <Input
-                id="se"
+                id="esign-signer-email"
                 tabIndex={TAB_EMAIL}
                 type="email"
                 autoComplete="email"
