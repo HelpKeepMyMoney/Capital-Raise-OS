@@ -227,6 +227,10 @@ export default async function DealDetailPage(props: { params: Promise<{ id: stri
           />
         </div>
 
+        {deal.youtubeOverviewUrl?.trim() ? (
+          <DealYoutubeSection url={deal.youtubeOverviewUrl} />
+        ) : null}
+
         {pitchDeckDoc ? (
           <DealPitchDeckViewer
             dealId={deal.id}
@@ -234,10 +238,6 @@ export default async function DealDetailPage(props: { params: Promise<{ id: stri
             documentName={pitchDeckDoc.name}
             isLikelyPdf={isLikelyPdfDeck(pitchDeckDoc)}
           />
-        ) : null}
-
-        {deal.youtubeOverviewUrl?.trim() ? (
-          <DealYoutubeSection url={deal.youtubeOverviewUrl} />
         ) : null}
 
         <WhyInvest deal={deal} />
