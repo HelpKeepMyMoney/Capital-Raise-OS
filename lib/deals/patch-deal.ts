@@ -1,6 +1,7 @@
 import { FieldValue } from "firebase-admin/firestore";
 import { z } from "zod";
 import { DealStatusSchema, DealTypeSchema } from "@/lib/firestore/types";
+import { parseYoutubeVideoId } from "@/lib/youtube/embed";
 
 const whyInvestBlock = z.object({
   title: z.string().min(1).max(200),
@@ -70,8 +71,20 @@ export const DealPatchBodySchema = z
         body: z.string().min(1).max(20_000),
       })
       .optional(),
+    youtubeOverviewUrl: z.union([z.literal(""), z.null(), z.string().max(2000)]).optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((data, ctx) => {
+    const y = data.youtubeOverviewUrl;
+    if (y === undefined || y === null || y === "") return;
+    if (!parseYoutubeVideoId(y)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Invalid YouTube URL",
+        path: ["youtubeOverviewUrl"],
+      });
+    }
+  });
 
 export type DealPatchBody = z.infer<typeof DealPatchBodySchema>;
 
@@ -110,6 +123,12 @@ export function dealPatchToFirestoreUpdate(patch: DealPatchBody): Record<string,
     const c = patch.calendarBookingUrl;
     if (c === null || c === "") u.calendarBookingUrl = FieldValue.delete();
     else u.calendarBookingUrl = c;
+  }
+
+  if (patch.youtubeOverviewUrl !== undefined) {
+    const y = patch.youtubeOverviewUrl;
+    if (y === null || y === "") u.youtubeOverviewUrl = FieldValue.delete();
+    else u.youtubeOverviewUrl = y.trim();
   }
 
   if (patch.faqs !== undefined) u.faqs = patch.faqs;

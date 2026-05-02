@@ -418,6 +418,8 @@ export type Deal = {
   faqs?: { q: string; a: string }[];
   investorUpdates?: { title: string; body: string; createdAt: number }[];
   calendarBookingUrl?: string;
+  /** Sponsor-set overview / explainer video (YouTube URL). */
+  youtubeOverviewUrl?: string;
   createdAt: number;
   /** Premium portal fields (all optional, backward compatible). */
   tagline?: string;

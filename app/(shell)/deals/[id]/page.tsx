@@ -23,6 +23,7 @@ import { aggregateDealTelemetry } from "@/lib/deals/telemetry";
 import { countActiveInvitesForDeal } from "@/lib/deals/invite-helpers";
 import { computeProgressPct, fmtUsd } from "@/lib/deals/format";
 import { hasWhyInvestNarrativeOnDeal } from "@/lib/deals/why-invest-narrative";
+import { isLikelyPdfDeck, pickPitchDeckDocument } from "@/lib/deals/pitch-deck-picker";
 import { DealDetailShell } from "@/components/deals/deal-detail-shell";
 import { DealTitleHero } from "@/components/deals/deal-title-hero";
 import { WhyInvest } from "@/components/deals/why-invest";
@@ -38,6 +39,8 @@ import { DealManagerPanel } from "@/components/deals/deal-manager-panel";
 import type { DealAnalyticsDTO } from "@/components/deals/deal-analytics";
 import { DealCommitmentForm } from "@/components/deal-commitment-form";
 import { DealGuestSigning } from "@/components/deal-guest-signing";
+import { DealPitchDeckViewer } from "@/components/deals/deal-pitch-deck-viewer";
+import { DealYoutubeSection } from "@/components/deals/deal-youtube-section";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -188,6 +191,8 @@ export default async function DealDetailPage(props: { params: Promise<{ id: stri
   const ctaVisibility = deal.cta;
   const showBookCallCta = ctaVisibility?.showBookCall !== false && Boolean(deal.calendarBookingUrl);
 
+  const pitchDeckDoc = pickPitchDeckDocument(roomDocs);
+
   return (
     <DealDetailShell
       dealId={deal.id}
@@ -221,6 +226,19 @@ export default async function DealDetailPage(props: { params: Promise<{ id: stri
             displayProgressPct={displayProgressPct}
           />
         </div>
+
+        {pitchDeckDoc ? (
+          <DealPitchDeckViewer
+            dealId={deal.id}
+            documentId={pitchDeckDoc.id}
+            documentName={pitchDeckDoc.name}
+            isLikelyPdf={isLikelyPdfDeck(pitchDeckDoc)}
+          />
+        ) : null}
+
+        {deal.youtubeOverviewUrl?.trim() ? (
+          <DealYoutubeSection url={deal.youtubeOverviewUrl} />
+        ) : null}
 
         <WhyInvest deal={deal} />
 

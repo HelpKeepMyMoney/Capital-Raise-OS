@@ -94,6 +94,7 @@ export function DealSettingsForm(props: {
   const [calendarBookingUrl, setCalendarBookingUrl] = React.useState(
     d.calendarBookingUrl ?? "",
   );
+  const [youtubeOverviewUrl, setYoutubeOverviewUrl] = React.useState(d.youtubeOverviewUrl ?? "");
   const [logoUrl, setLogoUrl] = React.useState(d.logoUrl ?? "");
   const [whyInvestNarrative, setWhyInvestNarrative] = React.useState<Record<
     WhyInvestNarrativeFieldKey,
@@ -222,6 +223,7 @@ export function DealSettingsForm(props: {
       eligibility: eligibility.trim() || null,
       logoUrl: logoUrl.trim() || null,
       calendarBookingUrl: calendarBookingUrl.trim() || null,
+      youtubeOverviewUrl: youtubeOverviewUrl.trim() || null,
       cta: {
         showDataRoom,
         showBookCall,
@@ -388,6 +390,19 @@ export function DealSettingsForm(props: {
             onChange={(e) => setCalendarBookingUrl(e.target.value)}
             className="rounded-xl"
           />
+        </div>
+        <div className="space-y-2 sm:col-span-2">
+          <Label htmlFor="st-youtube">YouTube overview URL</Label>
+          <Input
+            id="st-youtube"
+            value={youtubeOverviewUrl}
+            onChange={(e) => setYoutubeOverviewUrl(e.target.value)}
+            className="rounded-xl"
+            placeholder="https://www.youtube.com/watch?v=…"
+          />
+          <p className="text-xs text-muted-foreground">
+            Optional. Shown on the deal page as an embedded overview video (standard YouTube links supported).
+          </p>
         </div>
         <div className="space-y-2 sm:col-span-2">
           <Label htmlFor="st-logo">Logo URL</Label>
