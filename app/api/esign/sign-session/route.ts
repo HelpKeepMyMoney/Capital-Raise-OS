@@ -53,6 +53,17 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  /** For LP subscription step: requester’s Auth email so they can confirm identity if the session cookie is missing. */
+  let subscriptionRequesterEmailHint: string | null = null;
+  if (payload.r === "lp" && env.context.kind === "deal_subscription") {
+    try {
+      const u = await getAdminAuth().getUser(env.context.userId);
+      subscriptionRequesterEmailHint = u.email?.trim().toLowerCase() ?? null;
+    } catch {
+      subscriptionRequesterEmailHint = null;
+    }
+  }
+
   return NextResponse.json({
     envelopeId: env.id,
     role: payload.r,
@@ -61,5 +72,6 @@ export async function GET(req: NextRequest) {
     contextKind: env.context.kind,
     prefill,
     sessionEmailHint,
+    subscriptionRequesterEmailHint,
   });
 }

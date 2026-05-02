@@ -55,18 +55,53 @@ export async function POST(req: NextRequest) {
     if (ctx.kind !== "deal_subscription") {
       return NextResponse.json({ error: "Invalid envelope" }, { status: 400 });
     }
-    if (!sessionUid || sessionUid !== ctx.userId) {
-      return NextResponse.json(
-        { error: "Sign in with the same investor account that requested subscription documents." },
-        { status: 403 },
-      );
+    const requesterId = ctx.userId;
+    const auth = getAdminAuth();
+
+    if (sessionUid && sessionUid === requesterId) {
+      if (!sessionEmail) {
+        return NextResponse.json({ error: "Account email missing" }, { status: 400 });
+      }
+      signerEmail = sessionEmail;
+      signerName = bodyName || sessionEmail.split("@")[0] || "Investor";
+      prefillSessionUid = sessionUid;
+    } else {
+      const tryEmail = (bodyEmail || sessionEmail || "").trim().toLowerCase();
+      if (!tryEmail) {
+        return NextResponse.json(
+          {
+            error:
+              "Enter the email for the CapitalOS account that requested this subscription packet (use the field on the signing page), or sign in with that account in this browser.",
+          },
+          { status: 401 },
+        );
+      }
+      let record: { uid: string; displayName?: string } | null = null;
+      try {
+        const u = await auth.getUserByEmail(tryEmail);
+        record = { uid: u.uid, displayName: u.displayName ?? undefined };
+      } catch {
+        record = null;
+      }
+      if (!record || record.uid !== requesterId) {
+        let msg =
+          "That email does not match the account that requested subscription documents. Use the same CapitalOS login you used when you clicked “Request subscription packet” on the deal.";
+        if (sessionUid && sessionUid !== requesterId && env.organizationId) {
+          try {
+            if (await userHasStaffAccessToOrg(sessionUid, env.organizationId)) {
+              msg =
+                "This link is for the investor who requested the packet to sign—not sponsor signing. Forward it to that investor or use their CapitalOS login.";
+            }
+          } catch {
+            /* noop */
+          }
+        }
+        return NextResponse.json({ error: msg }, { status: 403 });
+      }
+      signerEmail = tryEmail;
+      signerName = bodyName || record.displayName?.trim() || tryEmail.split("@")[0] || "Investor";
+      prefillSessionUid = requesterId;
     }
-    if (!sessionEmail) {
-      return NextResponse.json({ error: "Account email missing" }, { status: 400 });
-    }
-    signerEmail = sessionEmail;
-    signerName = bodyName || sessionEmail.split("@")[0] || "Investor";
-    prefillSessionUid = sessionUid;
   } else if (payload.r === "sponsor" && ctx.kind === "deal_subscription") {
     const orgId = env.organizationId;
     const auth = getAdminAuth();

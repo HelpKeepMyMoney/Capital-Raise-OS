@@ -21,6 +21,8 @@ type SessionInfo = {
   prefill?: Record<string, string>;
   /** Logged-in user email from session cookie (for sponsor/investor prefill) */
   sessionEmailHint?: string | null;
+  /** LP subscription: Auth email of the user who requested the packet (for identity check) */
+  subscriptionRequesterEmailHint?: string | null;
 };
 
 const PDF_EMBED_FRAGMENT = "#view=FitH&navpanes=0";
@@ -61,14 +63,20 @@ export function EsignSignClient(props: { initialToken: string }) {
         const res = await fetch(`/api/esign/sign-session?token=${encodeURIComponent(token)}`, {
           credentials: "include",
         });
-        const json = (await res.json()) as SessionInfo & { error?: string; sessionEmailHint?: string | null };
+        const json = (await res.json()) as SessionInfo & {
+          error?: string;
+          sessionEmailHint?: string | null;
+          subscriptionRequesterEmailHint?: string | null;
+        };
         if (!res.ok) {
           throw new Error(json.error ?? "Could not load signing session");
         }
         if (!cancelled) {
           const s = json as SessionInfo;
           setSession(s);
-          if (typeof json.sessionEmailHint === "string" && json.sessionEmailHint.trim()) {
+          if (typeof json.subscriptionRequesterEmailHint === "string" && json.subscriptionRequesterEmailHint.trim()) {
+            setSignerEmail(json.subscriptionRequesterEmailHint.trim().toLowerCase());
+          } else if (typeof json.sessionEmailHint === "string" && json.sessionEmailHint.trim()) {
             setSignerEmail(json.sessionEmailHint.trim().toLowerCase());
           }
           const initial: Record<string, string> = {};
@@ -186,8 +194,16 @@ export function EsignSignClient(props: { initialToken: string }) {
         ? (document.getElementById("esign-signer-email") as HTMLInputElement | null)?.value?.trim() ?? ""
         : "";
     const effectiveSignerEmail = signerEmail.trim() || emailFromDom;
-    if ((session.role === "sponsor" || session.role === "investor") && !effectiveSignerEmail) {
-      toast.error("Enter your email (must match the invited address)");
+    const needsEmailField =
+      session.role === "sponsor" ||
+      session.role === "investor" ||
+      (session.role === "lp" && session.contextKind === "deal_subscription");
+    if (needsEmailField && !effectiveSignerEmail) {
+      toast.error(
+        session.role === "lp"
+          ? "Enter the email for the CapitalOS account that requested the subscription packet"
+          : "Enter your email (must match the invited address)",
+      );
       return;
     }
     setSubmitting(true);
@@ -236,7 +252,11 @@ export function EsignSignClient(props: { initialToken: string }) {
   if (error) return <p className="text-sm text-destructive">{error}</p>;
   if (!session) return null;
 
-  const showEmailForm = session.role === "sponsor" || session.role === "investor";
+  const showEmailForm =
+    session.role === "sponsor" ||
+    session.role === "investor" ||
+    (session.role === "lp" && session.contextKind === "deal_subscription");
+  const lpSubscription = session.role === "lp" && session.contextKind === "deal_subscription";
   const pdfSrcBase =
     token.length > 0 ? `/api/esign/sign-document?token=${encodeURIComponent(token)}` : null;
 
@@ -285,6 +305,19 @@ export function EsignSignClient(props: { initialToken: string }) {
       <div className="order-1 min-w-0 space-y-6 rounded-2xl border border-border bg-card p-6 shadow-md xl:order-2 xl:sticky xl:top-4">
         <div>
           <h1 className="text-xl font-semibold">{session.templateName}</h1>
+          {session.contextKind === "deal_subscription" && session.role === "lp" ? (
+            <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-800/80 dark:bg-amber-950/40 dark:text-amber-100">
+              <span className="font-medium">Investor (LP) step</span> — use the same CapitalOS account you used when you
+              clicked “Request subscription packet.” If sign-in does not stick (some browsers or email apps), confirm the
+              email below matches that account; we verify it against your login.
+            </p>
+          ) : null}
+          {session.contextKind === "deal_subscription" && session.role === "sponsor" ? (
+            <p className="mt-2 rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-950 dark:border-sky-800/80 dark:bg-sky-950/40 dark:text-sky-100">
+              <span className="font-medium">Sponsor step</span> — use your sponsor staff login in this browser, or
+              enter your sponsor account email in the field below.
+            </p>
+          ) : null}
           <p className="mt-1 text-sm text-muted-foreground">
             Your drawing is applied to every signature box on the document and to the certificate page.
           </p>
@@ -298,7 +331,7 @@ export function EsignSignClient(props: { initialToken: string }) {
         {showEmailForm ? (
           <div className="grid gap-3">
             <div className="space-y-2">
-              <Label htmlFor="se">Your email</Label>
+              <Label htmlFor="esign-signer-email">{lpSubscription ? "Your CapitalOS email" : "Your email"}</Label>
               <Input
                 id="esign-signer-email"
                 tabIndex={TAB_EMAIL}
@@ -309,7 +342,11 @@ export function EsignSignClient(props: { initialToken: string }) {
                 className="rounded-xl"
                 placeholder="you@company.com"
               />
-              <p className="text-[11px] text-muted-foreground">Must match the email used for this signing request.</p>
+              <p className="text-[11px] text-muted-foreground">
+                {lpSubscription
+                  ? "Must be the account that requested subscription documents on the deal (same as your LP portal login)."
+                  : "Must match the email used for this signing request."}
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="sn">Display name</Label>
