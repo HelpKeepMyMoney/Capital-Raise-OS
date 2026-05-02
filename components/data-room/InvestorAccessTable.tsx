@@ -42,6 +42,7 @@ import {
 import { MoreHorizontal } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useMounted } from "@/hooks/use-mounted";
 
 type Props = {
   invitations: InviteRow[];
@@ -77,6 +78,7 @@ function memberPickLabel(m: OrgMemberOption): string {
 
 export function InvestorAccessTable(props: Props) {
   const router = useRouter();
+  const mounted = useMounted();
   const now = Date.now();
   const [busyKey, setBusyKey] = React.useState<string | null>(null);
 
@@ -346,8 +348,8 @@ export function InvestorAccessTable(props: Props) {
                     </TableCell>
                     <TableCell className="hidden text-xs text-muted-foreground md:table-cell">
                       {inv.ndaSignedAt ? (
-                        <span title={new Date(inv.ndaSignedAt).toLocaleString()}>
-                          Signed {new Date(inv.ndaSignedAt).toLocaleDateString()}
+                        <span title={mounted ? new Date(inv.ndaSignedAt).toLocaleString() : undefined}>
+                          {mounted ? `Signed ${new Date(inv.ndaSignedAt).toLocaleDateString()}` : "Signed"}
                         </span>
                       ) : (
                         "—"

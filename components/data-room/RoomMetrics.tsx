@@ -91,7 +91,7 @@ export function RoomMetrics(props: Props) {
         icon={<TrendingUp className="h-4 w-4" />}
         label="Hot Room"
         value={most ? most.name.slice(0, 18) + (most.name.length > 18 ? "…" : "") : "—"}
-        micro={most ? `${most.views.toLocaleString()} tracked views (docs)` : "Link rooms to deals to prioritize."}
+        micro={most ? `${most.views.toLocaleString("en-US")} tracked views (docs)` : "Link rooms to deals to prioritize."}
         delay={4}
       />
       <MetricCell

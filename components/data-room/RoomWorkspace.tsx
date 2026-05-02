@@ -26,6 +26,7 @@ type Props = {
   selectedDealId?: string;
   roomSelectList: { id: string; name: string }[];
   lastLoginAtMs: number | null;
+  activitySinceMs: number;
   workspaceTab?: string;
   onWorkspaceTabChange?: (tab: string) => void;
   esignTemplateLibraryConfigured?: boolean;
@@ -108,6 +109,7 @@ export function RoomWorkspace(props: Props) {
             deal={props.dealForRoom}
             documentsForRoom={props.documentsForRoom}
             lastLoginAtMs={props.lastLoginAtMs}
+            activitySinceMs={props.activitySinceMs}
             onOpenDocuments={() => goTab("documents")}
           />
         </TabsContent>

@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import type { SerializedDataRoom, SerializedDealLite } from "@/components/data-room/types";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
+import { useMounted } from "@/hooks/use-mounted";
 import { Archive, BarChart3, FolderOpen, Link2, Pencil } from "lucide-react";
 
 type Props = {
@@ -47,6 +48,7 @@ function statusBadges(room: SerializedDataRoom) {
 }
 
 export function RoomCard(props: Props) {
+  const mounted = useMounted();
   const { room, selected } = props;
   const badges = statusBadges(room);
   const updated = room.updatedAt ?? room.createdAt;
@@ -102,7 +104,7 @@ export function RoomCard(props: Props) {
         </p>
         {updated ? (
           <p className="text-[11px] text-muted-foreground">
-            Updated {formatDistanceToNow(updated, { addSuffix: true })}
+            Updated {mounted ? formatDistanceToNow(updated, { addSuffix: true }) : "recently"}
           </p>
         ) : null}
 

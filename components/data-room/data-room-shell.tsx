@@ -40,6 +40,8 @@ type Props = {
   initialDealFilterId?: string;
   /** Used for “since last login” recent updates on Investor view (Firebase Auth last sign-in). */
   lastLoginAtMs: number | null;
+  /** Server-fixed lower bound for recent activity when last login is unknown (avoids hydration mismatch). */
+  activitySinceMs: number;
   /** True when the org has at least one signable PDF template. */
   esignTemplateLibraryConfigured?: boolean;
 };
@@ -327,6 +329,7 @@ export function DataRoomShell(props: Props) {
                 selectedDealId={dealFilterId || selectedRoom.dealId}
                 roomSelectList={roomSelectList}
                 lastLoginAtMs={props.lastLoginAtMs}
+                activitySinceMs={props.activitySinceMs}
                 workspaceTab={workspaceTab}
                 onWorkspaceTabChange={setWorkspaceTab}
                 esignTemplateLibraryConfigured={props.esignTemplateLibraryConfigured}

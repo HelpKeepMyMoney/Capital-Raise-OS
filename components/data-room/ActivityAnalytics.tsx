@@ -18,6 +18,7 @@ import {
 import { formatDistanceToNow } from "date-fns";
 import { kindLabel } from "@/lib/data-room/kind-labels";
 import { cn } from "@/lib/utils";
+import { useMounted } from "@/hooks/use-mounted";
 
 type Props = {
   documents: SerializedRoomDocument[];
@@ -37,6 +38,7 @@ function fillLastDays(count: number, counts: Map<string, number>): { day: string
 }
 
 export function ActivityAnalytics(props: Props) {
+  const mounted = useMounted();
   const byKind: Record<string, number> = {};
   for (const d of props.documents) {
     byKind[d.kind] = (byKind[d.kind] ?? 0) + (d.viewCount ?? 0);
@@ -77,7 +79,7 @@ export function ActivityAnalytics(props: Props) {
         <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div className="rounded-xl border border-border bg-muted/30 p-4">
             <p className="text-xs uppercase text-muted-foreground">Total views (docs)</p>
-            <p className="mt-1 text-2xl font-semibold tabular-nums">{totalViews.toLocaleString()}</p>
+            <p className="mt-1 text-2xl font-semibold tabular-nums">{totalViews.toLocaleString("en-US")}</p>
           </div>
           <div className="rounded-xl border border-border bg-muted/30 p-4">
             <p className="text-xs uppercase text-muted-foreground">Documents in room</p>
@@ -92,7 +94,7 @@ export function ActivityAnalytics(props: Props) {
           <div className="rounded-xl border border-border bg-muted/30 p-4">
             <p className="text-xs uppercase text-muted-foreground">Last audit activity</p>
             <p className="mt-1 text-sm font-medium">
-              {lastActivity ? formatDistanceToNow(lastActivity, { addSuffix: true }) : "—"}
+              {lastActivity ? (mounted ? formatDistanceToNow(lastActivity, { addSuffix: true }) : "—") : "—"}
             </p>
           </div>
         </CardContent>
@@ -210,7 +212,7 @@ export function ActivityAnalytics(props: Props) {
                     <span className="absolute -left-1.5 top-1.5 block h-3 w-3 rounded-full bg-primary" />
                     <p className="font-medium">{a.summary}</p>
                     <p className="text-xs text-muted-foreground">
-                      {formatDistanceToNow(a.createdAt, { addSuffix: true })}
+                      {mounted ? formatDistanceToNow(a.createdAt, { addSuffix: true }) : "—"}
                     </p>
                   </li>
                 ))}

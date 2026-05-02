@@ -31,6 +31,9 @@ export default async function DataRoomPage(props: {
   const canManage = membership != null && canEditOrgData(membership.role);
 
   const lastLoginAtMs = await getUserLastSignInMs(ctx.user.uid);
+  const ninetyDaysMs = 90 * 24 * 60 * 60 * 1000;
+  /** Stable boundary for “recent” rows — must not use client Date.now() or SSR vs client lists diverge. */
+  const activitySinceMs = lastLoginAtMs ?? Date.now() - ninetyDaysMs;
 
   const sp = props.searchParams ? await props.searchParams : {};
   const dealParam = typeof sp.deal === "string" ? sp.deal.trim() : "";
@@ -164,6 +167,7 @@ export default async function DataRoomPage(props: {
         canManage={canManage}
         initialDealFilterId={initialDealFilterId}
         lastLoginAtMs={lastLoginAtMs}
+        activitySinceMs={activitySinceMs}
         esignTemplateLibraryConfigured={esignTemplateLibraryConfigured}
       />
     </div>

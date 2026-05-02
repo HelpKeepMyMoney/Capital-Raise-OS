@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import * as React from "react";
 import { formatDistanceToNow } from "date-fns";
+import { useMounted } from "@/hooks/use-mounted";
 
 const KIND_ORDER: Record<SerializedRoomDocument["kind"], number> = {
   deck: 0,
@@ -35,6 +36,8 @@ type Props = {
   deal: Deal | null | undefined;
   documentsForRoom: SerializedRoomDocument[];
   lastLoginAtMs: number | null;
+  /** Lower bound for “recent” (computed on server so SSR and client agree). */
+  activitySinceMs: number;
   onOpenDocuments: () => void;
 };
 
@@ -70,17 +73,17 @@ function buildRecentRows(
 }
 
 export function InvestorPreview(props: Props) {
+  const mounted = useMounted();
   const welcome = props.room.welcomeMessage?.trim()
     ? props.room.welcomeMessage
     : "Welcome to the diligence room. Review materials and reach out with diligence questions.";
 
   const keyDocs = React.useMemo(() => sortKeyDocuments(props.documentsForRoom), [props.documentsForRoom]);
 
-  const recentRows = React.useMemo(() => {
-    const ninetyDaysMs = 90 * 24 * 60 * 60 * 1000;
-    const boundaryMs = props.lastLoginAtMs ?? Date.now() - ninetyDaysMs;
-    return buildRecentRows(props.deal, props.documentsForRoom, boundaryMs);
-  }, [props.deal, props.documentsForRoom, props.lastLoginAtMs]);
+  const recentRows = React.useMemo(
+    () => buildRecentRows(props.deal, props.documentsForRoom, props.activitySinceMs),
+    [props.deal, props.documentsForRoom, props.activitySinceMs],
+  );
 
   const faqs = resolveDealFaqItems(props.deal?.faqs);
 
@@ -117,7 +120,9 @@ export function InvestorPreview(props: Props) {
                 <h4 className="text-sm font-semibold text-foreground">Mutual NDA</h4>
                 {props.room.investorNdaSignedAt ? (
                   <Badge variant="secondary" className="rounded-full">
-                    Signed {new Date(props.room.investorNdaSignedAt).toLocaleDateString()}
+                    {mounted
+                      ? `Signed ${new Date(props.room.investorNdaSignedAt).toLocaleDateString()}`
+                      : "Signed"}
                   </Badge>
                 ) : (
                   <Badge variant="outline" className="rounded-full">
@@ -131,7 +136,7 @@ export function InvestorPreview(props: Props) {
                     <p className="text-muted-foreground">
                       Signed on{" "}
                       <span className="font-medium text-foreground">
-                        {new Date(props.room.investorNdaSignedAt).toLocaleString()}
+                        {mounted ? new Date(props.room.investorNdaSignedAt).toLocaleString() : "—"}
                       </span>
                       .
                     </p>
@@ -210,7 +215,7 @@ export function InvestorPreview(props: Props) {
                       <div className="flex flex-wrap items-baseline justify-between gap-2">
                         <p className="text-sm font-semibold text-foreground">{row.title}</p>
                         <span className="text-xs text-muted-foreground">
-                          {formatDistanceToNow(row.at, { addSuffix: true })}
+                          {mounted ? formatDistanceToNow(row.at, { addSuffix: true }) : "—"}
                         </span>
                       </div>
                       <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{row.body}</p>
@@ -224,7 +229,7 @@ export function InvestorPreview(props: Props) {
                         </Badge>
                       </div>
                       <span className="text-xs text-muted-foreground">
-                        {formatDistanceToNow(row.at, { addSuffix: true })}
+                        {mounted ? formatDistanceToNow(row.at, { addSuffix: true }) : "—"}
                       </span>
                     </li>
                   ),
@@ -284,14 +289,14 @@ export function InvestorPreview(props: Props) {
               <div>
                 <p className="text-xs uppercase text-muted-foreground">Raise target</p>
                 <p className="mt-1 font-medium tabular-nums">
-                  {props.deal.targetRaise != null ? `$${props.deal.targetRaise.toLocaleString()}` : "—"}
+                  {props.deal.targetRaise != null ? `$${props.deal.targetRaise.toLocaleString("en-US")}` : "—"}
                 </p>
               </div>
               <div>
                 <p className="text-xs uppercase text-muted-foreground">Minimum</p>
                 <p className="mt-1 font-medium tabular-nums">
                   {props.deal.minimumInvestment != null
-                    ? `$${props.deal.minimumInvestment.toLocaleString()}`
+                    ? `$${props.deal.minimumInvestment.toLocaleString("en-US")}`
                     : "—"}
                 </p>
               </div>
@@ -299,11 +304,13 @@ export function InvestorPreview(props: Props) {
                 <p className="text-xs uppercase text-muted-foreground">Timeline</p>
                 <p className="mt-1 font-medium">
                   {props.deal.closeDate
-                    ? new Date(props.deal.closeDate).toLocaleDateString(undefined, {
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                      })
+                    ? mounted
+                      ? new Date(props.deal.closeDate).toLocaleDateString(undefined, {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })
+                      : "…"
                     : "TBD"}
                 </p>
               </div>

@@ -55,6 +55,7 @@ import {
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
+import { useMounted } from "@/hooks/use-mounted";
 
 function formatBytes(n?: number): string {
   if (n == null || Number.isNaN(n)) return "—";
@@ -149,6 +150,7 @@ type Props = {
 
 export function DocumentManager(props: Props) {
   const router = useRouter();
+  const mounted = useMounted();
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [kind, setKind] = React.useState<RoomDocType["kind"]>("deck");
   const [editOpen, setEditOpen] = React.useState(false);
@@ -573,11 +575,11 @@ export function DocumentManager(props: Props) {
                   <TableCell className="tabular-nums">{d.version ?? 1}</TableCell>
                   <TableCell className="text-xs">{formatBytes(d.sizeBytes)}</TableCell>
                   <TableCell className="hidden text-xs text-muted-foreground xl:table-cell">
-                    {d.createdAt ? formatDistanceToNow(d.createdAt, { addSuffix: true }) : "—"}
+                    {d.createdAt ? (mounted ? formatDistanceToNow(d.createdAt, { addSuffix: true }) : "—") : "—"}
                   </TableCell>
                   <TableCell className="tabular-nums">{d.viewCount ?? 0}</TableCell>
                   <TableCell className="hidden text-xs text-muted-foreground lg:table-cell">
-                    {d.lastViewedAt ? formatDistanceToNow(d.lastViewedAt, { addSuffix: true }) : "—"}
+                    {d.lastViewedAt ? (mounted ? formatDistanceToNow(d.lastViewedAt, { addSuffix: true }) : "—") : "—"}
                   </TableCell>
                   <TableCell className="hidden capitalize 2xl:table-cell">{visibilityLabel(d)}</TableCell>
                   <TableCell>
