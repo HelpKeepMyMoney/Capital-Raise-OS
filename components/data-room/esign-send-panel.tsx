@@ -3,16 +3,26 @@
 import * as React from "react";
 import { toast } from "sonner";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
+type EligibleRow = { id: string; email: string; displayName: string };
+
 type Props = {
   dataRoomId: string;
   roomName: string;
+  /** Saved deal id on the room — refetch eligible investors when this changes (e.g. after Save settings). */
+  associatedDealId: string;
   ndaRequired: boolean;
   hasNdaTemplate: boolean;
   /** Template id from the room settings form (used even before Save settings). */
@@ -20,11 +30,48 @@ type Props = {
 };
 
 export function EsignSendPanel(props: Props) {
-  const [investorEmail, setInvestorEmail] = React.useState("");
-  const [investorName, setInvestorName] = React.useState("");
+  const [investorId, setInvestorId] = React.useState<string>("");
+  const [eligible, setEligible] = React.useState<EligibleRow[]>([]);
+  const [loadingEligible, setLoadingEligible] = React.useState(false);
+  const [noDealLinked, setNoDealLinked] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
   const [sponsorUrl, setSponsorUrl] = React.useState<string | null>(null);
   const [investorUrl, setInvestorUrl] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      setLoadingEligible(true);
+      setInvestorId("");
+      try {
+        const res = await fetch(
+          `/api/data-room/rooms/${encodeURIComponent(props.dataRoomId)}/nda-eligible-investors`,
+        );
+        const json = (await res.json()) as {
+          investors?: EligibleRow[];
+          noDealLinked?: boolean;
+          error?: string;
+        };
+        if (!res.ok) throw new Error(json.error ?? "Could not load investors");
+        if (!cancelled) {
+          setEligible(json.investors ?? []);
+          setNoDealLinked(Boolean(json.noDealLinked));
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setEligible([]);
+          setNoDealLinked(false);
+          toast.error(e instanceof Error ? e.message : "Could not load investors");
+        }
+      } finally {
+        if (!cancelled) setLoadingEligible(false);
+      }
+    }
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [props.dataRoomId, props.associatedDealId]);
 
   if (!props.ndaRequired || !props.hasNdaTemplate) {
     const reasons: string[] = [];
@@ -47,9 +94,8 @@ export function EsignSendPanel(props: Props) {
   }
 
   async function createEnvelope() {
-    const email = investorEmail.trim();
-    if (!email) {
-      toast.error("Enter the investor email");
+    if (!investorId) {
+      toast.error("Choose an investor from the list");
       return;
     }
     setSubmitting(true);
@@ -62,8 +108,7 @@ export function EsignSendPanel(props: Props) {
         body: JSON.stringify({
           kind: "data_room_nda",
           dataRoomId: props.dataRoomId,
-          investorEmail: email,
-          investorName: investorName.trim() || undefined,
+          investorId,
           signableTemplateId: props.signableTemplateId.trim() || undefined,
         }),
       });
@@ -96,38 +141,62 @@ export function EsignSendPanel(props: Props) {
     }
   }
 
+  const selected = eligible.find((r) => r.id === investorId);
+
   return (
     <Card className="max-w-xl rounded-2xl border-border shadow-sm">
       <CardHeader>
         <CardTitle className="text-lg">Send for signature (e-sign)</CardTitle>
         <CardDescription>
-          Creates a signing envelope for <span className="font-medium">{props.roomName}</span> using this room’s
-          linked PDF template.
+          NDAs can only go to CRM contacts who have this room&apos;s deal under{" "}
+          <span className="font-medium">Interested deals</span>. Link the room to a deal above, save settings, then
+          choose the investor here.
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">
+        {noDealLinked ? (
+          <p className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-950 dark:text-amber-50">
+            Associate this room with a deal under <span className="font-medium">Associated deal</span>, then save room
+            settings. Eligible investors appear here once they have that deal checked under Interested deals on their CRM
+            profile.
+          </p>
+        ) : null}
+
+        {!noDealLinked && !loadingEligible && eligible.length === 0 ? (
+          <p className="rounded-xl border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+            No eligible investors yet. Add people in Investor CRM and mark <span className="font-medium text-foreground">Interested deals</span> to include this room&apos;s deal, with a valid email on file.
+          </p>
+        ) : null}
+
         <div className="space-y-2">
-          <Label htmlFor="mnda-inv-email">Investor email</Label>
-          <Input
-            id="mnda-inv-email"
-            type="email"
-            autoComplete="email"
-            placeholder="investor@example.com"
-            className="rounded-xl"
-            value={investorEmail}
-            onChange={(e) => setInvestorEmail(e.target.value)}
-          />
+          <Label>Investor (CRM — deal access)</Label>
+          <Select
+            value={investorId || "__pick__"}
+            onValueChange={(v) => setInvestorId(!v || v === "__pick__" ? "" : v)}
+            disabled={loadingEligible || noDealLinked || eligible.length === 0}
+          >
+            <SelectTrigger className="h-10 rounded-xl">
+              <SelectValue
+                placeholder={loadingEligible ? "Loading…" : "Choose investor email…"}
+              />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__pick__">Choose investor…</SelectItem>
+              {eligible.map((row) => (
+                <SelectItem key={row.id} value={row.id}>
+                  {row.displayName} — {row.email}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {selected ? (
+            <p className="text-[11px] text-muted-foreground">
+              Sending to <span className="font-medium text-foreground">{selected.email}</span> ({selected.displayName}
+              ).
+            </p>
+          ) : null}
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="mnda-inv-name">Investor display name (optional)</Label>
-          <Input
-            id="mnda-inv-name"
-            placeholder="Acme Investors LLC"
-            className="rounded-xl"
-            value={investorName}
-            onChange={(e) => setInvestorName(e.target.value)}
-          />
-        </div>
+
         <p className="text-[11px] text-muted-foreground">
           Sponsor signs first when the template has sponsor fields; otherwise the investor link is active immediately.
           Uses the template selected above (save room settings to store it as this room&apos;s default).
@@ -135,7 +204,7 @@ export function EsignSendPanel(props: Props) {
         <Button
           type="button"
           className="max-w-xs rounded-xl"
-          disabled={submitting}
+          disabled={submitting || !investorId}
           onClick={() => void createEnvelope()}
         >
           {submitting ? "Creating…" : "Create envelope"}

@@ -98,6 +98,11 @@ export function InvestorCard(props: {
               {inv.firm ? (
                 <p className="truncate text-xs text-muted-foreground">{inv.firm}</p>
               ) : null}
+              {inv.email?.trim() ? (
+                <p className="truncate font-mono text-[11px] text-muted-foreground" title={inv.email.trim()}>
+                  {inv.email.trim()}
+                </p>
+              ) : null}
             </div>
             {props.canManage ? (
               <DropdownMenu>

@@ -26,6 +26,8 @@ export function DealTitleHero(props: {
   daysRemaining: number | null;
   momentumHints: string[];
   displayProgressPct: number;
+  /** Investor: subscription PDF fully signed — hero shows download instead of request. */
+  subscriptionCompleted?: boolean;
 }) {
   const d = props.deal;
   const [logoFailed, setLogoFailed] = React.useState(false);
@@ -173,6 +175,7 @@ export function DealTitleHero(props: {
                   dealId={d.id}
                   variant="outline"
                   label="Request subscription packet"
+                  subscriptionCompleted={props.subscriptionCompleted}
                 />
                 {showBook && d.calendarBookingUrl ? (
                   <a

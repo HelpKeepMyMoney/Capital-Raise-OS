@@ -19,13 +19,26 @@ const PROMPTS = [
   "Show hidden opportunities",
 ] as const;
 
+/** Auto-open the panel once per browser; user can always reopen via the floating button. */
+const COPILOT_INTRO_SEEN_KEY = "cpin-investor-crm-copilot-intro-seen";
+
 export function InvestorCopilot(props: {
   investors: Investor[];
   className?: string;
 }) {
-  const [open, setOpen] = React.useState(true);
+  const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState("");
   const [reply, setReply] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    try {
+      if (localStorage.getItem(COPILOT_INTRO_SEEN_KEY)) return;
+      setOpen(true);
+      localStorage.setItem(COPILOT_INTRO_SEEN_KEY, "1");
+    } catch {
+      /* private / blocked storage */
+    }
+  }, []);
 
   function runInsight(prompt: string) {
     setQuery(prompt);

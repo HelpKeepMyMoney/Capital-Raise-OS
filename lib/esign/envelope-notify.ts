@@ -139,6 +139,8 @@ export async function sendEsignInvestorTurnEmail(args: {
 export async function sendEsignCompletedEmails(args: {
   orgName: string;
   sponsorEmail?: string | null;
+  /** Extra sponsor inboxes (e.g. deal subscription — envelope may omit sponsorEmailNorm). De-duplicated with sponsorEmail. */
+  sponsorEmails?: string[] | null;
   investorEmail?: string | null;
   investorName?: string;
   pdfAttachmentName: string;
@@ -147,17 +149,23 @@ export async function sendEsignCompletedEmails(args: {
   if (!process.env.RESEND_API_KEY) return;
 
   const from = invitationsTransactionalFrom();
-  const sponsor = args.sponsorEmail?.trim().toLowerCase() || "";
+  const sponsorTargets = new Set<string>();
+  const one = args.sponsorEmail?.trim().toLowerCase();
+  if (one) sponsorTargets.add(one);
+  for (const raw of args.sponsorEmails ?? []) {
+    const x = typeof raw === "string" ? raw.trim().toLowerCase() : "";
+    if (x) sponsorTargets.add(x);
+  }
   const investor = args.investorEmail?.trim().toLowerCase() || "";
   const investorLabel = escapeHtmlForEmail(args.investorName?.trim() || investor || "Investor");
-  if (!sponsor && !investor) return;
+  if (sponsorTargets.size === 0 && !investor) return;
 
   const attachment = {
     filename: args.pdfAttachmentName,
     content: Buffer.from(args.pdfBytes),
   };
 
-  if (sponsor) {
+  for (const sponsor of sponsorTargets) {
     try {
       await sendTransactionalEmail({
         from,
@@ -171,7 +179,7 @@ export async function sendEsignCompletedEmails(args: {
     }
   }
 
-  if (investor && investor !== sponsor) {
+  if (investor && !sponsorTargets.has(investor)) {
     try {
       await sendTransactionalEmail({
         from,

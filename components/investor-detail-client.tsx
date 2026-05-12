@@ -551,100 +551,6 @@ export function InvestorDetailClient(props: {
         ) : null}
       </div>
 
-      <Card className="border-border bg-card shadow-sm">
-        <CardHeader>
-          <CardTitle className="text-base">Pipeline stage</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Select
-            value={inv.pipelineStage}
-            disabled={!props.canManage}
-            onValueChange={(v) => void onStageChange(v as PipelineStage)}
-          >
-            <SelectTrigger className="h-9 w-full max-w-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {PIPELINE_STAGES.map((s) => (
-                <SelectItem key={s} value={s}>
-                  {pipelineStageLabel(s)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </CardContent>
-      </Card>
-
-      <Card className="rounded-2xl border-border/80 bg-gradient-to-br from-card to-muted/15 shadow-md">
-        <CardHeader>
-          <CardTitle className="font-heading text-base">Relationship intelligence</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3 text-sm">
-          <p>
-            <span className="text-muted-foreground">Segment:</span>{" "}
-            <span className="font-medium">{investorSegmentLabel(inv)}</span>
-          </p>
-          {inv.investProbability != null ? (
-            <p>
-              <span className="text-muted-foreground">P(close):</span> {inv.investProbability}%
-            </p>
-          ) : null}
-          {inv.referralSource ? (
-            <p>
-              <span className="text-muted-foreground">Referral:</span> {inv.referralSource}
-            </p>
-          ) : null}
-          {inv.relationshipOwnerUserId ? (
-            <p>
-              <span className="text-muted-foreground">Owner:</span>{" "}
-              {props.members.find((m) => m.userId === inv.relationshipOwnerUserId)?.displayName ??
-                props.members.find((m) => m.userId === inv.relationshipOwnerUserId)?.email ??
-                inv.relationshipOwnerUserId}
-            </p>
-          ) : (
-            <p className="text-muted-foreground">Owner unassigned</p>
-          )}
-          {inv.interestedDealIds?.length ? (
-            <div>
-              <span className="text-muted-foreground">Interested deals:</span>
-              <ul className="mt-1 list-inside list-disc">
-                {inv.interestedDealIds.map((id) => (
-                  <li key={id}>
-                    {props.deals.find((d) => d.id === id)?.name ?? id}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
-        </CardContent>
-      </Card>
-
-      <Card className="rounded-2xl border border-emerald-500/15 bg-gradient-to-br from-emerald-500/5 to-card shadow-md">
-        <CardHeader>
-          <CardTitle className="text-base font-heading">AI insight</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3 text-sm leading-relaxed">
-          <p>
-            <span className="text-muted-foreground">Likely to invest:</span>{" "}
-            <span className="font-semibold text-emerald-700 dark:text-emerald-400">{aiLikelyPct}%</span>
-          </p>
-          <p>
-            <span className="text-muted-foreground">Recommended next action:</span>{" "}
-            {idleDaysSinceTouch != null && idleDaysSinceTouch >= 14
-              ? "Re-establish cadence — last touch over two weeks ago."
-              : inv.nextFollowUpAt
-                ? "Prepare for scheduled follow-up."
-                : "Send a concise update tied to pipeline momentum."}
-          </p>
-          <p className="text-amber-800 dark:text-amber-400">
-            <span className="font-medium">Risk:</span>{" "}
-            {idleDaysSinceTouch != null
-              ? `Last logged touch ${idleDaysSinceTouch} days ago.`
-              : "No logged touchpoint yet — capture interactions on the timeline."}
-          </p>
-        </CardContent>
-      </Card>
-
       <div className="grid gap-6 lg:grid-cols-2">
         <Card className="border-border bg-card shadow-sm">
           <CardHeader>
@@ -769,6 +675,102 @@ export function InvestorDetailClient(props: {
             </CardContent>
           </Card>
         ) : null}
+      </div>
+
+      <Card className="border-border bg-card shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-base">Pipeline stage</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Select
+            value={inv.pipelineStage}
+            disabled={!props.canManage}
+            onValueChange={(v) => void onStageChange(v as PipelineStage)}
+          >
+            <SelectTrigger className="h-9 w-full max-w-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {PIPELINE_STAGES.map((s) => (
+                <SelectItem key={s} value={s}>
+                  {pipelineStageLabel(s)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-6 lg:grid-cols-2 lg:items-stretch">
+        <Card className="flex h-full flex-col rounded-2xl border-border/80 bg-gradient-to-br from-card to-muted/15 shadow-md">
+          <CardHeader>
+            <CardTitle className="font-heading text-base">Relationship intelligence</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            <p>
+              <span className="text-muted-foreground">Segment:</span>{" "}
+              <span className="font-medium">{investorSegmentLabel(inv)}</span>
+            </p>
+            {inv.investProbability != null ? (
+              <p>
+                <span className="text-muted-foreground">P(close):</span> {inv.investProbability}%
+              </p>
+            ) : null}
+            {inv.referralSource ? (
+              <p>
+                <span className="text-muted-foreground">Referral:</span> {inv.referralSource}
+              </p>
+            ) : null}
+            {inv.relationshipOwnerUserId ? (
+              <p>
+                <span className="text-muted-foreground">Owner:</span>{" "}
+                {props.members.find((m) => m.userId === inv.relationshipOwnerUserId)?.displayName ??
+                  props.members.find((m) => m.userId === inv.relationshipOwnerUserId)?.email ??
+                  inv.relationshipOwnerUserId}
+              </p>
+            ) : (
+              <p className="text-muted-foreground">Owner unassigned</p>
+            )}
+            {inv.interestedDealIds?.length ? (
+              <div>
+                <span className="text-muted-foreground">Interested deals:</span>
+                <ul className="mt-1 list-inside list-disc">
+                  {inv.interestedDealIds.map((id) => (
+                    <li key={id}>
+                      {props.deals.find((d) => d.id === id)?.name ?? id}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </CardContent>
+        </Card>
+
+        <Card className="flex h-full flex-col rounded-2xl border border-emerald-500/15 bg-gradient-to-br from-emerald-500/5 to-card shadow-md">
+          <CardHeader>
+            <CardTitle className="text-base font-heading">AI insight</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm leading-relaxed">
+            <p>
+              <span className="text-muted-foreground">Likely to invest:</span>{" "}
+              <span className="font-semibold text-emerald-700 dark:text-emerald-400">{aiLikelyPct}%</span>
+            </p>
+            <p>
+              <span className="text-muted-foreground">Recommended next action:</span>{" "}
+              {idleDaysSinceTouch != null && idleDaysSinceTouch >= 14
+                ? "Re-establish cadence — last touch over two weeks ago."
+                : inv.nextFollowUpAt
+                  ? "Prepare for scheduled follow-up."
+                  : "Send a concise update tied to pipeline momentum."}
+            </p>
+            <p className="text-amber-800 dark:text-amber-400">
+              <span className="font-medium">Risk:</span>{" "}
+              {idleDaysSinceTouch != null
+                ? `Last logged touch ${idleDaysSinceTouch} days ago.`
+                : "No logged touchpoint yet — capture interactions on the timeline."}
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
       <Card className="border-border bg-card shadow-sm">

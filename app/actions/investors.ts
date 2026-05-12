@@ -168,6 +168,7 @@ const CreateInvestorSchema = z.object({
   referralSource: z.string().trim().optional(),
   interestedDealIds: z.array(z.string()).optional(),
   relationshipOwnerUserId: z.string().trim().optional(),
+  lastContactAt: z.number().nonnegative().optional(),
 });
 
 const UpdateInvestorSchema = z.object({
@@ -248,6 +249,7 @@ export async function createInvestor(raw: z.infer<typeof CreateInvestorSchema>) 
   if (d.referralSource?.trim()) doc.referralSource = d.referralSource.trim();
   if (d.interestedDealIds?.length) doc.interestedDealIds = d.interestedDealIds;
   if (d.relationshipOwnerUserId?.trim()) doc.relationshipOwnerUserId = d.relationshipOwnerUserId.trim();
+  if (d.lastContactAt !== undefined) doc.lastContactAt = d.lastContactAt;
 
   await ref.set(doc);
 
@@ -276,6 +278,82 @@ export async function createInvestor(raw: z.infer<typeof CreateInvestorSchema>) 
 
   revalidateInvestorSurfaces(ref.id);
   return ref.id;
+}
+
+const ImportInvestorRowSchema = z.object({
+  firstName: z.string().trim().min(1),
+  lastName: z.string().trim().min(1),
+  email: z.string().trim().email(),
+  investorType: InvestorTypeSchema,
+  warmCold: WarmColdSchema,
+  referralSource: z.string().trim().min(1),
+  firm: z.string().trim().optional(),
+  title: z.string().trim().optional(),
+  phone: z.string().trim().optional(),
+  website: z.string().trim().optional(),
+  linkedIn: z.string().trim().optional(),
+  location: z.string().trim().optional(),
+  pipelineStage: PipelineStageSchema.optional(),
+  relationshipScore: z.number().min(0).max(100).optional(),
+  investProbability: z.number().min(0).max(100).optional(),
+  checkSizeMin: z.number().nonnegative().optional(),
+  checkSizeMax: z.number().nonnegative().optional(),
+  committedAmount: z.number().nonnegative().optional(),
+  relationshipOwnerUserId: z.string().trim().optional(),
+  lastContactAt: z.number().nonnegative().optional(),
+  nextFollowUpAt: z.number().nonnegative().optional().nullable(),
+  interestedDealIds: z.array(z.string()).optional(),
+  notesSummary: z.string().trim().optional(),
+});
+
+export async function importInvestorsCommit(
+  rawRows: unknown,
+): Promise<{ createdIds: string[]; failed: { index: number; message: string }[] }> {
+  await requireInvestorEditor();
+  const parsed = z.array(ImportInvestorRowSchema).min(1).max(500).safeParse(rawRows);
+  if (!parsed.success) {
+    throw new Error(parsed.error.issues[0]?.message ?? "Invalid import payload");
+  }
+  const createdIds: string[] = [];
+  const failed: { index: number; message: string }[] = [];
+  for (let i = 0; i < parsed.data.length; i++) {
+    const row = parsed.data[i]!;
+    try {
+      const id = await createInvestor({
+        firstName: row.firstName,
+        lastName: row.lastName,
+        email: row.email,
+        investorType: row.investorType,
+        warmCold: row.warmCold,
+        referralSource: row.referralSource,
+        firm: row.firm,
+        title: row.title,
+        phone: row.phone,
+        website: row.website,
+        linkedIn: row.linkedIn,
+        location: row.location,
+        pipelineStage: row.pipelineStage,
+        relationshipScore: row.relationshipScore,
+        investProbability: row.investProbability,
+        checkSizeMin: row.checkSizeMin,
+        checkSizeMax: row.checkSizeMax,
+        committedAmount: row.committedAmount,
+        relationshipOwnerUserId: row.relationshipOwnerUserId,
+        lastContactAt: row.lastContactAt,
+        interestedDealIds: row.interestedDealIds,
+        notesSummary: row.notesSummary,
+        nextFollowUpAt: row.nextFollowUpAt ?? null,
+      });
+      createdIds.push(id);
+    } catch (e) {
+      failed.push({
+        index: i + 1,
+        message: e instanceof Error ? e.message : "Failed to create investor",
+      });
+    }
+  }
+  revalidateInvestorSurfaces();
+  return { createdIds, failed };
 }
 
 export async function updateInvestor(

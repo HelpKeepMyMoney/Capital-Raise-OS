@@ -93,7 +93,7 @@ export function ShellLayoutClient(props: {
         aiCopilotEnabled={aiCopilotEnabled}
       />
       <CopilotUIProvider openCopilot={openCopilot}>
-        <SidebarInset className="bg-[#f8fafc] dark:bg-muted/40">
+        <SidebarInset className="min-h-0 bg-[#f8fafc] dark:bg-muted/40">
           <header className="flex min-h-14 shrink-0 flex-wrap items-center gap-3 border-b border-border bg-card/80 px-4 py-2 shadow-sm backdrop-blur-sm md:px-6">
             <SidebarTrigger className="-ml-1 text-foreground" />
             <Separator orientation="vertical" className="hidden h-6 sm:block" />

@@ -1,4 +1,5 @@
 import type { Investor, PipelineStage } from "@/lib/firestore/types";
+import { investorNamePartsForForm } from "@/lib/investors/display-name";
 import { isInvestorActive } from "@/lib/investors/investor-kpis";
 import type { InvestorToolbarState, LastActivityFilter } from "@/lib/investors/investor-toolbar-types";
 import { FILTER_UNSET } from "@/lib/investors/investor-toolbar-types";
@@ -120,37 +121,66 @@ export function filterInvestorsForBoard(
   });
 }
 
+/** Column headers for investor CSV export and import template (same order). */
+export const INVESTOR_CSV_HEADERS = [
+  "FirstName",
+  "LastName",
+  "Firm",
+  "Title",
+  "Email",
+  "Phone",
+  "Website",
+  "LinkedIn",
+  "Location",
+  "PipelineStage",
+  "InvestorType",
+  "WarmCold",
+  "RelationshipScore",
+  "InvestProbability",
+  "ReferralSource",
+  "CheckSizeMin",
+  "CheckSizeMax",
+  "CommittedAmount",
+  "RelationshipOwnerUserId",
+  "LastContactAt",
+  "NextFollowUpAt",
+  "InterestedDeals",
+  "NotesSummary",
+] as const;
+
+export type InvestorCsvHeader = (typeof INVESTOR_CSV_HEADERS)[number];
+
+/**
+ * CSV columns align with investor profile / CRM fields (names, contact, capital, intelligence).
+ * — InterestedDeals: deal display names in this org, separated by `;`
+ * — LastContactAt / NextFollowUpAt: Unix epoch milliseconds (empty if unknown)
+ * — PipelineStage: slug values (e.g. lead, researching, due_diligence, committed)
+ * — InvestorType / WarmCold: stored enum strings (e.g. vc, angel, warm, cold)
+ */
 export function exportInvestorsCsv(
   investors: Investor[],
   deals: { id: string; name: string }[],
 ): string {
-  const headers = [
-    "Name",
-    "Firm",
-    "Stage",
-    "Type",
-    "Warmth",
-    "Score",
-    "Probability",
-    "CheckMin",
-    "CheckMax",
-    "Committed",
-    "OwnerUserId",
-    "LastContact",
-    "NextFollowUp",
-    "InterestedDeals",
-    "NotesSummary",
-  ];
+  const headers = [...INVESTOR_CSV_HEADERS];
   const escape = (s: string) => `"${s.replace(/"/g, '""')}"`;
-  const rows = investors.map((inv) =>
-    [
-      inv.name ?? "",
+  const rows = investors.map((inv) => {
+    const { firstName, lastName } = investorNamePartsForForm(inv);
+    return [
+      firstName,
+      lastName,
       inv.firm ?? "",
+      inv.title ?? "",
+      inv.email ?? "",
+      inv.phone ?? "",
+      inv.website ?? "",
+      inv.linkedIn ?? "",
+      inv.location ?? "",
       inv.pipelineStage,
       inv.investorType ?? "",
       inv.warmCold ?? "",
       inv.relationshipScore ?? "",
       inv.investProbability ?? "",
+      inv.referralSource ?? "",
       inv.checkSizeMin ?? "",
       inv.checkSizeMax ?? "",
       inv.committedAmount ?? "",
@@ -163,7 +193,7 @@ export function exportInvestorsCsv(
       inv.notesSummary ?? "",
     ]
       .map((c) => escape(String(c)))
-      .join(","),
-  );
+      .join(",");
+  });
   return [headers.join(","), ...rows].join("\n");
 }

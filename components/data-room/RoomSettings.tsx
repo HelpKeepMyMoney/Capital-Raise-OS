@@ -246,6 +246,7 @@ export function RoomSettings(props: Props) {
         <EsignSendPanel
           dataRoomId={props.room.id}
           roomName={props.room.name}
+          associatedDealId={props.room.dealId ?? ""}
           ndaRequired={form.ndaRequired}
           hasNdaTemplate={hasNdaTemplate}
           signableTemplateId={form.signableTemplateId}

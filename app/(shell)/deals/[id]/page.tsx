@@ -193,6 +193,8 @@ export default async function DealDetailPage(props: { params: Promise<{ id: stri
 
   const pitchDeckDoc = pickPitchDeckDocument(roomDocs);
 
+  const subscriptionCompleted = signingRow?.status === "completed";
+
   return (
     <DealDetailShell
       dealId={deal.id}
@@ -201,6 +203,7 @@ export default async function DealDetailPage(props: { params: Promise<{ id: stri
       progressPct={displayProgressPct}
       showBookCall={showBookCallCta}
       calendarBookingUrl={deal.calendarBookingUrl}
+      subscriptionCompleted={subscriptionCompleted}
     >
       <div className="mx-auto max-w-4xl space-y-12 px-4 pb-20 pt-6 md:px-6">
         <Link
@@ -224,6 +227,7 @@ export default async function DealDetailPage(props: { params: Promise<{ id: stri
             daysRemaining={daysRemaining}
             momentumHints={momentumHints}
             displayProgressPct={displayProgressPct}
+            subscriptionCompleted={subscriptionCompleted}
           />
         </div>
 

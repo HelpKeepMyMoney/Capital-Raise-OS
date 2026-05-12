@@ -7,6 +7,8 @@ import type { EsignEnvelope } from "@/lib/firestore/types";
 import { verifyEsignToken } from "@/lib/esign/tokens";
 import { completeSignerStep } from "@/lib/esign/envelope-service";
 import { sendEsignCompletedEmails, sendEsignInvestorTurnEmail } from "@/lib/esign/envelope-notify";
+import { resolveDealSubscriptionSponsorEmails } from "@/lib/esign/subscription-sponsor-emails";
+import { recordCrmTouchFromCompletedEnvelope } from "@/lib/investors/esign-crm-touch";
 import { getOrganization } from "@/lib/firestore/queries";
 export async function POST(req: NextRequest) {
   const json = (await req.json()) as {
@@ -235,16 +237,77 @@ export async function POST(req: NextRequest) {
     try {
       const latestSnap = await db.collection(col.esignEnvelopes).doc(env.id).get();
       const latest = latestSnap.exists ? ({ id: latestSnap.id, ...(latestSnap.data() as Omit<EsignEnvelope, "id">) }) : env;
+
+      const normAddr = (v: unknown): string | null =>
+        typeof v === "string" && v.trim() ? v.trim().toLowerCase() : null;
+      let touchInvestorEmail =
+        normAddr(latest.investorEmailNorm) ?? normAddr(latest.investorEmail);
+      const touchCtx = latest.context;
+      if (touchCtx.kind === "deal_subscription" && !touchInvestorEmail && touchCtx.userId) {
+        try {
+          const lp = await getAdminAuth().getUser(touchCtx.userId);
+          touchInvestorEmail = lp.email?.trim().toLowerCase() ?? null;
+        } catch {
+          /* noop */
+        }
+      }
+      await recordCrmTouchFromCompletedEnvelope(db, latest, touchInvestorEmail);
+
       const finalPath = latest.finalPdfStoragePath?.trim();
       if (finalPath) {
         const bucket = getAdminBucket();
         const [buf] = await bucket.file(finalPath).download();
         const org = await getOrganization(env.organizationId);
+
+        let sponsorEmail = normAddr(latest.sponsorEmailNorm);
+        let investorEmail = normAddr(latest.investorEmailNorm) ?? normAddr(latest.investorEmail);
+        let investorName = latest.investorName;
+        let sponsorEmailsExtra: string[] | undefined;
+
+        const doneCtx = latest.context;
+        const auth = getAdminAuth();
+
+        if (doneCtx.kind === "deal_subscription") {
+          if (!investorEmail && doneCtx.userId) {
+            try {
+              const lp = await auth.getUser(doneCtx.userId);
+              investorEmail = lp.email?.trim().toLowerCase() ?? null;
+              investorName = investorName ?? lp.displayName ?? undefined;
+            } catch {
+              /* noop */
+            }
+          }
+          if (org) {
+            sponsorEmailsExtra = await resolveDealSubscriptionSponsorEmails(org);
+          }
+        } else if (doneCtx.kind === "data_room_nda" || doneCtx.kind === "ad_hoc") {
+          if (!sponsorEmail && latest.createdByUid) {
+            try {
+              const creator = await auth.getUser(latest.createdByUid);
+              sponsorEmail = creator.email?.trim().toLowerCase() ?? null;
+            } catch {
+              /* noop */
+            }
+          }
+          if (!sponsorEmail && org) {
+            sponsorEmailsExtra = await resolveDealSubscriptionSponsorEmails(org);
+          }
+        }
+
+        if (!sponsorEmail && !(sponsorEmailsExtra?.length) && !investorEmail) {
+          console.error(
+            "[esign sign-complete] Completed envelope has no recipient emails",
+            latest.id,
+            doneCtx.kind,
+          );
+        }
+
         await sendEsignCompletedEmails({
           orgName: org?.name ?? "CapitalOS",
-          sponsorEmail: latest.sponsorEmailNorm ?? null,
-          investorEmail: latest.investorEmailNorm ?? latest.investorEmail ?? null,
-          investorName: latest.investorName,
+          sponsorEmail,
+          sponsorEmails: sponsorEmailsExtra,
+          investorEmail,
+          investorName,
           pdfAttachmentName: `signed-${latest.id}.pdf`,
           pdfBytes: new Uint8Array(buf),
         });

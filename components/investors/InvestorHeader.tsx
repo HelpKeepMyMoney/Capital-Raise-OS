@@ -8,7 +8,8 @@ import { cn } from "@/lib/utils";
 export function InvestorHeader(props: {
   canManage: boolean;
   onAddInvestor: () => void;
-  onImportCsv?: () => void;
+  onDownloadImportTemplate?: () => void;
+  onImportInvestors?: () => void;
   className?: string;
 }) {
   return (
@@ -42,10 +43,19 @@ export function InvestorHeader(props: {
               variant="outline"
               className="rounded-xl border-border/80 bg-card px-4 shadow-sm hover:bg-muted/40"
               type="button"
-              onClick={props.onImportCsv}
+              onClick={props.onDownloadImportTemplate}
             >
               <Upload className="mr-2 size-4" />
-              Import CSV
+              Download import template
+            </Button>
+            <Button
+              size="lg"
+              variant="outline"
+              className="rounded-xl border-border/80 bg-card px-4 shadow-sm hover:bg-muted/40"
+              type="button"
+              onClick={props.onImportInvestors}
+            >
+              Import investors
             </Button>
             <Link
               href="/outreach"

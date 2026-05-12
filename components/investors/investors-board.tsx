@@ -55,6 +55,7 @@ import { InvestorListView } from "@/components/investors/InvestorListView";
 import { InvestorCalendarView } from "@/components/investors/InvestorCalendarView";
 import { InvestorCopilot } from "@/components/investors/InvestorCopilot";
 import { InvestorSearchCommand } from "@/components/investors/InvestorSearchCommand";
+import { InvestorImportDialog } from "@/components/investors/InvestorImportDialog";
 import { LayoutGrid, List, Network, Table2, CalendarDays } from "lucide-react";
 
 const PRESETS_STORAGE = "cpin-investor-filter-presets-v1";
@@ -92,6 +93,7 @@ export function InvestorsBoard(props: {
   const [noteInvestorId, setNoteInvestorId] = React.useState<string | null>(null);
   const [noteBody, setNoteBody] = React.useState("");
   const [noteSaving, setNoteSaving] = React.useState(false);
+  const [importOpen, setImportOpen] = React.useState(false);
   const [presets, setPresets] = React.useState<SavedPreset[]>([]);
 
   const [firstName, setFirstName] = React.useState("");
@@ -370,7 +372,7 @@ export function InvestorsBoard(props: {
     a.download = "investors-import-template.csv";
     a.click();
     URL.revokeObjectURL(url);
-    toast.message("Template downloaded — fill rows and re-import when bulk ingest ships.");
+    toast.message("Template downloaded — add rows, then use Import investors to verify and import.");
   }
 
   async function submitQuickNote() {
@@ -444,7 +446,8 @@ export function InvestorsBoard(props: {
       <InvestorHeader
         canManage={props.canManage}
         onAddInvestor={() => setAddOpen(true)}
-        onImportCsv={downloadImportTemplate}
+        onDownloadImportTemplate={downloadImportTemplate}
+        onImportInvestors={() => setImportOpen(true)}
       />
 
       <InvestorMetrics
@@ -679,6 +682,12 @@ export function InvestorsBoard(props: {
       />
 
       <InvestorCopilot investors={filtered} />
+
+      <InvestorImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        deals={props.deals}
+      />
     </div>
   );
 }

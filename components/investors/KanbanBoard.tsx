@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import type { Investor, PipelineStage } from "@/lib/firestore/types";
 import { PIPELINE_STAGES, pipelineStageShortLabel } from "@/lib/investors/form-options";
@@ -30,14 +29,14 @@ export function KanbanBoard(props: {
   }
 
   return (
-    <div className={cn("flex gap-3 overflow-x-auto pb-4 pt-1", props.className)}>
+    <div className={cn("flex min-h-0 gap-3 overflow-x-auto pb-4 pt-1", props.className)}>
       {PIPELINE_STAGES.map((stage) => {
         const column = props.grouped.get(stage) ?? [];
         const potential = stagePotentialCapital(column);
         return (
           <div
             key={stage}
-            className="flex min-w-[272px] max-w-[300px] flex-1 flex-col rounded-2xl border border-border/60 bg-muted/20 shadow-inner"
+            className="flex min-h-0 min-w-[272px] max-w-[300px] flex-1 flex-col overflow-hidden rounded-2xl border border-border/60 bg-muted/20 shadow-inner"
             onDragOver={props.canManage ? onColumnDragOver : undefined}
             onDrop={
               props.canManage
@@ -64,7 +63,7 @@ export function KanbanBoard(props: {
                 </Badge>
               </div>
             </div>
-            <ScrollArea className="h-[calc(100vh-22rem)] min-h-[320px] pr-2">
+            <div className="max-h-[min(calc(100dvh-28rem),720px)] min-h-[220px] overflow-y-auto overscroll-y-contain pr-2 touch-pan-y [-webkit-overflow-scrolling:touch]">
               <div className="flex flex-col gap-2 p-2">
                 {column.map((inv) => (
                   <InvestorCard
@@ -78,7 +77,7 @@ export function KanbanBoard(props: {
                   />
                 ))}
               </div>
-            </ScrollArea>
+            </div>
           </div>
         );
       })}

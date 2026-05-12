@@ -17,6 +17,8 @@ export function DealDetailShell(props: {
   progressPct: number;
   showBookCall: boolean;
   calendarBookingUrl?: string | null;
+  /** Investor: subscription fully signed — sticky bar shows download instead of request. */
+  subscriptionCompleted?: boolean;
   children: React.ReactNode;
 }) {
   const [showSticky, setShowSticky] = React.useState(false);
@@ -100,6 +102,7 @@ export function DealDetailShell(props: {
                   dealId={props.dealId}
                   variant="outline"
                   label="Request subscription packet"
+                  subscriptionCompleted={props.subscriptionCompleted}
                 />
               </div>
             </div>

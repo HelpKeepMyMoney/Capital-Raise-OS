@@ -2,7 +2,7 @@ import Link from "next/link";
 import { filterDealsForMember } from "@/lib/auth/investor-access";
 import { isInvestorGuestRole } from "@/lib/auth/rbac";
 import { requireOrgSession } from "@/lib/auth/session";
-import { getMembership, listDeals } from "@/lib/firestore/queries";
+import { getMembership, getSigningRequest, listDeals } from "@/lib/firestore/queries";
 import { redirect } from "next/navigation";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -15,6 +15,17 @@ export default async function PortalHomePage() {
   if (!membership || !isInvestorGuestRole(membership.role)) redirect("/dashboard");
 
   const deals = filterDealsForMember(await listDeals(ctx.orgId), membership);
+
+  const subscriptionRows = await Promise.all(
+    deals.map(async (d) => ({
+      deal: d,
+      signing: await getSigningRequest(ctx.orgId, d.id, ctx.user.uid),
+    })),
+  );
+  const completedSubs = subscriptionRows.filter((r) => r.signing?.status === "completed");
+  const inFlightSubs = subscriptionRows.filter(
+    (r) => r.signing && r.signing.status !== "completed",
+  );
 
   return (
     <div className="mx-auto max-w-4xl space-y-10">
@@ -88,9 +99,54 @@ export default async function PortalHomePage() {
           <FileSignature className="size-4" />
           Subscription documents (e-sign)
         </div>
-        <p className="mt-2 text-sm text-muted-foreground">
-          When your sponsor enables subscription templates in settings, open the deal page and use{" "}
-          <strong>Commit capital</strong> and signing tools. Completion updates your commitment on file.
+        {completedSubs.length > 0 ? (
+          <ul className="mt-4 space-y-2">
+            {completedSubs.map(({ deal }) => (
+              <li
+                key={deal.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/70 bg-card px-4 py-3 text-sm"
+              >
+                <span className="font-medium">{deal.name}</span>
+                <div className="flex flex-wrap gap-2">
+                  <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs font-medium text-emerald-800 dark:text-emerald-200">
+                    Signed
+                  </span>
+                  <Link
+                    href={`/api/esign/subscription/final-document?dealId=${encodeURIComponent(deal.id)}`}
+                    className={cn(buttonVariants({ variant: "outline", size: "sm" }), "rounded-lg")}
+                  >
+                    Download signed PDF
+                  </Link>
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        {inFlightSubs.length > 0 ? (
+          <ul className="mt-4 space-y-2">
+            {inFlightSubs.map(({ deal, signing }) => (
+              <li
+                key={deal.id}
+                className="rounded-xl border border-dashed border-border/80 bg-background/50 px-4 py-3 text-sm text-muted-foreground"
+              >
+                <span className="font-medium text-foreground">{deal.name}</span>
+                {" · "}
+                {signing?.awaitingSponsorPrep
+                  ? "Awaiting sponsor signature"
+                  : signing?.signingUrl
+                    ? "Ready for your signature — open the deal page"
+                    : "Subscription packet in progress"}
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        <p className="mt-4 text-sm text-muted-foreground">
+          Request subscription documents on each deal page. When fully signed, the finished PDF is emailed to you and
+          your sponsor (when email is configured). You can also download from here,{" "}
+          <Link href="/portal/commitments" className="font-medium text-primary underline-offset-4 hover:underline">
+            My commitments
+          </Link>
+          , or the deal page.
         </p>
       </section>
     </div>

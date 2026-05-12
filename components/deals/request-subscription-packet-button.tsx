@@ -2,9 +2,10 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { FileSignature } from "lucide-react";
+import { Download, FileSignature } from "lucide-react";
+import Link from "next/link";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import type { SigningRequestStatus } from "@/lib/firestore/types";
 import { cn } from "@/lib/utils";
 
@@ -51,6 +52,8 @@ export function subscriptionPacketToast(json: SubscriptionPacketApiResponse) {
 
 type ButtonProps = {
   dealId: string;
+  /** When the native subscription envelope is fully signed, show download instead of request. */
+  subscriptionCompleted?: boolean;
   className?: string;
   variant?: "default" | "outline" | "secondary" | "ghost";
   size?: "default" | "sm" | "lg";
@@ -60,10 +63,34 @@ type ButtonProps = {
   fullWidth?: boolean;
 };
 
+function finalDocumentHref(dealId: string) {
+  return `/api/esign/subscription/final-document?dealId=${encodeURIComponent(dealId)}`;
+}
+
 export function RequestSubscriptionPacketButton(props: ButtonProps) {
   const router = useRouter();
   const [loading, setLoading] = React.useState(false);
   const label = props.label ?? "Request subscription packet";
+  const downloadLabel = "Download subscription packet";
+
+  if (props.subscriptionCompleted) {
+    return (
+      <Link
+        href={finalDocumentHref(props.dealId)}
+        target="_blank"
+        rel="noreferrer"
+        className={cn(
+          buttonVariants({ variant: props.variant ?? "outline", size: props.size ?? "default" }),
+          "justify-center gap-2 rounded-xl",
+          props.fullWidth !== false && "w-full sm:w-auto",
+          props.className,
+        )}
+      >
+        {props.showIcon !== false ? <Download className="size-4 shrink-0" /> : null}
+        {downloadLabel}
+      </Link>
+    );
+  }
 
   async function onClick() {
     setLoading(true);

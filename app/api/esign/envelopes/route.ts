@@ -11,14 +11,15 @@ import {
   loadTemplate,
 } from "@/lib/esign/envelope-service";
 import { col } from "@/lib/firestore/paths";
-import type { DataRoom } from "@/lib/firestore/types";
+import { investorDisplayName } from "@/lib/investors/display-name";
+import type { DataRoom, Investor } from "@/lib/firestore/types";
 
 const CreateBodySchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("data_room_nda"),
     dataRoomId: z.string().min(1),
-    investorEmail: z.string().email(),
-    investorName: z.string().max(200).optional(),
+    /** CRM investor id — must have email and this room’s deal under Interested deals. */
+    investorId: z.string().min(1),
     /** Optional when the room form has a template selected but settings were not saved yet. */
     signableTemplateId: z.string().uuid().optional(),
   }),
@@ -139,8 +140,44 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Your account needs an email to send signing requests." }, { status: 400 });
   }
 
-  const investorEmail = body.investorEmail.trim().toLowerCase();
-  const investorName = body.investorName?.trim() || investorEmail.split("@")[0] || "Investor";
+  const roomDealId = typeof room.dealId === "string" ? room.dealId.trim() : "";
+  if (!roomDealId) {
+    return NextResponse.json(
+      {
+        error:
+          "Link this data room to a deal in room settings before sending an NDA. Eligible investors are those in the CRM with that deal under Interested deals.",
+      },
+      { status: 400 },
+    );
+  }
+
+  const invSnap = await db.collection(col.investors).doc(body.investorId).get();
+  if (!invSnap.exists) {
+    return NextResponse.json({ error: "Investor not found" }, { status: 404 });
+  }
+  const invRow = { id: invSnap.id, ...(invSnap.data() as Omit<Investor, "id">) } as Investor;
+  if (invRow.organizationId !== ctx.orgId) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+  const invEmailRaw = invRow.email?.trim();
+  if (!invEmailRaw) {
+    return NextResponse.json(
+      { error: "This CRM profile has no email. Add an email to the investor before sending an NDA." },
+      { status: 400 },
+    );
+  }
+  if (!invRow.interestedDealIds?.includes(roomDealId)) {
+    return NextResponse.json(
+      {
+        error:
+          "This investor is not listed with access to this deal. Open their CRM profile → Edit profile → Intelligence → Deals, or add them from the pipeline, then mark this deal under Interested deals.",
+      },
+      { status: 400 },
+    );
+  }
+
+  const investorEmail = invEmailRaw.toLowerCase();
+  const investorName = investorDisplayName(invRow);
 
   const { envelope, sponsorUrl, investorUrl } = await createNdaEnvelope({
     db,

@@ -24,6 +24,15 @@ import type { InvestorProfileFormFieldsProps } from "@/components/investor-profi
 import { InvestorProfileFormFields } from "@/components/investor-profile-form-fields";
 import type { OrganizationMemberPublic } from "@/lib/firestore/queries";
 
+function relationshipOwnerOptionLabel(m: OrganizationMemberPublic): string {
+  const name = m.displayName?.trim();
+  const email = m.email?.trim();
+  if (name && email) return `${name} — ${email}`;
+  if (email) return email;
+  if (name) return name;
+  return m.userId;
+}
+
 type IntelProps = {
   investProbability: string;
   onInvestProbabilityChange: (v: string) => void;
@@ -46,6 +55,15 @@ export type InvestorEditModalProps = InvestorProfileFormFieldsProps &
   };
 
 export function InvestorEditModal(props: InvestorEditModalProps) {
+  /** Explicit label so the closed select never shows the raw Firebase uid (Base UI value fallback). */
+  const relationshipOwnerTriggerLabel = React.useMemo(() => {
+    const id = props.relationshipOwnerUserId?.trim();
+    if (!id) return null;
+    const m = props.members.find((x) => x.userId === id);
+    if (m) return relationshipOwnerOptionLabel(m);
+    return id;
+  }, [props.relationshipOwnerUserId, props.members]);
+
   const formCommon: InvestorProfileFormFieldsProps = {
     idPrefix: props.idPrefix,
     showPipelineStage: props.showPipelineStage,
@@ -147,14 +165,22 @@ export function InvestorEditModal(props: InvestorEditModalProps) {
                       props.onRelationshipOwnerUserIdChange(!v || v === "__none__" ? "" : v)
                     }
                   >
-                    <SelectTrigger className="h-9">
-                      <SelectValue placeholder="Assign owner" />
+                    <SelectTrigger className="h-9 w-full min-w-0 max-w-full [&_[data-slot=select-value]]:line-clamp-2 [&_[data-slot=select-value]]:whitespace-normal [&_[data-slot=select-value]]:break-words">
+                      <SelectValue placeholder="Assign owner">{relationshipOwnerTriggerLabel}</SelectValue>
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent
+                      align="start"
+                      alignItemWithTrigger={false}
+                      className="max-h-[min(40vh,var(--available-height))] min-w-[min(100vw-2rem,34rem)] max-w-[min(100vw-2rem,42rem)] overflow-x-visible sm:min-w-[36rem]"
+                    >
                       <SelectItem value="__none__">Unassigned</SelectItem>
                       {props.members.map((m) => (
-                        <SelectItem key={m.userId} value={m.userId}>
-                          {m.displayName ?? m.email ?? m.userId}
+                        <SelectItem
+                          key={m.userId}
+                          value={m.userId}
+                          className="items-start py-1.5 [&_span]:max-w-full [&_span]:whitespace-normal [&_span]:break-words"
+                        >
+                          {relationshipOwnerOptionLabel(m)}
                         </SelectItem>
                       ))}
                     </SelectContent>
