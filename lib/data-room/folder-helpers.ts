@@ -1,4 +1,4 @@
-import type { Firestore } from "firebase-admin/firestore";
+import type { Firestore, DocumentSnapshot, DocumentData } from "firebase-admin/firestore";
 import type { RoomDocument } from "@/lib/firestore/types";
 import { col } from "@/lib/firestore/paths";
 
@@ -21,12 +21,14 @@ export async function folderParentWouldCreateCycle(
   if (!newParentId) return false;
   let cur: string | null = newParentId;
   const seen = new Set<string>();
-  while (cur) {
-    if (cur === movingFolderId) return true;
-    if (seen.has(cur)) return true;
-    seen.add(cur);
-    const snap = await db.collection(col.documents).doc(cur).get();
-    const raw = snap.data()?.parentFolderId;
+  while (cur !== null) {
+    const id: string = cur;
+    if (id === movingFolderId) return true;
+    if (seen.has(id)) return true;
+    seen.add(id);
+    const snap: DocumentSnapshot<DocumentData> = await db.collection(col.documents).doc(id).get();
+    const data = snap.data();
+    const raw: unknown = data ? data.parentFolderId : undefined;
     cur = typeof raw === "string" && raw.trim() ? raw.trim() : null;
   }
   return false;
