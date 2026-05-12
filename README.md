@@ -108,6 +108,7 @@ Configure **Firebase Console → Authentication → Templates → Password reset
 - **Deal list:** **`deal-card.tsx`** shows **`logoUrl`** when load succeeds (rounded tile + **`onError`** fallback); placeholder monogram or briefcase when missing or invalid.
 - **Deal detail — Documents:** **Download summary** in **`deal-documents.tsx`** calls **`POST /api/data-room/sign-url`** for a heuristically chosen file (name matches summary/overview/teaser, else deck, else first PDF, else first doc) and opens it in a **new tab** only (no navigation of the current tab; pop-up–friendly **`window.open`** usage). This is separate from the inline pitch deck viewer, which **only** uses documents tagged **`kind === "deck"`**.
 - **Data Room — document table:** **`DocumentManager.tsx`** supports **sortable columns** (name, category, version, size, uploaded, views, last viewed, access) with header toggles and direction indicators.
+- **Data Room — Preview / Download via preview:** Opens the signed URL in a **new tab** by opening `about:blank` synchronously on click, then assigning the URL after **`POST /api/data-room/sign-url`**. The placeholder **`window.open`** call must not include **`noopener`** in the window-features string (many browsers then return `null`, which previously forced **`window.location`** and replaced the current workspace). If a new tab still cannot be opened (e.g. pop-up blocked), a **toast** is shown instead of navigating away.
 
 ### Data Room portal redesign (since `1f136f3`)
 

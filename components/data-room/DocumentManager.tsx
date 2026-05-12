@@ -298,7 +298,11 @@ export function DocumentManager(props: Props) {
   }
 
   async function openDocument(documentId: string) {
-    const popup = window.open("about:blank", "_blank", "noopener,noreferrer");
+    // Do not pass "noopener" in the window features string: with noopener, many
+    // browsers return null from window.open(), and we need this handle to set
+    // location after the async sign-url fetch (otherwise the app falls back to
+    // navigating the current tab).
+    const popup = window.open("about:blank", "_blank");
     try {
       const res = await fetch("/api/data-room/sign-url", {
         method: "POST",
@@ -307,8 +311,16 @@ export function DocumentManager(props: Props) {
       });
       const data = (await res.json()) as { url?: string; error?: string };
       if (!res.ok || !data.url) throw new Error(data.error ?? "Could not open file");
-      if (popup) popup.location.href = data.url;
-      else window.location.href = data.url;
+      if (popup && !popup.closed) {
+        popup.opener = null;
+        popup.location.href = data.url;
+      } else {
+        const direct = window.open(data.url, "_blank", "noopener,noreferrer");
+        if (!direct) {
+          toast.error("Pop-up blocked. Allow pop-ups for this site, then try Preview again.");
+          return;
+        }
+      }
       router.refresh();
     } catch (e) {
       popup?.close();
