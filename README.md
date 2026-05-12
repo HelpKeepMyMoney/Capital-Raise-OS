@@ -4,6 +4,23 @@ AI-powered private capital platform: investor CRM, discovery, outreach, data roo
 
 ## Changelog
 
+### Data Room folders (create, nest, move, delete)
+
+- **Data model (`lib/firestore/types.ts`):** **`RoomDocument`** gains a virtual **`folder`** kind (no **`storagePath`**) plus optional **`parentFolderId`** for hierarchy. Files reuse the same collection so existing queries keep working; **`SerializedRoomDocument`** mirrors the new field (**`components/data-room/types.ts`**).
+- **Folder API (`app/api/data-room/folders/route.ts`):** **`POST`** creates a folder under a room (or under another folder via **`parentFolderId`**), validates the parent belongs to the same room and is itself a folder, and writes an audit log (**`data_room.folder_create`**).
+- **Upload destination (`app/api/data-room/documents/route.ts`):** Accepts a **`parentFolderId`** form field so new files land inside a specific folder; server validates the parent exists, lives in the room, and is a folder.
+- **Move / rename (`app/api/data-room/documents/[documentId]/route.ts`):** **`PATCH`** now accepts **`parentFolderId`** for both files **and** folders; folder moves are validated with **`folderParentWouldCreateCycle`** (**`lib/data-room/folder-helpers.ts`**) so a folder cannot be moved into itself or a descendant. Files moved to a new room have their parent folder cleared.
+- **Delete (`app/api/data-room/documents/[documentId]/route.ts`):** Deleting a folder reparents direct children to the folder’s parent (or room root) in batched updates so files are never orphaned. File deletes continue to remove the Storage object.
+- **Authorization (`lib/data-room/authorize-room-document-read.ts`):** **`sign-url`** / file streaming reject folder rows up front (`Not a downloadable file`) so folders can never produce signed URLs.
+- **Metrics & previews (`lib/data-room/metrics.ts`, `components/data-room/data-room-shell.tsx`, `components/data-room/InvestorPreview.tsx`, `components/data-room/ActivityAnalytics.tsx`):** Document counts, week-over-week document trend, room view aggregates, the **Key documents** list, recent updates feed, and engagement charts all skip **`kind === "folder"`** so analytics stay file-oriented.
+- **DocumentManager UI (`components/data-room/DocumentManager.tsx`):**
+  - **Breadcrumb navigation** (**All files / Folder / Subfolder**) with click-to-jump segments; folders sort to the top of the list and folder names act as links into the subtree.
+  - **New folder** button (top bar and upload panel) opens a dialog with a **Parent folder** picker (Room root or any existing folder, shown with full path).
+  - **Upload into folder** select in the upload panel — defaults to the folder you’re viewing, can be overridden to Room root or any folder; uploads send **`parentFolderId`** with the file. Default upload type select sits beside it.
+  - **Move to…** submenu in each row’s actions: one-click move to Room root or any folder, with the current parent and (for folders) descendants disabled. Rename / Move dialog gains an **Inside folder** select for combined rename + move.
+  - **Delete** confirmation copy adapts for folders (explains children are kept and move up one level).
+- **Kind labels (`lib/data-room/kind-labels.ts`):** Adds a **Folder** label so folder rows render cleanly in the category column without leaking into the upload kind options.
+
 ### Investor CRM CSV import, Data Room NDA recipients, e-sign completion + portal subscription
 
 - **CSV export / template (`lib/investors/investor-filters.ts`):** Shared **`INVESTOR_CSV_HEADERS`** (FirstName, LastName, Firm, Title, Email, pipeline, type, warmth, scores, referral, check sizes, owner uid, epoch **`LastContactAt`** / **`NextFollowUpAt`**, **`InterestedDeals`** as `;`-separated deal names, notes). Export splits display name via **`investorNamePartsForForm`**.

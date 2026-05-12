@@ -91,6 +91,7 @@ export function DataRoomShell(props: Props) {
     }
     for (const d of props.documents) {
       if (!d.dataRoomId) continue;
+      if (d.kind === "folder") continue;
       const prev = map.get(d.dataRoomId) ?? { docCount: 0, views: 0 };
       map.set(d.dataRoomId, {
         docCount: prev.docCount + 1,

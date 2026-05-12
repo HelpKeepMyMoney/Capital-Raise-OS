@@ -13,17 +13,19 @@ import * as React from "react";
 import { formatDistanceToNow } from "date-fns";
 import { useMounted } from "@/hooks/use-mounted";
 
-const KIND_ORDER: Record<SerializedRoomDocument["kind"], number> = {
+const KIND_ORDER: Partial<Record<SerializedRoomDocument["kind"], number>> = {
   deck: 0,
   ppm: 1,
   legal: 2,
   model: 3,
   video: 4,
   other: 5,
+  folder: 99,
 };
 
 function sortKeyDocuments(docs: SerializedRoomDocument[]) {
-  return [...docs].sort((a, b) => {
+  const filesOnly = docs.filter((d) => d.kind !== "folder");
+  return [...filesOnly].sort((a, b) => {
     const ka = KIND_ORDER[a.kind] ?? 99;
     const kb = KIND_ORDER[b.kind] ?? 99;
     if (ka !== kb) return ka - kb;
@@ -63,6 +65,7 @@ function buildRecentRows(
     }
   }
   for (const d of docs) {
+    if (d.kind === "folder") continue;
     const at = d.createdAt;
     if (typeof at === "number" && at > sinceMs) {
       rows.push({ key: `d-${d.id}`, kind: "doc", doc: d, at });

@@ -11,6 +11,10 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -46,6 +50,8 @@ import {
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
+  ChevronRight,
+  Folder,
   FolderPlus,
   Layers,
   MoreHorizontal,
@@ -65,9 +71,25 @@ function formatBytes(n?: number): string {
   return `${(kb / 1024).toFixed(1)} MB`;
 }
 
+function normParentId(p: string | null | undefined): string | null {
+  if (typeof p === "string" && p.trim()) return p.trim();
+  return null;
+}
+
+function docSearchMatches(d: SerializedRoomDocument, q: string): boolean {
+  const s = q.trim().toLowerCase();
+  if (!s) return true;
+  return (
+    d.name.toLowerCase().includes(s) ||
+    d.kind.toLowerCase().includes(s) ||
+    (d.mimeType?.toLowerCase().includes(s) ?? false)
+  );
+}
+
 type DocFilter = "all" | "financials" | "legal" | "pitch" | "media" | "hidden";
 
 function docMatches(d: SerializedRoomDocument, f: DocFilter): boolean {
+  if (d.kind === "folder") return f === "all";
   switch (f) {
     case "all":
       return true;
@@ -138,6 +160,8 @@ function SortableTableHead(props: {
 
 type Props = {
   documents: SerializedRoomDocument[];
+  /** Search text from room workspace (filters rows in the current folder). */
+  documentSearch?: string;
   selectedRoomId: string;
   canManage: boolean;
   /** Investor cannot open previews until mutual NDA is completed (matched by session email). */
@@ -167,6 +191,22 @@ export function DocumentManager(props: Props) {
   const [docFilter, setDocFilter] = React.useState<DocFilter>("all");
   const [sortColumn, setSortColumn] = React.useState<SortColumn>("name");
   const [sortDir, setSortDir] = React.useState<"asc" | "desc">("asc");
+  const [currentFolderId, setCurrentFolderId] = React.useState<string | null>(null);
+  const [uploadFolderId, setUploadFolderId] = React.useState<string | null>(null);
+  const [newFolderOpen, setNewFolderOpen] = React.useState(false);
+  const [newFolderName, setNewFolderName] = React.useState("");
+  const [newFolderParentId, setNewFolderParentId] = React.useState<string | null>(null);
+  const [creatingFolder, setCreatingFolder] = React.useState(false);
+  const [editIsFolder, setEditIsFolder] = React.useState(false);
+  const [editParentFolderId, setEditParentFolderId] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    setCurrentFolderId(null);
+  }, [props.selectedRoomId]);
+
+  React.useEffect(() => {
+    setUploadFolderId(currentFolderId);
+  }, [currentFolderId]);
 
   function onSortColumn(col: SortColumn) {
     if (sortColumn === col) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -201,6 +241,7 @@ export function DocumentManager(props: Props) {
       fd.set("file", file);
       fd.set("dataRoomId", props.selectedRoomId);
       fd.set("kind", kind);
+      if (uploadFolderId) fd.set("parentFolderId", uploadFolderId);
       xhr.send(fd);
     });
   }
@@ -247,7 +288,9 @@ export function DocumentManager(props: Props) {
     setEditDocId(doc.id);
     setEditName(doc.name);
     setEditRoomId(doc.dataRoomId);
-    setEditKindState(doc.kind);
+    setEditKindState(doc.kind === "folder" ? "deck" : doc.kind);
+    setEditIsFolder(doc.kind === "folder");
+    setEditParentFolderId(normParentId(doc.parentFolderId));
     setEditOpen(true);
   }
 
@@ -259,18 +302,20 @@ export function DocumentManager(props: Props) {
     }
     setSavingDoc(true);
     try {
+      const body: Record<string, unknown> = {
+        name,
+        dataRoomId: editRoomId,
+        parentFolderId: editParentFolderId,
+      };
+      if (!editIsFolder) body.kind = editKindState;
       const res = await fetch(`/api/data-room/documents/${editDocId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name,
-          dataRoomId: editRoomId,
-          kind: editKindState,
-        }),
+        body: JSON.stringify(body),
       });
       const data = (await res.json()) as { error?: string };
       if (!res.ok) throw new Error(data.error ?? "Could not save");
-      toast.success("Document updated");
+      toast.success(editIsFolder ? "Folder updated" : "Document updated");
       setEditOpen(false);
       router.refresh();
     } catch (e) {
@@ -287,7 +332,7 @@ export function DocumentManager(props: Props) {
       const res = await fetch(`/api/data-room/documents/${deleteTarget.id}`, { method: "DELETE" });
       const data = (await res.json()) as { error?: string };
       if (!res.ok) throw new Error(data.error ?? "Could not delete");
-      toast.success("Document removed.");
+      toast.success(deleteTarget.kind === "folder" ? "Folder removed." : "Document removed.");
       setDeleteTarget(null);
       router.refresh();
     } catch (e) {
@@ -297,7 +342,63 @@ export function DocumentManager(props: Props) {
     }
   }
 
-  async function openDocument(documentId: string) {
+  function openNewFolderDialog(parent: string | null) {
+    setNewFolderName("");
+    setNewFolderParentId(parent);
+    setNewFolderOpen(true);
+  }
+
+  async function createFolderSubmit() {
+    const name = newFolderName.trim();
+    if (!name) {
+      toast.error("Folder name is required.");
+      return;
+    }
+    if (!props.selectedRoomId) {
+      toast.error("Select a room first.");
+      return;
+    }
+    setCreatingFolder(true);
+    try {
+      const res = await fetch("/api/data-room/folders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          dataRoomId: props.selectedRoomId,
+          name,
+          parentFolderId: newFolderParentId,
+        }),
+      });
+      const data = (await res.json()) as { error?: string };
+      if (!res.ok) throw new Error(data.error ?? "Could not create folder");
+      toast.success("Folder created.");
+      setNewFolderOpen(false);
+      setNewFolderName("");
+      router.refresh();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not create folder");
+    } finally {
+      setCreatingFolder(false);
+    }
+  }
+
+  async function moveDocumentToFolder(doc: SerializedRoomDocument, targetFolderId: string | null) {
+    try {
+      const res = await fetch(`/api/data-room/documents/${doc.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ parentFolderId: targetFolderId }),
+      });
+      const data = (await res.json()) as { error?: string };
+      if (!res.ok) throw new Error(data.error ?? "Could not move");
+      toast.success(targetFolderId ? "Moved into folder." : "Moved to room root.");
+      router.refresh();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not move");
+    }
+  }
+
+  async function openDocument(doc: SerializedRoomDocument) {
     // Do not pass "noopener" in the window features string: with noopener, many
     // browsers return null from window.open(), and we need this handle to set
     // location after the async sign-url fetch (otherwise the app falls back to
@@ -307,7 +408,7 @@ export function DocumentManager(props: Props) {
       const res = await fetch("/api/data-room/sign-url", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ documentId }),
+        body: JSON.stringify({ documentId: doc.id }),
       });
       const data = (await res.json()) as { url?: string; error?: string };
       if (!res.ok || !data.url) throw new Error(data.error ?? "Could not open file");
@@ -329,6 +430,7 @@ export function DocumentManager(props: Props) {
   }
 
   async function patchDocumentAccess(doc: SerializedRoomDocument, accessLevel: RoomDocType["accessLevel"]) {
+    if (doc.kind === "folder") return;
     try {
       const res = await fetch(`/api/data-room/documents/${doc.id}`, {
         method: "PATCH",
@@ -344,6 +446,8 @@ export function DocumentManager(props: Props) {
     }
   }
 
+  const searchQ = props.documentSearch ?? "";
+
   const activeDocs = props.documents.filter((d) => !props.selectedRoomId || d.dataRoomId === props.selectedRoomId);
 
   const filteredByCategory = React.useMemo(
@@ -351,8 +455,78 @@ export function DocumentManager(props: Props) {
     [activeDocs, docFilter],
   );
 
+  const atFolderLevel = React.useMemo(
+    () => filteredByCategory.filter((d) => normParentId(d.parentFolderId) === normParentId(currentFolderId)),
+    [filteredByCategory, currentFolderId],
+  );
+
+  const searchedDocs = React.useMemo(
+    () => atFolderLevel.filter((d) => docSearchMatches(d, searchQ)),
+    [atFolderLevel, searchQ],
+  );
+
+  const breadcrumbSegments = React.useMemo(() => {
+    if (!currentFolderId) return [] as { id: string; name: string }[];
+    const folders = activeDocs.filter((d) => d.kind === "folder");
+    const byId = new Map(folders.map((f) => [f.id, f]));
+    const chain: { id: string; name: string }[] = [];
+    let id: string | null = currentFolderId;
+    while (id) {
+      const f = byId.get(id);
+      if (!f) break;
+      chain.unshift({ id: f.id, name: f.name });
+      id = normParentId(f.parentFolderId);
+    }
+    return chain;
+  }, [activeDocs, currentFolderId]);
+
+  const roomFolders = React.useMemo(() => activeDocs.filter((d) => d.kind === "folder"), [activeDocs]);
+
+  const allFolderOptions = React.useMemo(() => {
+    return roomFolders
+      .map((f) => {
+        const parts: string[] = [];
+        let cur: string | null = normParentId(f.parentFolderId);
+        const seen = new Set<string>();
+        while (cur) {
+          if (seen.has(cur)) break;
+          seen.add(cur);
+          const parent = roomFolders.find((x) => x.id === cur);
+          if (!parent) break;
+          parts.unshift(parent.name);
+          cur = normParentId(parent.parentFolderId);
+        }
+        const path = parts.length ? `${parts.join(" / ")} / ` : "";
+        return { id: f.id, label: `${path}${f.name}` };
+      })
+      .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
+  }, [roomFolders]);
+
+  function descendantSet(rootId: string): Set<string> {
+    const out = new Set<string>([rootId]);
+    let added = true;
+    while (added) {
+      added = false;
+      for (const f of roomFolders) {
+        if (out.has(f.id)) continue;
+        const p = normParentId(f.parentFolderId);
+        if (p && out.has(p)) {
+          out.add(f.id);
+          added = true;
+        }
+      }
+    }
+    return out;
+  }
+
+  const folderSelectOptions = React.useMemo(() => {
+    const banned = editDocId && editIsFolder ? descendantSet(editDocId) : new Set<string>();
+    return allFolderOptions.filter((o) => !banned.has(o.id));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allFolderOptions, editDocId, editIsFolder, roomFolders]);
+
   const sortedDocs = React.useMemo(() => {
-    const list = [...filteredByCategory];
+    const list = [...searchedDocs];
     const dir = sortDir === "asc" ? 1 : -1;
     const cmp = (a: SerializedRoomDocument, b: SerializedRoomDocument): number => {
       switch (sortColumn) {
@@ -378,9 +552,14 @@ export function DocumentManager(props: Props) {
           return 0;
       }
     };
-    list.sort(cmp);
+    list.sort((a, b) => {
+      const fa = a.kind === "folder" ? 0 : 1;
+      const fb = b.kind === "folder" ? 0 : 1;
+      if (fa !== fb) return fa - fb;
+      return cmp(a, b);
+    });
     return list;
-  }, [filteredByCategory, sortColumn, sortDir]);
+  }, [searchedDocs, sortColumn, sortDir]);
 
   return (
     <div className="space-y-4">
@@ -419,7 +598,14 @@ export function DocumentManager(props: Props) {
             <Badge variant="secondary" className="rounded-full">
               Bulk actions
             </Badge>
-            <Button type="button" variant="outline" size="sm" className="gap-2 rounded-xl" disabled title="Coming soon">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-2 rounded-xl"
+              disabled={!props.selectedRoomId}
+              onClick={() => openNewFolderDialog(currentFolderId)}
+            >
               New folder
               <FolderPlus className="h-3.5 w-3.5" />
             </Button>
@@ -438,24 +624,63 @@ export function DocumentManager(props: Props) {
               inputRef={fileInputRef}
             />
             <div className="space-y-4 rounded-2xl border border-border bg-card p-4 shadow-sm">
-              <Label className="text-xs uppercase text-muted-foreground">Default upload type</Label>
-              <Select
-                value={kind}
-                onValueChange={(v) => {
-                  if (typeof v === "string") setKind(v as RoomDocType["kind"]);
-                }}
-              >
-                <SelectTrigger className="rounded-xl border-border">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {DATA_ROOM_KIND_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="space-y-2">
+                <Label className="text-xs uppercase text-muted-foreground">Upload into folder</Label>
+                <Select
+                  value={uploadFolderId ?? "__root__"}
+                  onValueChange={(v) => setUploadFolderId(v === "__root__" ? null : v)}
+                  disabled={!props.selectedRoomId}
+                >
+                  <SelectTrigger className="rounded-xl border-border">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__root__">Room root</SelectItem>
+                    {allFolderOptions.map((o) => (
+                      <SelectItem key={o.id} value={o.id}>
+                        {o.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
+                  <span>
+                    {uploadFolderId
+                      ? "New files land in the chosen folder."
+                      : "New files land at the room root."}
+                  </span>
+                  <button
+                    type="button"
+                    className="underline-offset-2 hover:underline"
+                    onClick={() => openNewFolderDialog(uploadFolderId)}
+                    disabled={!props.selectedRoomId}
+                  >
+                    New folder
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-xs uppercase text-muted-foreground">Default upload type</Label>
+                <Select
+                  value={kind}
+                  onValueChange={(v) => {
+                    if (typeof v === "string") setKind(v as RoomDocType["kind"]);
+                  }}
+                >
+                  <SelectTrigger className="rounded-xl border-border">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DATA_ROOM_KIND_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
               <Button
                 type="button"
                 variant="outline"
@@ -467,11 +692,45 @@ export function DocumentManager(props: Props) {
                 Browse files
               </Button>
               <p className="text-[11px] text-muted-foreground">
-                Applies to uploads from the drop zone above. Larger folders upload sequentially — watch for browser limits.
+                Larger batches upload sequentially — watch for browser limits.
               </p>
             </div>
           </div>
         </>
+      ) : null}
+
+      {props.selectedRoomId ? (
+        <nav className="flex flex-wrap items-center gap-0.5 text-sm text-muted-foreground" aria-label="Folder location">
+          <button
+            type="button"
+            className={cn(
+              "rounded-md px-1.5 py-0.5 hover:bg-muted hover:text-foreground",
+              !currentFolderId && "font-semibold text-foreground",
+            )}
+            onClick={() => setCurrentFolderId(null)}
+          >
+            All files
+          </button>
+          {breadcrumbSegments.map((seg, i) => {
+            const isLast = i === breadcrumbSegments.length - 1;
+            return (
+              <React.Fragment key={seg.id}>
+                <ChevronRight className="mx-0.5 inline h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden />
+                {isLast ? (
+                  <span className="rounded-md px-1.5 py-0.5 font-semibold text-foreground">{seg.name}</span>
+                ) : (
+                  <button
+                    type="button"
+                    className="rounded-md px-1.5 py-0.5 hover:bg-muted hover:text-foreground"
+                    onClick={() => setCurrentFolderId(seg.id)}
+                  >
+                    {seg.name}
+                  </button>
+                )}
+              </React.Fragment>
+            );
+          })}
+        </nav>
       ) : null}
 
       <div className="flex flex-wrap gap-2">
@@ -565,10 +824,16 @@ export function DocumentManager(props: Props) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {activeDocs.length === 0 ? (
+            {!props.selectedRoomId ? (
               <TableRow>
                 <TableCell colSpan={9} className="py-12 text-center text-sm text-muted-foreground">
-                  {props.selectedRoomId ? "No documents in this room yet." : "Select a room to see documents."}
+                  Select a room to see documents.
+                </TableCell>
+              </TableRow>
+            ) : activeDocs.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={9} className="py-12 text-center text-sm text-muted-foreground">
+                  No documents in this room yet.
                 </TableCell>
               </TableRow>
             ) : filteredByCategory.length === 0 ? (
@@ -577,23 +842,54 @@ export function DocumentManager(props: Props) {
                   No documents match this filter.
                 </TableCell>
               </TableRow>
+            ) : atFolderLevel.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={9} className="py-12 text-center text-sm text-muted-foreground">
+                  This folder is empty.
+                </TableCell>
+              </TableRow>
+            ) : searchedDocs.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={9} className="py-12 text-center text-sm text-muted-foreground">
+                  Nothing matches this search in this folder.
+                </TableCell>
+              </TableRow>
             ) : (
               sortedDocs.map((d) => (
                 <TableRow key={d.id} className="group hover:bg-muted/40">
-                  <TableCell className="max-w-[200px] font-medium">
-                    <span className="line-clamp-2">{d.name}</span>
+                  <TableCell className="max-w-[220px] font-medium">
+                    {d.kind === "folder" ? (
+                      <button
+                        type="button"
+                        className="line-clamp-2 inline-flex w-full min-w-0 items-center gap-1.5 text-left text-primary hover:underline"
+                        onClick={() => setCurrentFolderId(d.id)}
+                      >
+                        <Folder className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                        <span className="min-w-0">{d.name}</span>
+                      </button>
+                    ) : (
+                      <span className="line-clamp-2">{d.name}</span>
+                    )}
                   </TableCell>
                   <TableCell>{kindLabel(d.kind)}</TableCell>
-                  <TableCell className="tabular-nums">{d.version ?? 1}</TableCell>
-                  <TableCell className="text-xs">{formatBytes(d.sizeBytes)}</TableCell>
+                  <TableCell className="tabular-nums">{d.kind === "folder" ? "—" : d.version ?? 1}</TableCell>
+                  <TableCell className="text-xs">{d.kind === "folder" ? "—" : formatBytes(d.sizeBytes)}</TableCell>
                   <TableCell className="hidden text-xs text-muted-foreground xl:table-cell">
                     {d.createdAt ? (mounted ? formatDistanceToNow(d.createdAt, { addSuffix: true }) : "—") : "—"}
                   </TableCell>
-                  <TableCell className="tabular-nums">{d.viewCount ?? 0}</TableCell>
+                  <TableCell className="tabular-nums">{d.kind === "folder" ? "—" : d.viewCount ?? 0}</TableCell>
                   <TableCell className="hidden text-xs text-muted-foreground lg:table-cell">
-                    {d.lastViewedAt ? (mounted ? formatDistanceToNow(d.lastViewedAt, { addSuffix: true }) : "—") : "—"}
+                    {d.kind === "folder"
+                      ? "—"
+                      : d.lastViewedAt
+                        ? mounted
+                          ? formatDistanceToNow(d.lastViewedAt, { addSuffix: true })
+                          : "—"
+                        : "—"}
                   </TableCell>
-                  <TableCell className="hidden capitalize 2xl:table-cell">{visibilityLabel(d)}</TableCell>
+                  <TableCell className="hidden capitalize 2xl:table-cell">
+                    {d.kind === "folder" ? "—" : visibilityLabel(d)}
+                  </TableCell>
                   <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger
@@ -604,21 +900,65 @@ export function DocumentManager(props: Props) {
                         <MoreHorizontal className="h-4 w-4" />
                         <span className="sr-only">Actions</span>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-52 rounded-xl">
-                        <DropdownMenuItem onClick={() => void openDocument(d.id)}>Preview</DropdownMenuItem>
+                      <DropdownMenuContent align="end" className="w-56 rounded-xl">
+                        {d.kind === "folder" ? (
+                          <DropdownMenuItem onClick={() => setCurrentFolderId(d.id)}>Open folder</DropdownMenuItem>
+                        ) : (
+                          <DropdownMenuItem onClick={() => void openDocument(d)}>Preview</DropdownMenuItem>
+                        )}
                         {props.canManage ? (
                           <>
                             <DropdownMenuItem onClick={() => beginEdit(d)} className="gap-2">
                               <Pencil className="h-3.5 w-3.5" /> Rename / Move
                             </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => void patchDocumentAccess(d, d.accessLevel === "internal" ? "invited" : "internal")}
-                            >
-                              {d.accessLevel === "internal" ? "Visible to investors" : "Hide from investors"}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => void openDocument(d.id)} className="text-card-foreground">
-                              Download via preview
-                            </DropdownMenuItem>
+                            <DropdownMenuSub>
+                              <DropdownMenuSubTrigger className="gap-2">
+                                <Folder className="h-3.5 w-3.5" /> Move to…
+                              </DropdownMenuSubTrigger>
+                              <DropdownMenuSubContent className="max-h-72 w-60 overflow-y-auto rounded-xl">
+                                <DropdownMenuItem
+                                  disabled={!normParentId(d.parentFolderId)}
+                                  onClick={() => void moveDocumentToFolder(d, null)}
+                                >
+                                  Room root
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                {(() => {
+                                  const banned = d.kind === "folder" ? descendantSet(d.id) : new Set<string>();
+                                  const opts = allFolderOptions.filter((o) => !banned.has(o.id));
+                                  if (opts.length === 0) {
+                                    return (
+                                      <DropdownMenuItem disabled className="text-muted-foreground">
+                                        No other folders
+                                      </DropdownMenuItem>
+                                    );
+                                  }
+                                  return opts.map((o) => (
+                                    <DropdownMenuItem
+                                      key={o.id}
+                                      disabled={normParentId(d.parentFolderId) === o.id}
+                                      onClick={() => void moveDocumentToFolder(d, o.id)}
+                                    >
+                                      {o.label}
+                                    </DropdownMenuItem>
+                                  ));
+                                })()}
+                              </DropdownMenuSubContent>
+                            </DropdownMenuSub>
+                            {d.kind === "folder" ? null : (
+                              <>
+                                <DropdownMenuItem
+                                  onClick={() =>
+                                    void patchDocumentAccess(d, d.accessLevel === "internal" ? "invited" : "internal")
+                                  }
+                                >
+                                  {d.accessLevel === "internal" ? "Visible to investors" : "Hide from investors"}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => void openDocument(d)} className="text-card-foreground">
+                                  Download via preview
+                                </DropdownMenuItem>
+                              </>
+                            )}
                             <DropdownMenuItem disabled className="text-muted-foreground">
                               Archive soon
                             </DropdownMenuItem>
@@ -646,8 +986,10 @@ export function DocumentManager(props: Props) {
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent className="sm:max-w-md rounded-2xl">
           <DialogHeader>
-            <DialogTitle>Edit document</DialogTitle>
-            <DialogDescription>Update title, room, or category.</DialogDescription>
+            <DialogTitle>{editIsFolder ? "Edit folder" : "Edit document"}</DialogTitle>
+            <DialogDescription>
+              {editIsFolder ? "Update the folder name or where it sits in the tree." : "Update title, room, category, or folder."}
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-2">
@@ -658,9 +1000,12 @@ export function DocumentManager(props: Props) {
               <Label>Room</Label>
               <Select
                 value={editRoomId}
+                disabled={editIsFolder}
                 onValueChange={(v) => setEditRoomId(typeof v === "string" ? v : "")}
               >
-                <SelectTrigger className="rounded-xl"><SelectValue placeholder="Room" /></SelectTrigger>
+                <SelectTrigger className="rounded-xl">
+                  <SelectValue placeholder="Room" />
+                </SelectTrigger>
                 <SelectContent>
                   {props.rooms.map((r) => (
                     <SelectItem key={r.id} value={r.id}>
@@ -669,25 +1014,53 @@ export function DocumentManager(props: Props) {
                   ))}
                 </SelectContent>
               </Select>
+              {editIsFolder ? (
+                <p className="text-[11px] text-muted-foreground">
+                  Move files out of this folder before you can assign the folder to another room.
+                </p>
+              ) : null}
             </div>
             <div className="space-y-2">
-              <Label>Type</Label>
+              <Label>Inside folder</Label>
               <Select
-                value={editKindState}
-                onValueChange={(v) => {
-                  if (typeof v === "string") setEditKindState(v as RoomDocType["kind"]);
-                }}
+                value={editParentFolderId ?? "__root__"}
+                onValueChange={(v) => setEditParentFolderId(v === "__root__" ? null : v)}
               >
-                <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="rounded-xl">
+                  <SelectValue placeholder="Location" />
+                </SelectTrigger>
                 <SelectContent>
-                  {DATA_ROOM_KIND_OPTIONS.map((k) => (
-                    <SelectItem key={k.value} value={k.value}>
-                      {k.label}
+                  <SelectItem value="__root__">Room root</SelectItem>
+                  {folderSelectOptions.map((o) => (
+                    <SelectItem key={o.id} value={o.id}>
+                      {o.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
+            {editIsFolder ? null : (
+              <div className="space-y-2">
+                <Label>Type</Label>
+                <Select
+                  value={editKindState}
+                  onValueChange={(v) => {
+                    if (typeof v === "string") setEditKindState(v as RoomDocType["kind"]);
+                  }}
+                >
+                  <SelectTrigger className="rounded-xl">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DATA_ROOM_KIND_OPTIONS.map((k) => (
+                      <SelectItem key={k.value} value={k.value}>
+                        {k.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
           <DialogFooter className="border-0 bg-transparent gap-2 sm:justify-end">
             <Button variant="outline" onClick={() => setEditOpen(false)} className="rounded-xl">
@@ -700,12 +1073,69 @@ export function DocumentManager(props: Props) {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={newFolderOpen} onOpenChange={setNewFolderOpen}>
+        <DialogContent className="sm:max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>New folder</DialogTitle>
+            <DialogDescription>
+              Folders organize documents inside a room. Pick a parent (or leave at room root) and a name.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <Label htmlFor="dm-new-folder">Folder name</Label>
+              <Input
+                id="dm-new-folder"
+                value={newFolderName}
+                onChange={(e) => setNewFolderName(e.target.value)}
+                className="rounded-xl"
+                placeholder="e.g. Financials"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void createFolderSubmit();
+                }}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Parent folder</Label>
+              <Select
+                value={newFolderParentId ?? "__root__"}
+                onValueChange={(v) => setNewFolderParentId(v === "__root__" ? null : v)}
+              >
+                <SelectTrigger className="rounded-xl">
+                  <SelectValue placeholder="Location" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__root__">Room root</SelectItem>
+                  {allFolderOptions.map((o) => (
+                    <SelectItem key={o.id} value={o.id}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter className="border-0 bg-transparent gap-2 sm:justify-end">
+            <Button variant="outline" className="rounded-xl" disabled={creatingFolder} onClick={() => setNewFolderOpen(false)}>
+              Cancel
+            </Button>
+            <Button className="rounded-xl" disabled={creatingFolder} onClick={() => void createFolderSubmit()}>
+              {creatingFolder ? "Creating…" : "Create"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={deleteTarget !== null} onOpenChange={(o) => !o && setDeleteTarget(null)}>
         <DialogContent className="rounded-2xl">
           <DialogHeader>
-            <DialogTitle>Delete document?</DialogTitle>
+            <DialogTitle>{deleteTarget?.kind === "folder" ? "Delete folder?" : "Delete document?"}</DialogTitle>
             <DialogDescription>
-              {deleteTarget ? `“${deleteTarget.name}” will be permanently removed.` : ""}
+              {deleteTarget
+                ? deleteTarget.kind === "folder"
+                  ? `“${deleteTarget.name}” will be removed. Files inside stay in the room and move up one level.`
+                  : `“${deleteTarget.name}” will be permanently removed.`
+                : ""}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="border-0">

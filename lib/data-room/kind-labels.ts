@@ -8,6 +8,7 @@ export const DATA_ROOM_KIND_TO_LABEL: Record<RoomDocument["kind"], string> = {
   video: "Video",
   legal: "Legal Docs",
   other: "Other",
+  folder: "Folder",
 };
 
 export function kindLabel(kind: string): string {

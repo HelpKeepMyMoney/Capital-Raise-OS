@@ -53,18 +53,6 @@ export function RoomWorkspace(props: Props) {
     }
   }, [canManage, workspaceTab, internalTab, onWorkspaceTabChange]);
 
-  const filteredDocs = React.useMemo(() => {
-    const list = props.documentsForRoom;
-    const q = query.trim().toLowerCase();
-    if (!q) return list;
-    return list.filter(
-      (d) =>
-        d.name.toLowerCase().includes(q) ||
-        d.kind.toLowerCase().includes(q) ||
-        (d.mimeType?.toLowerCase().includes(q) ?? false),
-    );
-  }, [props.documentsForRoom, query]);
-
   return (
     <div className="space-y-4">
       <div className="relative max-w-md">
@@ -117,7 +105,8 @@ export function RoomWorkspace(props: Props) {
         <TabsContent value="documents" className="mt-4 focus-visible:outline-none">
           <DocumentManager
             rooms={props.roomSelectList}
-            documents={filteredDocs}
+            documents={props.documentsForRoom}
+            documentSearch={query}
             selectedRoomId={props.room.id}
             canManage={props.canManage}
             investorDocsLockedByNda={props.room.investorDocsLockedByNda}

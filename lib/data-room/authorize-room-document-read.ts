@@ -24,11 +24,14 @@ export async function authorizeRoomDocumentRead(
     name?: string;
     dataRoomId?: string;
     mimeType?: string;
+    kind?: string;
   };
   if (data.organizationId !== ctx.orgId) {
     return { ok: false, status: 403, error: "Forbidden" };
   }
-  if (!data.storagePath) return { ok: false, status: 400, error: "Invalid document" };
+  if (data.kind === "folder" || !data.storagePath) {
+    return { ok: false, status: 400, error: "Not a downloadable file" };
+  }
 
   const dataRoomId = typeof data.dataRoomId === "string" ? data.dataRoomId : "";
   if (!dataRoomId) {

@@ -576,8 +576,11 @@ export type RoomDocument = {
   organizationId: string;
   dataRoomId: string;
   name: string;
-  storagePath: string;
-  kind: "deck" | "model" | "ppm" | "video" | "legal" | "other";
+  /** Omitted for virtual folders (`kind: "folder"`). */
+  storagePath?: string;
+  kind: "deck" | "model" | "ppm" | "video" | "legal" | "other" | "folder";
+  /** Folder hierarchy within a room; unset or null = room root. */
+  parentFolderId?: string | null;
   viewCount?: number;
   lastViewedAt?: number;
   /** File size on upload. */

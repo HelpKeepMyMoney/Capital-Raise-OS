@@ -103,6 +103,12 @@ export default async function DataRoomPage(props: {
       name: typeof x.name === "string" ? x.name : d.id,
       kind: (typeof x.kind === "string" ? x.kind : "other") as RoomDocType["kind"],
       dataRoomId: typeof x.dataRoomId === "string" ? x.dataRoomId : "",
+      parentFolderId:
+        typeof x.parentFolderId === "string"
+          ? x.parentFolderId
+          : x.parentFolderId === null
+            ? null
+            : undefined,
       viewCount: typeof x.viewCount === "number" ? x.viewCount : undefined,
       lastViewedAt: typeof x.lastViewedAt === "number" ? x.lastViewedAt : undefined,
       sizeBytes: typeof x.sizeBytes === "number" ? x.sizeBytes : undefined,

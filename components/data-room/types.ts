@@ -32,6 +32,7 @@ export type SerializedRoomDocument = {
   name: string;
   kind: RoomDocument["kind"];
   dataRoomId: string;
+  parentFolderId?: string | null;
   viewCount?: number;
   lastViewedAt?: number;
   sizeBytes?: number;

@@ -19,6 +19,7 @@ import { formatDistanceToNow } from "date-fns";
 import { kindLabel } from "@/lib/data-room/kind-labels";
 import { cn } from "@/lib/utils";
 import { useMounted } from "@/hooks/use-mounted";
+import * as React from "react";
 
 type Props = {
   documents: SerializedRoomDocument[];
@@ -39,8 +40,12 @@ function fillLastDays(count: number, counts: Map<string, number>): { day: string
 
 export function ActivityAnalytics(props: Props) {
   const mounted = useMounted();
+  const fileDocs = React.useMemo(
+    () => props.documents.filter((d) => d.kind !== "folder"),
+    [props.documents],
+  );
   const byKind: Record<string, number> = {};
-  for (const d of props.documents) {
+  for (const d of fileDocs) {
     byKind[d.kind] = (byKind[d.kind] ?? 0) + (d.viewCount ?? 0);
   }
   const chartData = Object.entries(byKind).map(([kind, views]) => ({
@@ -48,8 +53,8 @@ export function ActivityAnalytics(props: Props) {
     views,
   }));
 
-  const totalViews = props.documents.reduce((a, d) => a + (d.viewCount ?? 0), 0);
-  const topDocs = [...props.documents]
+  const totalViews = fileDocs.reduce((a, d) => a + (d.viewCount ?? 0), 0);
+  const topDocs = [...fileDocs]
     .sort((a, b) => (b.viewCount ?? 0) - (a.viewCount ?? 0))
     .slice(0, 6)
     .map((d) => ({ name: d.name.slice(0, 28) + (d.name.length > 28 ? "…" : ""), views: d.viewCount ?? 0 }));

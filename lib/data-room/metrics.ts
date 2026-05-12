@@ -57,14 +57,18 @@ export async function computeDataRoomMetrics(orgId: string): Promise<DataRoomMet
     roomNameById.set(d.id, typeof x.name === "string" ? x.name : d.id);
   }
 
-  const totalDocuments = docsSnap.size;
+  const totalDocuments = docsSnap.docs.filter((d) => {
+    const k = (d.data() as { kind?: string }).kind;
+    return k !== "folder";
+  }).length;
 
   let thisWeekViews = 0;
   let prevWeekViews = 0;
   let docsThisWeek = 0;
   let docsPrevWeek = 0;
   for (const d of docsSnap.docs) {
-    const row = d.data() as { createdAt?: number };
+    const row = d.data() as { createdAt?: number; kind?: string };
+    if (row.kind === "folder") continue;
     const t = row.createdAt ?? 0;
     if (t >= weekStart) docsThisWeek += 1;
     else if (t >= prevWeekStart && t < weekStart) docsPrevWeek += 1;
@@ -93,7 +97,8 @@ export async function computeDataRoomMetrics(orgId: string): Promise<DataRoomMet
 
   const viewsByRoom = new Map<string, number>();
   for (const d of docsSnap.docs) {
-    const x = d.data() as { dataRoomId?: string; viewCount?: number };
+    const x = d.data() as { dataRoomId?: string; viewCount?: number; kind?: string };
+    if (x.kind === "folder") continue;
     const rid = x.dataRoomId;
     if (!rid) continue;
     const vc = typeof x.viewCount === "number" ? x.viewCount : 0;
@@ -142,9 +147,14 @@ export function buildInvestorGuestMetrics(
   documents: Array<{ dataRoomId?: string; viewCount?: number }>,
 ): DataRoomMetricsDTO {
   const activeRooms = rooms.filter((r) => !r.archived).length;
-  const totalDocuments = documents.length;
+  const totalDocuments = documents.filter((d) => {
+    const k = (d as { kind?: string }).kind;
+    return k !== "folder";
+  }).length;
   const viewsByRoom = new Map<string, number>();
   for (const d of documents) {
+    const k = (d as { kind?: string }).kind;
+    if (k === "folder") continue;
     const rid = d.dataRoomId;
     if (!rid) continue;
     viewsByRoom.set(rid, (viewsByRoom.get(rid) ?? 0) + (d.viewCount ?? 0));

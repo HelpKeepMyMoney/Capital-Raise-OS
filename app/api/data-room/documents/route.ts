@@ -7,9 +7,10 @@ import { col } from "@/lib/firestore/paths";
 import { getMembership } from "@/lib/firestore/queries";
 import { writeAuditLog } from "@/lib/audit";
 import type { RoomDocument } from "@/lib/firestore/types";
+import { FILE_KINDS } from "@/lib/data-room/folder-helpers";
 
 const MAX_BYTES = 50 * 1024 * 1024;
-const KINDS: RoomDocument["kind"][] = ["deck", "model", "ppm", "video", "legal", "other"];
+const KINDS = FILE_KINDS;
 
 function safeFileName(name: string): string {
   const base = name
@@ -63,6 +64,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  const parentFolderIdRaw = formData.get("parentFolderId");
+  const parentFolderId =
+    typeof parentFolderIdRaw === "string" && parentFolderIdRaw.trim() ? parentFolderIdRaw.trim() : null;
+  if (parentFolderId) {
+    const parentSnap = await db.collection(col.documents).doc(parentFolderId).get();
+    if (!parentSnap.exists) return NextResponse.json({ error: "Parent folder not found" }, { status: 404 });
+    const pdata = parentSnap.data() as { organizationId?: string; dataRoomId?: string; kind?: string };
+    if (pdata.organizationId !== ctx.orgId) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    if (pdata.dataRoomId !== dataRoomId) {
+      return NextResponse.json({ error: "Parent folder is not in this room" }, { status: 400 });
+    }
+    if (pdata.kind !== "folder") return NextResponse.json({ error: "Invalid parent folder" }, { status: 400 });
+  }
+
   const docId = randomUUID();
   const safe = safeFileName(file.name);
   const storagePath = `orgs/${ctx.orgId}/data_rooms/${dataRoomId}/${docId}_${safe}`;
@@ -77,7 +92,7 @@ export async function POST(req: NextRequest) {
   const now = Date.now();
   const displayName = file.name.trim() || safe;
 
-  await db.collection(col.documents).doc(docId).set({
+  const row: Record<string, unknown> = {
     id: docId,
     organizationId: ctx.orgId,
     dataRoomId,
@@ -90,7 +105,9 @@ export async function POST(req: NextRequest) {
     createdByUid: ctx.user.uid,
     version: 1,
     createdAt: now,
-  });
+  };
+  if (parentFolderId) row.parentFolderId = parentFolderId;
+  await db.collection(col.documents).doc(docId).set(row);
 
   await writeAuditLog({
     organizationId: ctx.orgId,
