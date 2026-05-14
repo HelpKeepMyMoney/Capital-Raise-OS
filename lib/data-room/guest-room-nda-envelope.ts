@@ -146,6 +146,8 @@ export async function createRoomNdaEnvelopeFromGuestSelfRequest(params: {
     investorName,
   });
 
+  const roomLabel =
+    typeof room.name === "string" && room.name.trim().length > 0 ? room.name.trim() : room.id;
   await sendEsignEnvelopeCreatedEmails({
     orgName: org?.name ?? "CapitalOS",
     sponsorEmail,
@@ -153,7 +155,7 @@ export async function createRoomNdaEnvelopeFromGuestSelfRequest(params: {
     investorName,
     sponsorUrl,
     investorUrl,
-    context: { kind: "data_room", roomName: room.name },
+    context: { kind: "data_room", roomName: roomLabel },
   });
 
   return {

@@ -16,14 +16,19 @@ export async function postInvestorNdaRequest(
     method: "POST",
     headers: { "Content-Type": "application/json" },
   });
-  const json = (await res.json()) as {
+  let json: {
     error?: string;
     emailed?: boolean;
     envelopeCreated?: boolean;
     envelopeError?: string;
     investorSigningUrl?: string | null;
     sponsorSigningUrl?: string | null;
-  };
+  } = {};
+  try {
+    json = (await res.json()) as typeof json;
+  } catch {
+    return { ok: false, error: res.ok ? "Invalid response" : "Request failed" };
+  }
   if (!res.ok) return { ok: false, error: typeof json.error === "string" ? json.error : "Request failed" };
   return {
     ok: true,

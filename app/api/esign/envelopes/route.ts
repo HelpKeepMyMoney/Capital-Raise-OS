@@ -202,6 +202,8 @@ export async function POST(req: NextRequest) {
   });
 
   const org = await getOrganization(ctx.orgId);
+  const roomLabel =
+    typeof room.name === "string" && room.name.trim().length > 0 ? room.name.trim() : room.id;
   await sendEsignEnvelopeCreatedEmails({
     orgName: org?.name ?? "CapitalOS",
     sponsorEmail,
@@ -209,7 +211,7 @@ export async function POST(req: NextRequest) {
     investorName,
     sponsorUrl,
     investorUrl,
-    context: { kind: "data_room", roomName: room.name },
+    context: { kind: "data_room", roomName: roomLabel },
   });
 
   return NextResponse.json({

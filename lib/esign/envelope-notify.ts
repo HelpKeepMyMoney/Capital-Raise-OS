@@ -2,8 +2,13 @@ import { sendTransactionalEmail } from "@/lib/email/resend";
 import { escapeHtmlForEmail, invitationsTransactionalFrom } from "@/lib/invitations/invite-email-shared";
 
 export type EsignEnvelopeNotifyContext =
-  | { kind: "data_room"; roomName: string }
+  | { kind: "data_room"; roomName?: string | null }
   | { kind: "ad_hoc"; label?: string };
+
+function escapeHtmlLabel(raw: string | undefined | null, fallback: string): string {
+  const t = typeof raw === "string" ? raw.trim() : "";
+  return escapeHtmlForEmail(t.length > 0 ? t : fallback);
+}
 
 /** Send both parties an email when an envelope is created (Resend optional). */
 export async function sendEsignEnvelopeCreatedEmails(args: {
@@ -22,19 +27,19 @@ export async function sendEsignEnvelopeCreatedEmails(args: {
 
   const ctxBlock =
     context.kind === "data_room"
-      ? `<p>Data room: <strong>${escapeHtmlForEmail(context.roomName)}</strong></p>`
+      ? `<p>Data room: <strong>${escapeHtmlLabel(context.roomName, "This data room")}</strong></p>`
       : context.label
-        ? `<p>${escapeHtmlForEmail(context.label)}</p>`
+        ? `<p>${escapeHtmlLabel(context.label, "")}</p>`
         : "";
 
-  const invLabel = escapeHtmlForEmail(investorName.trim() || investorEmail);
+  const invLabel = escapeHtmlForEmail((typeof investorName === "string" ? investorName.trim() : "") || investorEmail);
   const invMail = escapeHtmlForEmail(investorEmail);
 
   const roomOrDoc =
     context.kind === "data_room"
-      ? escapeHtmlForEmail(context.roomName)
+      ? escapeHtmlLabel(context.roomName, "This data room")
       : context.label
-        ? escapeHtmlForEmail(context.label)
+        ? escapeHtmlLabel(context.label, "this agreement")
         : "this agreement";
 
   try {

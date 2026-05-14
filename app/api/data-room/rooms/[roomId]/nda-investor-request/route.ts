@@ -26,6 +26,19 @@ export async function POST(
   req: NextRequest,
   ctxParams: { params: Promise<{ roomId: string }> },
 ) {
+  try {
+    return await postNdaInvestorRequest(req, ctxParams);
+  } catch (e) {
+    console.error("[nda-investor-request] unhandled", e);
+    const msg = e instanceof Error ? e.message : "Server error";
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
+}
+
+async function postNdaInvestorRequest(
+  req: NextRequest,
+  ctxParams: { params: Promise<{ roomId: string }> },
+) {
   const ctx = await requireOrgSession();
   if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
