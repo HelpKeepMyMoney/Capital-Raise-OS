@@ -15,14 +15,20 @@ export type InviteRow = Pick<
   | "acceptedAt"
   | "message"
   | "linkedInvestorId"
+  | "acceptedUserId"
 > & {
   ndaSignedAt?: number;
   ndaEnvelopeId?: string;
+  /** In-flight room NDA (not completed). */
+  ndaOpenEnvelopeId?: string;
+  ndaOpenNextSigner?: "sponsor" | "investor";
+  /** Latest guest “Request NDA” timestamp for this invite’s accepted user + room scope. */
+  ndaRequestedAt?: number;
 };
 
 export async function listInvestorInvitationsForOrganization(orgId: string, limit = 100): Promise<InviteRow[]> {
   const db = getAdminFirestore();
-  const [snap, envSnap] = await Promise.all([
+  const [snap, envSnap, reqSnap] = await Promise.all([
     db
       .collection(col.investorInvitations)
       .where("organizationId", "==", orgId)
@@ -30,22 +36,52 @@ export async function listInvestorInvitationsForOrganization(orgId: string, limi
       .limit(limit)
       .get(),
     db.collection(col.esignEnvelopes).where("organizationId", "==", orgId).limit(500).get(),
+    db.collection(col.roomNdaInvestorRequests).where("organizationId", "==", orgId).limit(300).get(),
   ]);
 
   const latestNdaByRoomAndEmail = new Map<string, { envelopeId: string; signedAt: number }>();
+  const openNdaByRoomAndEmail = new Map<
+    string,
+    { envelopeId: string; nextSignerRole: "sponsor" | "investor" | undefined; updatedAt: number }
+  >();
+
   for (const d of envSnap.docs) {
     const env = d.data() as Omit<EsignEnvelope, "id">;
     if (env.context.kind !== "data_room_nda") continue;
-    if (env.status !== "completed") continue;
     const email = env.investorEmailNorm?.trim().toLowerCase();
     const roomId = env.context.dataRoomId?.trim();
     if (!email || !roomId) continue;
     const key = `${roomId}::${email}`;
-    const signedAt = env.updatedAt ?? env.lastEventAt ?? env.createdAt ?? 0;
-    const prev = latestNdaByRoomAndEmail.get(key);
-    if (!prev || signedAt > prev.signedAt) {
-      latestNdaByRoomAndEmail.set(key, { envelopeId: d.id, signedAt });
+    const updatedAt = env.updatedAt ?? env.lastEventAt ?? env.createdAt ?? 0;
+
+    if (env.status === "completed") {
+      const signedAt = env.updatedAt ?? env.lastEventAt ?? env.createdAt ?? 0;
+      const prev = latestNdaByRoomAndEmail.get(key);
+      if (!prev || signedAt > prev.signedAt) {
+        latestNdaByRoomAndEmail.set(key, { envelopeId: d.id, signedAt });
+      }
+      continue;
     }
+
+    if (env.status === "declined" || env.status === "error") continue;
+
+    const next = env.nextSignerRole === "sponsor" || env.nextSignerRole === "investor" ? env.nextSignerRole : undefined;
+    const prevOpen = openNdaByRoomAndEmail.get(key);
+    if (!prevOpen || updatedAt > prevOpen.updatedAt) {
+      openNdaByRoomAndEmail.set(key, { envelopeId: d.id, nextSignerRole: next, updatedAt });
+    }
+  }
+
+  const requestAtByUidRoom = new Map<string, number>();
+  for (const d of reqSnap.docs) {
+    const x = d.data() as { investorUid?: string; roomId?: string; lastRequestedAt?: unknown };
+    const uid = typeof x.investorUid === "string" ? x.investorUid : "";
+    const rid = typeof x.roomId === "string" ? x.roomId : "";
+    const ts = x.lastRequestedAt;
+    if (!uid || !rid || typeof ts !== "number") continue;
+    const k = `${uid}::${rid}`;
+    const prev = requestAtByUidRoom.get(k);
+    if (!prev || ts > prev) requestAtByUidRoom.set(k, ts);
   }
 
   return snap.docs.map((d) => {
@@ -54,12 +90,35 @@ export async function listInvestorInvitationsForOrganization(orgId: string, limi
     const roomIds = row.dataRoomIds ?? [];
     let ndaSignedAt: number | undefined;
     let ndaEnvelopeId: string | undefined;
+    let ndaOpenEnvelopeId: string | undefined;
+    let ndaOpenNextSigner: "sponsor" | "investor" | undefined;
+    let ndaRequestedAt: number | undefined;
+    const acceptedUid = typeof row.acceptedUserId === "string" ? row.acceptedUserId : undefined;
+
+    let bestOpen:
+      | { envelopeId: string; nextSignerRole: "sponsor" | "investor" | undefined; updatedAt: number }
+      | undefined;
+
     for (const roomId of roomIds) {
       const hit = latestNdaByRoomAndEmail.get(`${roomId}::${emailNorm}`);
       if (hit && (ndaSignedAt == null || hit.signedAt > ndaSignedAt)) {
         ndaSignedAt = hit.signedAt;
         ndaEnvelopeId = hit.envelopeId;
       }
+      const open = openNdaByRoomAndEmail.get(`${roomId}::${emailNorm}`);
+      if (open && (!bestOpen || open.updatedAt > bestOpen.updatedAt)) {
+        bestOpen = open;
+      }
+      if (acceptedUid) {
+        const rq = requestAtByUidRoom.get(`${acceptedUid}::${roomId}`);
+        if (rq != null && (ndaRequestedAt == null || rq > ndaRequestedAt)) {
+          ndaRequestedAt = rq;
+        }
+      }
+    }
+    if (bestOpen) {
+      ndaOpenEnvelopeId = bestOpen.envelopeId;
+      ndaOpenNextSigner = bestOpen.nextSignerRole;
     }
 
     return {
@@ -74,8 +133,12 @@ export async function listInvestorInvitationsForOrganization(orgId: string, limi
       acceptedAt: row.acceptedAt,
       message: row.message,
       linkedInvestorId: typeof row.linkedInvestorId === "string" ? row.linkedInvestorId : undefined,
+      acceptedUserId: acceptedUid,
       ndaSignedAt,
       ndaEnvelopeId,
+      ndaOpenEnvelopeId,
+      ndaOpenNextSigner,
+      ndaRequestedAt,
     };
   });
 }

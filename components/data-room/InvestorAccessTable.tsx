@@ -43,6 +43,7 @@ import { MoreHorizontal } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useMounted } from "@/hooks/use-mounted";
+import { formatDistanceToNow } from "date-fns";
 
 type Props = {
   invitations: InviteRow[];
@@ -350,6 +351,18 @@ export function InvestorAccessTable(props: Props) {
                       {inv.ndaSignedAt ? (
                         <span title={mounted ? new Date(inv.ndaSignedAt).toLocaleString() : undefined}>
                           {mounted ? `Signed ${new Date(inv.ndaSignedAt).toLocaleDateString()}` : "Signed"}
+                        </span>
+                      ) : inv.ndaOpenEnvelopeId ? (
+                        <span className="text-foreground">
+                          {inv.ndaOpenNextSigner === "investor"
+                            ? "Awaiting investor signature"
+                            : inv.ndaOpenNextSigner === "sponsor"
+                              ? "Awaiting sponsor signature"
+                              : "In progress"}
+                        </span>
+                      ) : inv.ndaRequestedAt ? (
+                        <span title={mounted ? new Date(inv.ndaRequestedAt).toLocaleString() : undefined}>
+                          {mounted ? `Requested ${formatDistanceToNow(inv.ndaRequestedAt, { addSuffix: true })}` : "Requested"}
                         </span>
                       ) : (
                         "—"

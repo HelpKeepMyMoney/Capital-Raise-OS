@@ -3,10 +3,11 @@ import { memberCanAccessDataRoom } from "@/lib/auth/investor-access";
 import { requireOrgSession } from "@/lib/auth/session";
 import { writeAuditLog } from "@/lib/audit";
 import { sendTransactionalEmail } from "@/lib/email/resend";
+import { createRoomNdaEnvelopeFromGuestSelfRequest } from "@/lib/data-room/guest-room-nda-envelope";
 import { normalizeInvestorEmailForNda, resolveInvestorPendingDataRoomNdaForRooms } from "@/lib/data-room/investor-nda-gate";
 import { roomNdaInvestorRequestDocId } from "@/lib/data-room/nda-investor-request";
 import { resolveDealSubscriptionSponsorEmails } from "@/lib/esign/subscription-sponsor-emails";
-import { getAdminFirestore } from "@/lib/firebase/admin";
+import { getAdminBucket, getAdminFirestore } from "@/lib/firebase/admin";
 import { col } from "@/lib/firestore/paths";
 import type { DataRoom } from "@/lib/firestore/types";
 import { getMembership, getOrganization } from "@/lib/firestore/queries";
@@ -65,6 +66,13 @@ export async function POST(
   }
 
   const emailNorm = normalizeInvestorEmailForNda(ctx.user.email);
+  if (!emailNorm) {
+    return NextResponse.json(
+      { error: "Your CapitalOS account needs an email address to match CRM and create the NDA envelope." },
+      { status: 400 },
+    );
+  }
+
   const pendingMap = await resolveInvestorPendingDataRoomNdaForRooms(db, ctx.orgId, emailNorm, [roomId]);
   const pending = pendingMap.get(roomId);
   if (pending?.kind === "sign_now") {
@@ -104,11 +112,26 @@ export async function POST(
     organizationId: ctx.orgId,
     roomId,
     investorUid: ctx.user.uid,
-    investorEmailNorm: emailNorm || null,
+    investorEmailNorm: emailNorm,
     lastRequestedAt: now,
     updatedAt: now,
   };
   if (!prev.exists) row.createdAt = now;
+
+  const bucket = getAdminBucket();
+  const envResult = await createRoomNdaEnvelopeFromGuestSelfRequest({
+    db,
+    bucket,
+    organizationId: ctx.orgId,
+    room,
+    guestUid: ctx.user.uid,
+    guestEmailNorm: emailNorm,
+  });
+
+  if (envResult.ok) {
+    row.lastEnvelopeId = envResult.envelopeId;
+  }
+
   await ref.set(row, { merge: true });
 
   await writeAuditLog({
@@ -116,17 +139,27 @@ export async function POST(
     actorId: ctx.user.uid,
     action: "nda.investor_request",
     resource: `${col.roomNdaInvestorRequests}/${docId}`,
-    payload: { roomId, dealId: room.dealId ?? null },
+    payload: {
+      roomId,
+      dealId: room.dealId ?? null,
+      envelopeCreated: envResult.ok,
+      envelopeId: envResult.ok ? envResult.envelopeId : undefined,
+      envelopeError: envResult.ok ? undefined : envResult.error,
+    },
   });
 
   let emailed = false;
-  if (process.env.RESEND_API_KEY && sponsorEmails.length > 0) {
+  if (!envResult.ok && process.env.RESEND_API_KEY && sponsorEmails.length > 0) {
     const from = invitationsTransactionalFrom();
     const roomSafe = escapeHtmlForEmail(roomName);
     const orgSafe = escapeHtmlForEmail(orgName);
     const href = dataRoomLink.replace(/"/g, "&quot;");
+    const errBlock = envResult.error
+      ? `<p style="font-size:13px;color:#92400e"><strong>Automatic envelope was not created:</strong> ${escapeHtmlForEmail(envResult.error)}</p>`
+      : "";
     const html = `<p>An investor (${invLabel}${invMailHtml ? ` — ${invMailHtml}` : ""}) asked you to send or continue the mutual NDA for the data room <strong>${roomSafe}</strong> (${orgSafe}).</p>
-<p>Open the data room, select this room, then use <strong>Settings → Send for signature (e-sign)</strong> to create the envelope if you have not yet.</p>
+${errBlock}
+<p>Open the data room, select this room, then use <strong>Settings → Send for signature (e-sign)</strong> to create the envelope if needed.</p>
 <p><a href="${href}">Open data room</a></p>`;
     try {
       await sendTransactionalEmail({
@@ -142,5 +175,12 @@ export async function POST(
     }
   }
 
-  return NextResponse.json({ ok: true, emailed });
+  return NextResponse.json({
+    ok: true,
+    emailed,
+    envelopeCreated: envResult.ok,
+    envelopeError: envResult.ok ? undefined : envResult.error,
+    investorSigningUrl: envResult.ok ? envResult.investorSigningUrl : null,
+    sponsorSigningUrl: envResult.ok ? envResult.sponsorSigningUrl : null,
+  });
 }

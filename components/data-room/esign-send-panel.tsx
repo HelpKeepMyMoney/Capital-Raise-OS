@@ -54,8 +54,11 @@ export function EsignSendPanel(props: Props) {
         };
         if (!res.ok) throw new Error(json.error ?? "Could not load investors");
         if (!cancelled) {
-          setEligible(json.investors ?? []);
+          const invs = json.investors ?? [];
+          setEligible(invs);
           setNoDealLinked(Boolean(json.noDealLinked));
+          if (invs.length === 1) setInvestorId(invs[0]!.id);
+          else setInvestorId("");
         }
       } catch (e) {
         if (!cancelled) {
@@ -171,8 +174,8 @@ export function EsignSendPanel(props: Props) {
         <div className="space-y-2">
           <Label>Investor (CRM — deal access)</Label>
           <Select
-            value={investorId || "__pick__"}
-            onValueChange={(v) => setInvestorId(!v || v === "__pick__" ? "" : v)}
+            value={investorId || undefined}
+            onValueChange={(v) => setInvestorId(typeof v === "string" ? v : "")}
             disabled={loadingEligible || noDealLinked || eligible.length === 0}
           >
             <SelectTrigger className="h-10 rounded-xl">
@@ -181,7 +184,6 @@ export function EsignSendPanel(props: Props) {
               />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="__pick__">Choose investor…</SelectItem>
               {eligible.map((row) => (
                 <SelectItem key={row.id} value={row.id}>
                   {row.displayName} — {row.email}
