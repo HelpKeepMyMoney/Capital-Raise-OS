@@ -29,6 +29,10 @@ export type SerializedDataRoom = {
   investorPendingNdaSigningUrl?: string;
   /** Sponsor must sign before the investor link is active. */
   investorNdaAwaitingSponsor?: boolean;
+  /** Last time this guest clicked “Request NDA from sponsor” (server-only doc). */
+  investorNdaLastRequestedAt?: number;
+  /** True when guest is NDA-locked and has no in-flight signing step to open. */
+  investorNdaCanRequestSponsor?: boolean;
 };
 
 export type SerializedRoomDocument = {

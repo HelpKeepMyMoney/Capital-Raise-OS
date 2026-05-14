@@ -46,6 +46,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { UploadZone } from "@/components/data-room/UploadZone";
+import { InvestorNdaRequestButton } from "@/components/data-room/investor-nda-request-button";
 import {
   ArrowDown,
   ArrowUp,
@@ -176,6 +177,7 @@ type Props = {
   /** Present when an incomplete room NDA envelope has an active investor signing URL for this session. */
   investorPendingNdaSigningUrl?: string;
   investorNdaAwaitingSponsor?: boolean;
+  investorNdaCanRequestSponsor?: boolean;
   uploading: boolean;
   uploadProgress?: number | null;
   /** Room list for move-to-room */
@@ -640,6 +642,13 @@ export function DocumentManager(props: Props) {
             <p className="mt-4 text-amber-950/95 dark:text-amber-50/95">
               The sponsor is signing first. You&apos;ll receive a link by email when it&apos;s your turn.
             </p>
+          ) : props.investorNdaCanRequestSponsor ? (
+            <div className="mt-4 flex flex-col gap-3">
+              <InvestorNdaRequestButton roomId={props.selectedRoomId} className="w-fit rounded-lg" />
+              <p className="text-xs text-amber-950/90 dark:text-amber-50/95">
+                Emails leadership in this workspace when delivery is configured.
+              </p>
+            </div>
           ) : (
             <p className="mt-4 text-amber-950/90 dark:text-amber-50/95">
               Contact the sponsor if you haven&apos;t received a signing link, or confirm your CapitalOS email matches

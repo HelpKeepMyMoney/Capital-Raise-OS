@@ -16,6 +16,8 @@ export const col = {
   webhooks: "webhooks",
   subscriptions: "subscriptions",
   investorInvitations: "investor_invitations",
+  /** Investor guest asks sponsor to send / set up room NDA (Admin SDK only). */
+  roomNdaInvestorRequests: "room_nda_investor_requests",
   dealCommitments: "deal_commitments",
   signingRequests: "signing_requests",
   mndaSigningRequests: "mnda_signing_requests",

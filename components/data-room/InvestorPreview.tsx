@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import * as React from "react";
 import { formatDistanceToNow } from "date-fns";
 import { useMounted } from "@/hooks/use-mounted";
+import { InvestorNdaRequestButton } from "@/components/data-room/investor-nda-request-button";
 
 const KIND_ORDER: Partial<Record<SerializedRoomDocument["kind"], number>> = {
   deck: 0,
@@ -122,11 +123,18 @@ export function InvestorPreview(props: Props) {
             <p className="mt-4 text-sm font-medium text-amber-950 dark:text-amber-50">
               Waiting for the sponsor to sign first. You&apos;ll get an email when it&apos;s your turn.
             </p>
+          ) : props.room.investorNdaCanRequestSponsor ? (
+            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+              <InvestorNdaRequestButton roomId={props.room.id} className="rounded-lg" />
+              <p className="text-sm text-amber-950/90 dark:text-amber-50/95">
+                We&apos;ll email your sponsor. Use the same email here as in their CRM so signing matches your account.
+              </p>
+            </div>
           ) : (
             <p className="mt-4 text-sm text-amber-950/90 dark:text-amber-50/95">
-              If you don&apos;t see an <span className="font-medium">Open NDA signing</span> button, the sponsor still
-              needs to send the envelope from Data room → Settings, or your login email must match the one they used
-              for you in CRM.
+              If you don&apos;t see <span className="font-medium">Open NDA signing</span>, the sponsor still needs to
+              send the envelope from Data room → Settings, or your login email must match the one they used for you in
+              CRM.
             </p>
           )}
         </div>

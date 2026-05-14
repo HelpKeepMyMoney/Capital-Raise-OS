@@ -112,6 +112,7 @@ export function RoomWorkspace(props: Props) {
             investorDocsLockedByNda={props.room.investorDocsLockedByNda}
             investorPendingNdaSigningUrl={props.room.investorPendingNdaSigningUrl}
             investorNdaAwaitingSponsor={props.room.investorNdaAwaitingSponsor}
+            investorNdaCanRequestSponsor={props.room.investorNdaCanRequestSponsor}
             uploading={false}
             uploadProgress={null}
           />

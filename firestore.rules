@@ -170,6 +170,11 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    /** Investor guest NDA “request sponsor” pings — Admin SDK only */
+    match /room_nda_investor_requests/{id} {
+      allow read, write: if false;
+    }
+
     match /deal_commitments/{id} {
       allow read, write: if false;
     }

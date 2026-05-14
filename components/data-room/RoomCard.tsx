@@ -7,7 +7,10 @@ import type { SerializedDataRoom, SerializedDealLite } from "@/components/data-r
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { useMounted } from "@/hooks/use-mounted";
+import { InvestorNdaRequestButton } from "@/components/data-room/investor-nda-request-button";
 import { Archive, BarChart3, FolderOpen, Link2, Pencil } from "lucide-react";
+
+const NDA_REQUEST_BADGE_RECENT_MS = 14 * 24 * 60 * 60 * 1000;
 
 type Props = {
   room: SerializedDataRoom;
@@ -46,7 +49,14 @@ function statusBadges(room: SerializedDataRoom) {
     badges.push({ label: "Open", variant: "outline" });
   }
   if (room.investorDocsLockedByNda && !room.archived) {
-    badges.push({ label: "NDA signing required", variant: "outline", className: "border-amber-500/50 bg-amber-50 text-amber-950 dark:bg-amber-950/35 dark:text-amber-50" });
+    const recent =
+      typeof room.investorNdaLastRequestedAt === "number" &&
+      Date.now() - room.investorNdaLastRequestedAt < NDA_REQUEST_BADGE_RECENT_MS;
+    badges.push({
+      label: recent ? "NDA signing requested" : "NDA signing required",
+      variant: "outline",
+      className: "border-amber-500/50 bg-amber-50 text-amber-950 dark:bg-amber-950/35 dark:text-amber-50",
+    });
   }
   return badges;
 }
@@ -100,6 +110,12 @@ export function RoomCard(props: Props) {
             </Badge>
           ))}
         </div>
+
+        {!props.canManage && props.room.investorNdaCanRequestSponsor ? (
+          <div onClick={(e) => e.stopPropagation()}>
+            <InvestorNdaRequestButton roomId={props.room.id} className="w-full rounded-lg" size="sm" />
+          </div>
+        ) : null}
 
         {!props.canManage &&
         props.room.investorDocsLockedByNda &&

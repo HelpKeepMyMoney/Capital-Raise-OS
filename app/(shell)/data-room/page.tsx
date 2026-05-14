@@ -9,6 +9,7 @@ import {
   normalizeInvestorEmailForNda,
   resolveInvestorPendingDataRoomNdaForRooms,
 } from "@/lib/data-room/investor-nda-gate";
+import { fetchInvestorNdaRequestTimestamps } from "@/lib/data-room/nda-investor-request";
 import { getAdminFirestore } from "@/lib/firebase/admin";
 import { buildInvestorGuestMetrics, computeDataRoomMetrics } from "@/lib/data-room/metrics";
 import type { InviteRow } from "@/lib/data-room/server-queries";
@@ -94,18 +95,30 @@ export default async function DataRoomPage(props: {
 
   rooms = rooms.map((r) => {
     const pending = pendingNdaByRoom?.get(r.id);
+    const locked =
+      membership?.role === "investor_guest" &&
+      Boolean(r.ndaRequired) &&
+      (!ndaGuestEmailNorm || !completedNdaRoomIds.has(r.id));
+    const canRequestSponsor =
+      locked && pending?.kind !== "sign_now" && pending?.kind !== "await_sponsor";
     return {
       ...r,
-      investorDocsLockedByNda:
-        membership?.role === "investor_guest" &&
-        Boolean(r.ndaRequired) &&
-        (!ndaGuestEmailNorm || !completedNdaRoomIds.has(r.id)),
+      investorDocsLockedByNda: locked,
       investorNdaSignedAt: completedNdaByRoom.get(r.id)?.signedAt,
       investorNdaEnvelopeId: completedNdaByRoom.get(r.id)?.envelopeId,
       investorPendingNdaSigningUrl: pending?.kind === "sign_now" ? pending.signingUrl : undefined,
       investorNdaAwaitingSponsor: pending?.kind === "await_sponsor",
+      investorNdaCanRequestSponsor: canRequestSponsor,
     };
   });
+
+  if (membership?.role === "investor_guest") {
+    const ts = await fetchInvestorNdaRequestTimestamps(db, ctx.orgId, ctx.user.uid, rooms.map((r) => r.id));
+    rooms = rooms.map((r) => ({
+      ...r,
+      investorNdaLastRequestedAt: ts.get(r.id),
+    }));
+  }
 
   let documents: SerializedRoomDocument[] = docsSnap.docs.map((d) => {
     const x = d.data() as Record<string, unknown>;

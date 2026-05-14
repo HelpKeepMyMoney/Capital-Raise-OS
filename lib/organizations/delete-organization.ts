@@ -121,6 +121,7 @@ export async function deleteOrganizationFirestore(db: Firestore, orgId: string):
     col.documents,
     col.dataRooms,
     col.investorInvitations,
+    col.roomNdaInvestorRequests,
   ];
 
   for (const name of flatCollections) {
