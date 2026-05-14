@@ -208,82 +208,90 @@ export function DealGuestSigning(props: {
         </CardContent>
       </Card>
 
-      {props.questionnaireConfigured ? (
-        <Card className="rounded-2xl border-border/80 shadow-md">
-          <CardHeader>
-            <div className="flex flex-wrap items-center gap-2">
-              <FileSignature className="size-5 text-primary" />
-              <CardTitle className="font-heading text-lg">Investor questionnaire</CardTitle>
-              <Badge variant="secondary" className="ml-auto">
-                {labelForStatus(qStatus)}
-              </Badge>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              Your sponsor designates this questionnaire in Settings → E-sign. The same sponsor-first rules apply when
-              the template includes sponsor fields.
-            </p>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-            {qRow?.awaitingSponsorPrep ? (
-              <div className="w-full rounded-xl border border-border/80 bg-muted/30 p-3 text-sm">
-                <p className="font-medium text-foreground">Sponsor signs first</p>
-                <p className="mt-1 text-muted-foreground">
-                  {qSponsorNotifyOk === false
-                    ? "We could not email your sponsor automatically. Share the signing link below with your sponsor. After they finish, you will receive an email with your signing link."
-                    : qSponsorNotifyOk === true
-                      ? "We emailed your sponsor team a link to sign. After they finish, you will receive an email with your personal signing link."
-                      : "Your sponsor must complete their signing step first. After they finish, you will receive an email with your personal signing link."}
-                </p>
-                {qRow.sponsorSigningUrl ? (
-                  <details className="mt-2" open={qSponsorNotifyOk === false}>
-                    <summary className="cursor-pointer text-xs text-muted-foreground underline-offset-4 hover:underline">
-                      Share signing link manually
-                    </summary>
-                    <div className="mt-2 flex flex-wrap items-center gap-2">
-                      <code className="max-w-full truncate rounded-md bg-muted px-2 py-1 text-xs">
-                        {qRow.sponsorSigningUrl}
-                      </code>
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="sm"
-                        className="rounded-lg"
-                        onClick={() => {
-                          void navigator.clipboard.writeText(qRow.sponsorSigningUrl ?? "");
-                          toast.success("Sponsor link copied");
-                        }}
-                      >
-                        Copy link
-                      </Button>
-                    </div>
-                  </details>
-                ) : null}
-              </div>
-            ) : null}
-            {qRow?.signingUrl && qRow.status !== "completed" && qRow.status !== "declined" ? (
-              <a href={qRow.signingUrl} target="_blank" rel="noreferrer" className={cn(buttonVariants(), "rounded-xl")}>
-                Open questionnaire to sign
-              </a>
-            ) : null}
-            {showQRequest ? (
-              <Button type="button" className="rounded-xl" disabled={qLoading} onClick={() => void requestQuestionnaire()}>
-                {qLoading ? "Working…" : qRow ? "Request again / refresh questionnaire" : "Request investor questionnaire"}
-              </Button>
-            ) : null}
-            {qRow?.status === "completed" ? (
+      <Card className="rounded-2xl border-border/80 shadow-md">
+        <CardHeader>
+          <div className="flex flex-wrap items-center gap-2">
+            <FileSignature className="size-5 text-primary" />
+            <CardTitle className="font-heading text-lg">Investor questionnaire</CardTitle>
+            <Badge variant="secondary" className="ml-auto">
+              {labelForStatus(qStatus)}
+            </Badge>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            {props.questionnaireConfigured ? (
               <>
-                <p className="text-sm text-muted-foreground">Questionnaire is on file.</p>
-                <a
-                  href={`/api/esign/questionnaire/final-document?dealId=${encodeURIComponent(props.dealId)}`}
-                  className={cn(buttonVariants({ variant: "outline", size: "sm" }), "rounded-xl")}
-                >
-                  Download signed PDF
-                </a>
+                Your sponsor designates this questionnaire in Settings → E-sign. The same sponsor-first rules apply when
+                the template includes sponsor fields.
               </>
-            ) : null}
-          </CardContent>
-        </Card>
-      ) : null}
+            ) : (
+              <>
+                Your sponsor has not assigned an investor questionnaire template in Settings → E-sign yet. After they
+                connect one, you can request it here—the same sponsor-first flow as subscription documents. If you try
+                before it is set up, you will see a short message explaining what is missing.
+              </>
+            )}
+          </p>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+          {qRow?.awaitingSponsorPrep ? (
+            <div className="w-full rounded-xl border border-border/80 bg-muted/30 p-3 text-sm">
+              <p className="font-medium text-foreground">Sponsor signs first</p>
+              <p className="mt-1 text-muted-foreground">
+                {qSponsorNotifyOk === false
+                  ? "We could not email your sponsor automatically. Share the signing link below with your sponsor. After they finish, you will receive an email with your signing link."
+                  : qSponsorNotifyOk === true
+                    ? "We emailed your sponsor team a link to sign. After they finish, you will receive an email with your personal signing link."
+                    : "Your sponsor must complete their signing step first. After they finish, you will receive an email with your personal signing link."}
+              </p>
+              {qRow.sponsorSigningUrl ? (
+                <details className="mt-2" open={qSponsorNotifyOk === false}>
+                  <summary className="cursor-pointer text-xs text-muted-foreground underline-offset-4 hover:underline">
+                    Share signing link manually
+                  </summary>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <code className="max-w-full truncate rounded-md bg-muted px-2 py-1 text-xs">
+                      {qRow.sponsorSigningUrl}
+                    </code>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      className="rounded-lg"
+                      onClick={() => {
+                        void navigator.clipboard.writeText(qRow.sponsorSigningUrl ?? "");
+                        toast.success("Sponsor link copied");
+                      }}
+                    >
+                      Copy link
+                    </Button>
+                  </div>
+                </details>
+              ) : null}
+            </div>
+          ) : null}
+          {qRow?.signingUrl && qRow.status !== "completed" && qRow.status !== "declined" ? (
+            <a href={qRow.signingUrl} target="_blank" rel="noreferrer" className={cn(buttonVariants(), "rounded-xl")}>
+              Open questionnaire to sign
+            </a>
+          ) : null}
+          {showQRequest ? (
+            <Button type="button" className="rounded-xl" disabled={qLoading} onClick={() => void requestQuestionnaire()}>
+              {qLoading ? "Working…" : qRow ? "Request again / refresh questionnaire" : "Request investor questionnaire"}
+            </Button>
+          ) : null}
+          {qRow?.status === "completed" ? (
+            <>
+              <p className="text-sm text-muted-foreground">Questionnaire is on file.</p>
+              <a
+                href={`/api/esign/questionnaire/final-document?dealId=${encodeURIComponent(props.dealId)}`}
+                className={cn(buttonVariants({ variant: "outline", size: "sm" }), "rounded-xl")}
+              >
+                Download signed PDF
+              </a>
+            </>
+          ) : null}
+        </CardContent>
+      </Card>
 
       <Link
         href="/portal/commitments"

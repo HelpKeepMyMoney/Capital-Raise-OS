@@ -22,7 +22,7 @@ export function DealDetailShell(props: {
   subscriptionCompleted?: boolean;
   /** Investor: org questionnaire template signed for this deal. */
   questionnaireCompleted?: boolean;
-  /** When false, questionnaire CTA is hidden (org has no questionnaire template). */
+  /** Investor: show questionnaire CTA in sticky bar (same visibility as subscription). */
   questionnaireEnabled?: boolean;
   children: React.ReactNode;
 }) {

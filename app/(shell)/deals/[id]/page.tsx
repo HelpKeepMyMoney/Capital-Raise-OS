@@ -120,9 +120,7 @@ export default async function DealDetailPage(props: { params: Promise<{ id: stri
     signingRow = await getSigningRequest(ctx.orgId, id, ctx.user.uid);
     const org = await getOrganization(ctx.orgId);
     questionnaireConfigured = Boolean(org?.investorQuestionnaireSignableTemplateId?.trim());
-    if (questionnaireConfigured) {
-      questionnaireSigningRow = await getQuestionnaireSigningRequest(ctx.orgId, id, ctx.user.uid);
-    }
+    questionnaireSigningRow = await getQuestionnaireSigningRequest(ctx.orgId, id, ctx.user.uid);
   }
 
   const avgCheck = investorCount > 0 ? raised / investorCount : 0;
@@ -215,7 +213,7 @@ export default async function DealDetailPage(props: { params: Promise<{ id: stri
       calendarBookingUrl={deal.calendarBookingUrl}
       subscriptionCompleted={subscriptionCompleted}
       questionnaireCompleted={questionnaireCompleted}
-      questionnaireEnabled={guest && questionnaireConfigured}
+      questionnaireEnabled={guest}
     >
       <div className="mx-auto max-w-4xl space-y-12 px-4 pb-20 pt-6 md:px-6">
         <Link
@@ -241,7 +239,7 @@ export default async function DealDetailPage(props: { params: Promise<{ id: stri
             displayProgressPct={displayProgressPct}
             subscriptionCompleted={subscriptionCompleted}
             questionnaireCompleted={questionnaireCompleted}
-            questionnaireEnabled={guest && questionnaireConfigured}
+            questionnaireEnabled={guest}
           />
         </div>
 
