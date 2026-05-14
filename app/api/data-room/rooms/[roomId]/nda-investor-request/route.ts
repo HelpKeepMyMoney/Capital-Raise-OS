@@ -156,8 +156,7 @@ async function postNdaInvestorRequest(
       roomId,
       dealId: room.dealId ?? null,
       envelopeCreated: envResult.ok,
-      envelopeId: envResult.ok ? envResult.envelopeId : undefined,
-      envelopeError: envResult.ok ? undefined : envResult.error,
+      ...(envResult.ok ? { envelopeId: envResult.envelopeId } : { envelopeError: envResult.error }),
     },
   });
 
