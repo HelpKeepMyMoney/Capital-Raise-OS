@@ -4,6 +4,13 @@ AI-powered private capital platform: investor CRM, discovery, outreach, data roo
 
 ## Changelog
 
+### Data room — investor guest NDA signing link in UI
+
+- **`lib/data-room/investor-nda-gate.ts`:** **`resolveInvestorPendingDataRoomNdaForRooms`** resolves incomplete native **`data_room_nda`** envelopes per room for the signed-in guest’s **`investorEmailNorm`** — **`sign_now`** (active **`investorSigningUrl`**), **`await_sponsor`** (**`nextSignerRole === "sponsor"`**), or no actionable envelope.
+- **`app/(shell)/data-room/page.tsx`:** For **`investor_guest`**, attaches **`investorPendingNdaSigningUrl`** and **`investorNdaAwaitingSponsor`** to each serialized room alongside existing NDA completion metadata.
+- **`components/data-room/types.ts`:** **`SerializedDataRoom`** optional **`investorPendingNdaSigningUrl`** / **`investorNdaAwaitingSponsor`**.
+- **UI:** **`RoomCard`** — NDA room badge is outline (not a primary-looking control); real **Open NDA signing** link (`/sign?token=…`, new tab) when the investor step is active; helper text when the sponsor must sign first. **`InvestorPreview`** (banner + Mutual NDA section) and **`DocumentManager`** (NDA-locked alert) surface the same CTA and clearer guidance; **`RoomWorkspace`** passes signing props into **`DocumentManager`**.
+
 ### LP investor questionnaire e-sign (parity with subscription) and data room upload routes
 
 - **Firestore (`lib/firestore/paths.ts`, `lib/firestore/types.ts`, `lib/firestore/queries.ts`):** Separate signing-request doc id for questionnaires (**`questionnaireRequestDocId`**, suffix **`__questionnaire`**) vs subscription (**`signingRequestDocId`**, **`__sign`**). **`EsignEnvelopeContext`** adds **`kind: "deal_questionnaire"`** with **`dealId`** + **`userId`**. **`DealCommitment`** gains optional **`questionnaireDocStatus`** (**`pending` | `complete` | `none`**) alongside subscription **`docStatus`** so completion of one packet does not overwrite the other.

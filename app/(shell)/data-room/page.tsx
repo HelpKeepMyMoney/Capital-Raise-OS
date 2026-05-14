@@ -7,6 +7,7 @@ import {
   listInvestorCompletedNdaRoomIds,
   listInvestorLatestCompletedNdaByRoom,
   normalizeInvestorEmailForNda,
+  resolveInvestorPendingDataRoomNdaForRooms,
 } from "@/lib/data-room/investor-nda-gate";
 import { getAdminFirestore } from "@/lib/firebase/admin";
 import { buildInvestorGuestMetrics, computeDataRoomMetrics } from "@/lib/data-room/metrics";
@@ -86,15 +87,25 @@ export default async function DataRoomPage(props: {
       : new Map<string, { envelopeId: string; signedAt: number }>();
 
   let rooms = filterDataRoomsForMember(roomsRaw, membership);
-  rooms = rooms.map((r) => ({
-    ...r,
-    investorDocsLockedByNda:
-      membership?.role === "investor_guest" &&
-      Boolean(r.ndaRequired) &&
-      (!ndaGuestEmailNorm || !completedNdaRoomIds.has(r.id)),
-    investorNdaSignedAt: completedNdaByRoom.get(r.id)?.signedAt,
-    investorNdaEnvelopeId: completedNdaByRoom.get(r.id)?.envelopeId,
-  }));
+  const pendingNdaByRoom =
+    membership?.role === "investor_guest" && ndaGuestEmailNorm
+      ? await resolveInvestorPendingDataRoomNdaForRooms(db, ctx.orgId, ndaGuestEmailNorm, rooms.map((r) => r.id))
+      : null;
+
+  rooms = rooms.map((r) => {
+    const pending = pendingNdaByRoom?.get(r.id);
+    return {
+      ...r,
+      investorDocsLockedByNda:
+        membership?.role === "investor_guest" &&
+        Boolean(r.ndaRequired) &&
+        (!ndaGuestEmailNorm || !completedNdaRoomIds.has(r.id)),
+      investorNdaSignedAt: completedNdaByRoom.get(r.id)?.signedAt,
+      investorNdaEnvelopeId: completedNdaByRoom.get(r.id)?.envelopeId,
+      investorPendingNdaSigningUrl: pending?.kind === "sign_now" ? pending.signingUrl : undefined,
+      investorNdaAwaitingSponsor: pending?.kind === "await_sponsor",
+    };
+  });
 
   let documents: SerializedRoomDocument[] = docsSnap.docs.map((d) => {
     const x = d.data() as Record<string, unknown>;

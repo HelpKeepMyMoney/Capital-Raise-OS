@@ -173,6 +173,9 @@ type Props = {
   canManage: boolean;
   /** Investor cannot open previews until mutual NDA is completed (matched by session email). */
   investorDocsLockedByNda?: boolean;
+  /** Present when an incomplete room NDA envelope has an active investor signing URL for this session. */
+  investorPendingNdaSigningUrl?: string;
+  investorNdaAwaitingSponsor?: boolean;
   uploading: boolean;
   uploadProgress?: number | null;
   /** Room list for move-to-room */
@@ -622,9 +625,27 @@ export function DocumentManager(props: Props) {
         >
           <p className="font-semibold">Mutual NDA required</p>
           <p className="mt-2 text-amber-950/90 dark:text-amber-50/95">
-            You can&apos;t preview or download files in this room until the mutual NDA for your email address is completed.
-            Contact the sponsor if you haven&apos;t received the signing link.
+            You can&apos;t preview or download files in this room until the mutual NDA for your email address is
+            completed.
           </p>
+          {typeof props.investorPendingNdaSigningUrl === "string" && props.investorPendingNdaSigningUrl.length > 0 ? (
+            <div className="mt-4">
+              <Button asChild className="rounded-lg">
+                <a href={props.investorPendingNdaSigningUrl} target="_blank" rel="noopener noreferrer">
+                  Open NDA signing
+                </a>
+              </Button>
+            </div>
+          ) : props.investorNdaAwaitingSponsor ? (
+            <p className="mt-4 text-amber-950/95 dark:text-amber-50/95">
+              The sponsor is signing first. You&apos;ll receive a link by email when it&apos;s your turn.
+            </p>
+          ) : (
+            <p className="mt-4 text-amber-950/90 dark:text-amber-50/95">
+              Contact the sponsor if you haven&apos;t received a signing link, or confirm your CapitalOS email matches
+              the address they used when they set up your NDA.
+            </p>
+          )}
         </div>
       ) : null}
 

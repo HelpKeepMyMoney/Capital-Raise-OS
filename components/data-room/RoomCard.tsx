@@ -1,7 +1,7 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import type { SerializedDataRoom, SerializedDealLite } from "@/components/data-room/types";
 import { cn } from "@/lib/utils";
@@ -36,7 +36,11 @@ function statusBadges(room: SerializedDataRoom) {
   if (room.archived) badges.push({ label: "Archived", variant: "secondary" });
   else if (room.visibility === "invite_only") badges.push({ label: "Invite only", variant: "outline" });
   if (room.ndaRequired && !badges.some((b) => b.label === "Archived")) {
-    badges.push({ label: "NDA", variant: "default" });
+    badges.push({
+      label: "NDA",
+      variant: "outline",
+      className: "border-primary/35 text-foreground",
+    });
   }
   if (!badges.some((b) => b.label === "NDA") && !room.archived && room.visibility !== "invite_only") {
     badges.push({ label: "Open", variant: "outline" });
@@ -96,6 +100,29 @@ export function RoomCard(props: Props) {
             </Badge>
           ))}
         </div>
+
+        {!props.canManage &&
+        props.room.investorDocsLockedByNda &&
+        typeof props.room.investorPendingNdaSigningUrl === "string" &&
+        props.room.investorPendingNdaSigningUrl.length > 0 ? (
+          <a
+            href={props.room.investorPendingNdaSigningUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={cn(
+              buttonVariants({ size: "sm", className: "w-full justify-center rounded-lg font-medium" }),
+            )}
+            onClick={(e) => e.stopPropagation()}
+          >
+            Open NDA signing
+          </a>
+        ) : null}
+        {!props.canManage && props.room.investorDocsLockedByNda && props.room.investorNdaAwaitingSponsor ? (
+          <p className="text-[11px] leading-snug text-muted-foreground" onClick={(e) => e.stopPropagation()}>
+            Sponsor signs first. When it&apos;s your turn, check your email or refresh this page — an{" "}
+            <span className="font-medium text-foreground">Open NDA signing</span> button will appear here.
+          </p>
+        ) : null}
 
         <p className="text-xs text-muted-foreground">
           {props.docCount} Docs ·{" "}

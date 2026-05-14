@@ -85,3 +85,72 @@ export async function listInvestorLatestCompletedNdaByRoom(
   }
   return out;
 }
+
+/** In-flight native data-room NDA for this investor email (not yet completed). */
+export type InvestorRoomNdaPendingState =
+  | { kind: "sign_now"; signingUrl: string }
+  | { kind: "await_sponsor" }
+  | { kind: "no_actionable_envelope" };
+
+/**
+ * For each room id, resolve whether this investor may open `/sign?token=…` now, is waiting on the sponsor,
+ * or has no matching incomplete envelope (e.g. sponsor has not created one yet).
+ */
+export async function resolveInvestorPendingDataRoomNdaForRooms(
+  db: Firestore,
+  organizationId: string,
+  investorEmailNorm: string,
+  roomIds: string[],
+): Promise<Map<string, InvestorRoomNdaPendingState>> {
+  const out = new Map<string, InvestorRoomNdaPendingState>();
+  if (!investorEmailNorm || roomIds.length === 0) {
+    for (const id of roomIds) out.set(id, { kind: "no_actionable_envelope" });
+    return out;
+  }
+
+  const roomSet = new Set(roomIds);
+  const snap = await db
+    .collection(col.esignEnvelopes)
+    .where("organizationId", "==", organizationId)
+    .where("investorEmailNorm", "==", investorEmailNorm)
+    .limit(300)
+    .get();
+
+  type Best = { env: EsignEnvelope; updatedAt: number };
+  const bestByRoom = new Map<string, Best>();
+
+  for (const d of snap.docs) {
+    const env = { id: d.id, ...(d.data() as Omit<EsignEnvelope, "id">) } as EsignEnvelope;
+    if (env.context.kind !== "data_room_nda") continue;
+    const roomId = env.context.dataRoomId;
+    if (typeof roomId !== "string" || !roomSet.has(roomId)) continue;
+    if (env.status === "completed") continue;
+    const updatedAt = env.updatedAt ?? env.lastEventAt ?? env.createdAt ?? 0;
+    const prev = bestByRoom.get(roomId);
+    if (!prev || updatedAt > prev.updatedAt) {
+      bestByRoom.set(roomId, { env, updatedAt });
+    }
+  }
+
+  for (const id of roomIds) {
+    const best = bestByRoom.get(id);
+    if (!best) {
+      out.set(id, { kind: "no_actionable_envelope" });
+      continue;
+    }
+    const env = best.env;
+    if (env.nextSignerRole === "investor") {
+      const url = typeof env.investorSigningUrl === "string" ? env.investorSigningUrl.trim() : "";
+      if (url) {
+        out.set(id, { kind: "sign_now", signingUrl: url });
+        continue;
+      }
+    }
+    if (env.nextSignerRole === "sponsor") {
+      out.set(id, { kind: "await_sponsor" });
+      continue;
+    }
+    out.set(id, { kind: "no_actionable_envelope" });
+  }
+  return out;
+}

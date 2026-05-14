@@ -110,6 +110,8 @@ export function RoomWorkspace(props: Props) {
             selectedRoomId={props.room.id}
             canManage={props.canManage}
             investorDocsLockedByNda={props.room.investorDocsLockedByNda}
+            investorPendingNdaSigningUrl={props.room.investorPendingNdaSigningUrl}
+            investorNdaAwaitingSponsor={props.room.investorNdaAwaitingSponsor}
             uploading={false}
             uploadProgress={null}
           />

@@ -25,6 +25,10 @@ export type SerializedDataRoom = {
   /** Latest completed native NDA metadata for this viewer in this room. */
   investorNdaSignedAt?: number;
   investorNdaEnvelopeId?: string;
+  /** When set for `investor_guest`, opens native e-sign for an in-flight room NDA. */
+  investorPendingNdaSigningUrl?: string;
+  /** Sponsor must sign before the investor link is active. */
+  investorNdaAwaitingSponsor?: boolean;
 };
 
 export type SerializedRoomDocument = {

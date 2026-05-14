@@ -102,10 +102,33 @@ export function InvestorPreview(props: Props) {
         >
           <p className="font-semibold">Mutual NDA required before you can open diligence files</p>
           <p className="mt-2 leading-relaxed text-amber-950/90 dark:text-amber-50/95">
-            This room requires a completed mutual NDA. Your sponsor sends a signing link — use{" "}
+            This room requires a completed mutual NDA. Your sponsor may email you a signing link — use{" "}
             <span className="font-medium">the same email you use here</span> so completion matches your account.
             After both parties finish signing, refresh this page; materials will unlock automatically.
           </p>
+          {typeof props.room.investorPendingNdaSigningUrl === "string" &&
+          props.room.investorPendingNdaSigningUrl.length > 0 ? (
+            <div className="mt-4 flex flex-wrap gap-2">
+              <a
+                href={props.room.investorPendingNdaSigningUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={cn(buttonVariants({ className: "rounded-lg" }))}
+              >
+                Open NDA signing
+              </a>
+            </div>
+          ) : props.room.investorNdaAwaitingSponsor ? (
+            <p className="mt-4 text-sm font-medium text-amber-950 dark:text-amber-50">
+              Waiting for the sponsor to sign first. You&apos;ll get an email when it&apos;s your turn.
+            </p>
+          ) : (
+            <p className="mt-4 text-sm text-amber-950/90 dark:text-amber-50/95">
+              If you don&apos;t see an <span className="font-medium">Open NDA signing</span> button, the sponsor still
+              needs to send the envelope from Data room → Settings, or your login email must match the one they used
+              for you in CRM.
+            </p>
+          )}
         </div>
       ) : null}
       <Card className="overflow-hidden rounded-2xl border-border shadow-sm">
@@ -151,9 +174,27 @@ export function InvestorPreview(props: Props) {
                     </a>
                   </div>
                 ) : (
-                  <p className="text-muted-foreground">
-                    The NDA must be signed by both parties before the final document is available here.
-                  </p>
+                  <div className="space-y-3">
+                    <p className="text-muted-foreground">
+                      The NDA must be signed by both parties before the final document is available here.
+                    </p>
+                    {typeof props.room.investorPendingNdaSigningUrl === "string" &&
+                    props.room.investorPendingNdaSigningUrl.length > 0 ? (
+                      <a
+                        href={props.room.investorPendingNdaSigningUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={cn(buttonVariants({ size: "sm", className: "inline-flex rounded-lg" }))}
+                      >
+                        Open NDA signing
+                      </a>
+                    ) : props.room.investorNdaAwaitingSponsor ? (
+                      <p className="text-sm text-muted-foreground">
+                        Waiting for the sponsor to sign first. Refresh after they finish, or watch for an email with
+                        your link.
+                      </p>
+                    ) : null}
+                  </div>
                 )}
               </div>
             </section>
