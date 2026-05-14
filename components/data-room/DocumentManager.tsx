@@ -76,6 +76,13 @@ function normParentId(p: string | null | undefined): string | null {
   return null;
 }
 
+/** Folder path selects — show full labels in the trigger and dropdown (default Select clamps to one line). */
+const DATA_ROOM_FOLDER_SELECT_TRIGGER_CLASS =
+  "h-auto min-h-9 w-full min-w-0 items-start justify-between gap-2 whitespace-normal py-2.5 text-left [&_[data-slot=select-value]]:line-clamp-none [&_[data-slot=select-value]]:whitespace-normal [&_[data-slot=select-value]]:break-words [&_[data-slot=select-value]]:text-left";
+
+const DATA_ROOM_FOLDER_SELECT_CONTENT_CLASS =
+  "max-h-72 w-max min-w-72 max-w-[min(40rem,calc(100vw-2rem))]";
+
 function docSearchMatches(d: SerializedRoomDocument, q: string): boolean {
   const s = q.trim().toLowerCase();
   if (!s) return true;
@@ -672,10 +679,12 @@ export function DocumentManager(props: Props) {
                   onValueChange={(v) => setUploadFolderId(v === "__root__" ? null : v)}
                   disabled={!props.selectedRoomId}
                 >
-                  <SelectTrigger className="rounded-xl border-border">
+                  <SelectTrigger
+                    className={cn(DATA_ROOM_FOLDER_SELECT_TRIGGER_CLASS, "rounded-xl border-border")}
+                  >
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent alignItemWithTrigger={false} className={DATA_ROOM_FOLDER_SELECT_CONTENT_CLASS}>
                     <SelectItem value="__root__">Room root</SelectItem>
                     {allFolderOptions.map((o) => (
                       <SelectItem key={o.id} value={o.id}>
@@ -956,7 +965,7 @@ export function DocumentManager(props: Props) {
                               <DropdownMenuSubTrigger className="gap-2">
                                 <Folder className="h-3.5 w-3.5" /> Move to…
                               </DropdownMenuSubTrigger>
-                              <DropdownMenuSubContent className="max-h-72 w-60 overflow-y-auto rounded-xl">
+                              <DropdownMenuSubContent className="max-h-72 min-w-64 max-w-[min(40rem,calc(100vw-2rem))] w-max overflow-y-auto rounded-xl">
                                 <DropdownMenuItem
                                   disabled={!normParentId(d.parentFolderId)}
                                   onClick={() => void moveDocumentToFolder(d, null)}
@@ -977,6 +986,7 @@ export function DocumentManager(props: Props) {
                                   return opts.map((o) => (
                                     <DropdownMenuItem
                                       key={o.id}
+                                      className="max-w-[min(40rem,calc(100vw-2rem))] whitespace-normal break-words"
                                       disabled={normParentId(d.parentFolderId) === o.id}
                                       onClick={() => void moveDocumentToFolder(d, o.id)}
                                     >
@@ -1067,10 +1077,10 @@ export function DocumentManager(props: Props) {
                 value={editParentFolderId ?? "__root__"}
                 onValueChange={(v) => setEditParentFolderId(v === "__root__" ? null : v)}
               >
-                <SelectTrigger className="rounded-xl">
+                <SelectTrigger className={cn(DATA_ROOM_FOLDER_SELECT_TRIGGER_CLASS, "rounded-xl")}>
                   <SelectValue placeholder="Location" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent alignItemWithTrigger={false} className={DATA_ROOM_FOLDER_SELECT_CONTENT_CLASS}>
                   <SelectItem value="__root__">Room root</SelectItem>
                   {folderSelectOptions.map((o) => (
                     <SelectItem key={o.id} value={o.id}>
@@ -1142,10 +1152,10 @@ export function DocumentManager(props: Props) {
                 value={newFolderParentId ?? "__root__"}
                 onValueChange={(v) => setNewFolderParentId(v === "__root__" ? null : v)}
               >
-                <SelectTrigger className="rounded-xl">
+                <SelectTrigger className={cn(DATA_ROOM_FOLDER_SELECT_TRIGGER_CLASS, "rounded-xl")}>
                   <SelectValue placeholder="Location" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent alignItemWithTrigger={false} className={DATA_ROOM_FOLDER_SELECT_CONTENT_CLASS}>
                   <SelectItem value="__root__">Room root</SelectItem>
                   {allFolderOptions.map((o) => (
                     <SelectItem key={o.id} value={o.id}>
