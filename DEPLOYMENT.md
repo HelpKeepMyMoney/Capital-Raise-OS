@@ -31,7 +31,9 @@ turbopack: { root: __dirname },
    firebase deploy --only firestore,storage
    ```
 
-5. **Cloud Functions** (optional): `cd functions && npm install && npm run build`, then `firebase deploy --only functions`.
+5. **Storage bucket CORS (data room uploads):** File bytes are uploaded from the browser with a signed `PUT` to Google Cloud Storage, so the bucket must allow your web origins. Add a CORS rule that includes your production URL and `http://localhost:3000` (or your dev port), allows method **`PUT`**, and allows request header **`Content-Type`**. See [Set CORS on a bucket](https://cloud.google.com/storage/docs/configuring-cors#command-line).
+
+6. **Cloud Functions** (optional): `cd functions && npm install && npm run build`, then `firebase deploy --only functions`.
 
 ## PayPal
 
@@ -59,6 +61,7 @@ Password reset emails use **Firebase Admin** (`generatePasswordResetLink`) plus 
 
 - [ ] Firebase session cookie works over HTTPS (`secure` cookie in production).
 - [ ] CORS / authorized domains include your Vercel URL in Firebase Auth settings.
+- [ ] Firebase **Storage** bucket CORS allows browser `PUT` from your app origin (see **Firebase** section above).
 - [ ] PayPal return/cancel URLs match `NEXT_PUBLIC_APP_URL`.
 - [ ] Resend domain verified; outreach send tested.
 - [ ] Firestore composite indexes deployed (`firestore.indexes.json`).

@@ -45,7 +45,10 @@ export default async function PortalCommitmentsPage() {
                     <p className="text-xs capitalize text-muted-foreground">
                       {r.status} · {r.currency}
                       {r.docStatus && r.docStatus !== "none"
-                        ? ` · Docs: ${r.docStatus === "complete" ? "signed" : r.docStatus}`
+                        ? ` · Subscription: ${r.docStatus === "complete" ? "signed" : r.docStatus}`
+                        : ""}
+                      {r.questionnaireDocStatus && r.questionnaireDocStatus !== "none"
+                        ? ` · Questionnaire: ${r.questionnaireDocStatus === "complete" ? "signed" : r.questionnaireDocStatus}`
                         : ""}
                     </p>
                   </div>
@@ -53,7 +56,7 @@ export default async function PortalCommitmentsPage() {
                     ${r.amount.toLocaleString()}
                   </p>
                 </div>
-                <div className="mt-4 flex gap-2">
+                <div className="mt-4 flex flex-wrap gap-2">
                   <Link
                     href={`/deals/${r.dealId}`}
                     className={cn(buttonVariants({ variant: "outline", size: "sm" }), "rounded-lg")}
@@ -65,7 +68,15 @@ export default async function PortalCommitmentsPage() {
                       href={`/api/esign/subscription/final-document?dealId=${encodeURIComponent(r.dealId)}`}
                       className={cn(buttonVariants({ variant: "outline", size: "sm" }), "rounded-lg")}
                     >
-                      Download signed PDF
+                      Subscription PDF
+                    </a>
+                  ) : null}
+                  {r.questionnaireDocStatus === "complete" ? (
+                    <a
+                      href={`/api/esign/questionnaire/final-document?dealId=${encodeURIComponent(r.dealId)}`}
+                      className={cn(buttonVariants({ variant: "outline", size: "sm" }), "rounded-lg")}
+                    >
+                      Questionnaire PDF
                     </a>
                   ) : null}
                 </div>

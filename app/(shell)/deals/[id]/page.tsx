@@ -9,6 +9,8 @@ import {
   getDeal,
   getDealCommitmentForUser,
   getMembership,
+  getOrganization,
+  getQuestionnaireSigningRequest,
   getSigningRequest,
   hasActiveDataRoomForDeal,
   listActiveDataRoomsForDeal,
@@ -111,9 +113,16 @@ export default async function DealDetailPage(props: { params: Promise<{ id: stri
 
   let myCommitment: DealCommitment | null = null;
   let signingRow: SigningRequest | null = null;
+  let questionnaireSigningRow: SigningRequest | null = null;
+  let questionnaireConfigured = false;
   if (guest) {
     myCommitment = await getDealCommitmentForUser(ctx.orgId, id, ctx.user.uid);
     signingRow = await getSigningRequest(ctx.orgId, id, ctx.user.uid);
+    const org = await getOrganization(ctx.orgId);
+    questionnaireConfigured = Boolean(org?.investorQuestionnaireSignableTemplateId?.trim());
+    if (questionnaireConfigured) {
+      questionnaireSigningRow = await getQuestionnaireSigningRequest(ctx.orgId, id, ctx.user.uid);
+    }
   }
 
   const avgCheck = investorCount > 0 ? raised / investorCount : 0;
@@ -194,6 +203,7 @@ export default async function DealDetailPage(props: { params: Promise<{ id: stri
   const pitchDeckDoc = pickPitchDeckDocument(roomDocs);
 
   const subscriptionCompleted = signingRow?.status === "completed";
+  const questionnaireCompleted = questionnaireSigningRow?.status === "completed";
 
   return (
     <DealDetailShell
@@ -204,6 +214,8 @@ export default async function DealDetailPage(props: { params: Promise<{ id: stri
       showBookCall={showBookCallCta}
       calendarBookingUrl={deal.calendarBookingUrl}
       subscriptionCompleted={subscriptionCompleted}
+      questionnaireCompleted={questionnaireCompleted}
+      questionnaireEnabled={guest && questionnaireConfigured}
     >
       <div className="mx-auto max-w-4xl space-y-12 px-4 pb-20 pt-6 md:px-6">
         <Link
@@ -228,6 +240,8 @@ export default async function DealDetailPage(props: { params: Promise<{ id: stri
             momentumHints={momentumHints}
             displayProgressPct={displayProgressPct}
             subscriptionCompleted={subscriptionCompleted}
+            questionnaireCompleted={questionnaireCompleted}
+            questionnaireEnabled={guest && questionnaireConfigured}
           />
         </div>
 
@@ -317,6 +331,8 @@ export default async function DealDetailPage(props: { params: Promise<{ id: stri
               orgId={ctx.orgId}
               userId={ctx.user.uid}
               initial={signingRow}
+              initialQuestionnaire={questionnaireSigningRow}
+              questionnaireConfigured={questionnaireConfigured}
             />
             <SoftCommitChips dealId={deal.id} dealName={deal.name} minAmount={deal.minimumInvestment} />
             <Card id="commit" className="rounded-2xl border-border/80 shadow-md">

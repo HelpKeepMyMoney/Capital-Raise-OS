@@ -78,10 +78,10 @@ async function resolveUserUidForPrefill(
 ): Promise<string | null> {
   const ctx = env.context;
   if (role === "lp") {
-    return ctx.kind === "deal_subscription" ? ctx.userId : null;
+    return ctx.kind === "deal_subscription" || ctx.kind === "deal_questionnaire" ? ctx.userId : null;
   }
   if (role === "sponsor") {
-    if (ctx.kind === "deal_subscription") {
+    if (ctx.kind === "deal_subscription" || ctx.kind === "deal_questionnaire") {
       return prefillSessionUid ?? null;
     }
     if (prefillSessionUid) return prefillSessionUid;
@@ -154,7 +154,9 @@ export async function buildSignFieldPrefill(
 
   const wantsUserKeys = defs.some(defUsesUserMergePrefix);
   const lpNeedsProfile =
-    role === "lp" && env.context.kind === "deal_subscription" && defs.some(defUsesInvestorMergeKey);
+    role === "lp" &&
+    (env.context.kind === "deal_subscription" || env.context.kind === "deal_questionnaire") &&
+    defs.some(defUsesInvestorMergeKey);
 
   let profileDoc: (UserDoc & { id: string }) | null = null;
   if (wantsUserKeys || lpNeedsProfile) {
@@ -164,7 +166,7 @@ export async function buildSignFieldPrefill(
 
   if (profileDoc) {
     Object.assign(mergeSource, buildUserMergeFlat(profileDoc));
-    if (role === "lp" && env.context.kind === "deal_subscription") {
+    if (role === "lp" && (env.context.kind === "deal_subscription" || env.context.kind === "deal_questionnaire")) {
       Object.assign(
         mergeSource,
         trimMap({

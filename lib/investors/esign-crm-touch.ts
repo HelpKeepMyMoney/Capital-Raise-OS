@@ -19,6 +19,9 @@ function buildEsignSummary(ctx: EsignEnvelopeContext, label?: string): string {
   if (ctx.kind === "deal_subscription") {
     return "Completed subscription documents (e-sign)";
   }
+  if (ctx.kind === "deal_questionnaire") {
+    return "Completed investor questionnaire (e-sign)";
+  }
   if (ctx.kind === "ad_hoc" && label?.trim()) {
     return `Completed “${label.trim()}” (e-sign)`;
   }
@@ -60,7 +63,7 @@ export async function recordCrmTouchFromCompletedEnvelope(
       contextKind: ctx.kind,
     },
   };
-  if (ctx.kind === "deal_subscription") act.dealId = ctx.dealId;
+  if (ctx.kind === "deal_subscription" || ctx.kind === "deal_questionnaire") act.dealId = ctx.dealId;
 
   const batch = db.batch();
   batch.set(db.collection(col.activities).doc(id), act);

@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
   const ctx = env.context;
 
   if (payload.r === "lp") {
-    if (ctx.kind !== "deal_subscription") {
+    if (ctx.kind !== "deal_subscription" && ctx.kind !== "deal_questionnaire") {
       return NextResponse.json({ error: "Invalid envelope" }, { status: 400 });
     }
     const requesterId = ctx.userId;
@@ -73,7 +73,9 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(
           {
             error:
-              "Enter the email for the CapitalOS account that requested this subscription packet (use the field on the signing page), or sign in with that account in this browser.",
+              ctx.kind === "deal_questionnaire"
+                ? "Enter the email for the CapitalOS account that requested the investor questionnaire (use the field on the signing page), or sign in with that account in this browser."
+                : "Enter the email for the CapitalOS account that requested this subscription packet (use the field on the signing page), or sign in with that account in this browser.",
           },
           { status: 401 },
         );
@@ -88,6 +90,10 @@ export async function POST(req: NextRequest) {
       if (!record || record.uid !== requesterId) {
         let msg =
           "That email does not match the account that requested subscription documents. Use the same CapitalOS login you used when you clicked “Request subscription packet” on the deal.";
+        if (ctx.kind === "deal_questionnaire") {
+          msg =
+            "That email does not match the account that requested the questionnaire. Use the same CapitalOS login you used when you clicked “Request investor questionnaire” on the deal.";
+        }
         if (sessionUid && sessionUid !== requesterId && env.organizationId) {
           try {
             if (await userHasStaffAccessToOrg(sessionUid, env.organizationId)) {
@@ -104,7 +110,7 @@ export async function POST(req: NextRequest) {
       signerName = bodyName || record.displayName?.trim() || tryEmail.split("@")[0] || "Investor";
       prefillSessionUid = requesterId;
     }
-  } else if (payload.r === "sponsor" && ctx.kind === "deal_subscription") {
+  } else if (payload.r === "sponsor" && (ctx.kind === "deal_subscription" || ctx.kind === "deal_questionnaire")) {
     const orgId = env.organizationId;
     const auth = getAdminAuth();
 
@@ -214,7 +220,7 @@ export async function POST(req: NextRequest) {
           console.error("[esign sign-complete investor turn email]", e);
         }
       }
-    } else if (ndaCtx.kind === "deal_subscription") {
+    } else if (ndaCtx.kind === "deal_subscription" || ndaCtx.kind === "deal_questionnaire") {
       try {
         const lpUser = await getAdminAuth().getUser(ndaCtx.userId);
         const to = lpUser.email?.trim().toLowerCase();
@@ -243,12 +249,14 @@ export async function POST(req: NextRequest) {
       let touchInvestorEmail =
         normAddr(latest.investorEmailNorm) ?? normAddr(latest.investorEmail);
       const touchCtx = latest.context;
-      if (touchCtx.kind === "deal_subscription" && !touchInvestorEmail && touchCtx.userId) {
-        try {
-          const lp = await getAdminAuth().getUser(touchCtx.userId);
-          touchInvestorEmail = lp.email?.trim().toLowerCase() ?? null;
-        } catch {
-          /* noop */
+      if (touchCtx.kind === "deal_subscription" || touchCtx.kind === "deal_questionnaire") {
+        if (!touchInvestorEmail && touchCtx.userId) {
+          try {
+            const lp = await getAdminAuth().getUser(touchCtx.userId);
+            touchInvestorEmail = lp.email?.trim().toLowerCase() ?? null;
+          } catch {
+            /* noop */
+          }
         }
       }
       await recordCrmTouchFromCompletedEnvelope(db, latest, touchInvestorEmail);
@@ -267,7 +275,7 @@ export async function POST(req: NextRequest) {
         const doneCtx = latest.context;
         const auth = getAdminAuth();
 
-        if (doneCtx.kind === "deal_subscription") {
+        if (doneCtx.kind === "deal_subscription" || doneCtx.kind === "deal_questionnaire") {
           if (!investorEmail && doneCtx.userId) {
             try {
               const lp = await auth.getUser(doneCtx.userId);

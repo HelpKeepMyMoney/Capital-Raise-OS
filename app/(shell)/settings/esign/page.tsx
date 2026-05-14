@@ -36,7 +36,7 @@ export default async function EsignSettingsPage() {
       </p>
       <Card className="border-border bg-card shadow-sm">
         <CardHeader>
-          <CardTitle>Library & subscription</CardTitle>
+          <CardTitle>Library, subscription & questionnaire</CardTitle>
         </CardHeader>
         <CardContent>
           <EsignSettingsClient
@@ -44,6 +44,7 @@ export default async function EsignSettingsPage() {
             canManageTemplates={canTemplates}
             canSetSubscriptionTemplate={canSubscription}
             initialSubscriptionTemplateId={org?.subscriptionSignableTemplateId ?? null}
+            initialQuestionnaireTemplateId={org?.investorQuestionnaireSignableTemplateId ?? null}
           />
         </CardContent>
       </Card>

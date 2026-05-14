@@ -22,11 +22,60 @@ type ListRow = {
   updatedAt: number;
 };
 
+const TEMPLATE_SELECT_TRIGGER_CLASS =
+  "h-auto min-h-8 w-full min-w-0 max-w-full rounded-xl py-2 text-left whitespace-normal [&_[data-slot=select-value]]:line-clamp-none [&_[data-slot=select-value]]:whitespace-normal [&_[data-slot=select-value]]:break-words";
+
+const TEMPLATE_SELECT_CONTENT_CLASS =
+  "max-h-[min(40vh,var(--available-height))] min-w-[min(100vw-2rem,34rem)] max-w-[min(100vw-2rem,42rem)] overflow-x-visible sm:min-w-[36rem]";
+
+const TEMPLATE_SELECT_ITEM_CLASS =
+  "items-start py-1.5 [&_span]:max-w-full [&_span]:whitespace-normal [&_span]:break-words";
+
+function templateOptionLabel(t: ListRow): string {
+  return `${t.name} (${t.fieldCount} field${t.fieldCount === 1 ? "" : "s"})`;
+}
+
+function OrgTemplateSelect(props: {
+  value: string | null;
+  onValueChange: (next: string | null) => void;
+  templates: ListRow[];
+  disabled: boolean;
+  placeholder: string;
+  noneLabel?: string;
+}) {
+  const triggerLabel = React.useMemo(() => {
+    if (!props.value) return props.noneLabel ?? "None";
+    const t = props.templates.find((x) => x.id === props.value);
+    return t ? templateOptionLabel(t) : props.value;
+  }, [props.value, props.templates, props.noneLabel]);
+
+  return (
+    <Select
+      value={props.value ?? "__none__"}
+      onValueChange={(v) => props.onValueChange(v === "__none__" ? null : v)}
+      disabled={props.disabled}
+    >
+      <SelectTrigger className={TEMPLATE_SELECT_TRIGGER_CLASS}>
+        <SelectValue placeholder={props.placeholder}>{triggerLabel}</SelectValue>
+      </SelectTrigger>
+      <SelectContent align="start" alignItemWithTrigger={false} className={TEMPLATE_SELECT_CONTENT_CLASS}>
+        <SelectItem value="__none__">{props.noneLabel ?? "None"}</SelectItem>
+        {props.templates.map((t) => (
+          <SelectItem key={t.id} value={t.id} className={TEMPLATE_SELECT_ITEM_CLASS}>
+            {templateOptionLabel(t)}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
 export function EsignSettingsClient(props: {
   organizationId: string;
   canManageTemplates: boolean;
   canSetSubscriptionTemplate: boolean;
   initialSubscriptionTemplateId: string | null;
+  initialQuestionnaireTemplateId: string | null;
 }) {
   const [templates, setTemplates] = React.useState<ListRow[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -36,7 +85,19 @@ export function EsignSettingsClient(props: {
   const [subscriptionId, setSubscriptionId] = React.useState<string | null>(
     props.initialSubscriptionTemplateId,
   );
+  const [questionnaireId, setQuestionnaireId] = React.useState<string | null>(
+    props.initialQuestionnaireTemplateId,
+  );
   const [subscriptionSaving, setSubscriptionSaving] = React.useState(false);
+  const [questionnaireSaving, setQuestionnaireSaving] = React.useState(false);
+
+  React.useEffect(() => {
+    setSubscriptionId(props.initialSubscriptionTemplateId);
+  }, [props.initialSubscriptionTemplateId]);
+
+  React.useEffect(() => {
+    setQuestionnaireId(props.initialQuestionnaireTemplateId);
+  }, [props.initialQuestionnaireTemplateId]);
 
   const loadList = React.useCallback(async () => {
     setLoading(true);
@@ -101,6 +162,25 @@ export function EsignSettingsClient(props: {
     }
   }
 
+  async function saveQuestionnaireTemplate(value: string | null) {
+    setQuestionnaireSaving(true);
+    try {
+      const res = await fetch(`/api/organizations/${props.organizationId}/esign-settings`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ investorQuestionnaireSignableTemplateId: value }),
+      });
+      const json = (await res.json()) as { ok?: boolean; error?: string };
+      if (!res.ok) throw new Error(json.error ?? "Save failed");
+      setQuestionnaireId(value);
+      toast.success("Investor questionnaire template updated");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Save failed");
+    } finally {
+      setQuestionnaireSaving(false);
+    }
+  }
+
   async function deleteTemplate(t: ListRow) {
     if (
       !window.confirm(
@@ -116,38 +196,48 @@ export function EsignSettingsClient(props: {
       toast.success("Template deleted");
       setSelectedId((cur) => (cur === t.id ? null : cur));
       setSubscriptionId((cur) => (cur === t.id ? null : cur));
+      setQuestionnaireId((cur) => (cur === t.id ? null : cur));
       await loadList();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Delete failed");
     }
   }
 
+  const templatePickDisabled = loading || subscriptionSaving || questionnaireSaving;
+
   return (
     <div className="space-y-8">
       {props.canSetSubscriptionTemplate ? (
-        <div className="space-y-2">
-          <Label>Investor subscription packet</Label>
-          <p className="text-xs text-muted-foreground">
-            LP guests sign this template when they request subscription documents on a deal.
-          </p>
-          <div className="flex max-w-md flex-col gap-2 sm:flex-row sm:items-center">
-            <Select
-              value={subscriptionId ?? "__none__"}
-              onValueChange={(v) => void saveSubscriptionTemplate(v === "__none__" ? null : v)}
-              disabled={subscriptionSaving || loading}
-            >
-              <SelectTrigger className="rounded-xl">
-                <SelectValue placeholder="None — choose a template" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none__">None</SelectItem>
-                {templates.map((t) => (
-                  <SelectItem key={t.id} value={t.id}>
-                    {t.name} ({t.fieldCount} fields)
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+        <div className="space-y-6">
+          <div className="space-y-2">
+            <Label>Investor subscription packet</Label>
+            <p className="text-xs text-muted-foreground">
+              LP guests sign this template when they request subscription documents on a deal.
+            </p>
+            <OrgTemplateSelect
+              value={subscriptionId}
+              onValueChange={(v) => void saveSubscriptionTemplate(v)}
+              templates={templates}
+              disabled={templatePickDisabled}
+              placeholder="None — choose a template"
+              noneLabel="None"
+            />
+          </div>
+
+          <div className="space-y-2 border-t border-border/60 pt-6">
+            <Label>Investor questionnaire</Label>
+            <p className="text-xs text-muted-foreground">
+              Optional: pick a signable PDF (e.g. accreditation or suitability questionnaire). Stored org-wide on your
+              organization for flows that use it.
+            </p>
+            <OrgTemplateSelect
+              value={questionnaireId}
+              onValueChange={(v) => void saveQuestionnaireTemplate(v)}
+              templates={templates}
+              disabled={templatePickDisabled}
+              placeholder="None — choose a template"
+              noneLabel="None"
+            />
           </div>
         </div>
       ) : null}
@@ -189,7 +279,7 @@ export function EsignSettingsClient(props: {
                         className="flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5 text-left text-sm hover:bg-muted/50"
                         onClick={() => setSelectedId(t.id === selectedId ? null : t.id)}
                       >
-                        <span className="flex-1 truncate font-medium">{t.name}</span>
+                        <span className="flex-1 break-words font-medium">{t.name}</span>
                         <span className="shrink-0 text-xs text-muted-foreground">
                           {t.fieldCount} field{t.fieldCount === 1 ? "" : "s"}
                         </span>

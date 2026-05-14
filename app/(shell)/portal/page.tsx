@@ -2,7 +2,7 @@ import Link from "next/link";
 import { filterDealsForMember } from "@/lib/auth/investor-access";
 import { isInvestorGuestRole } from "@/lib/auth/rbac";
 import { requireOrgSession } from "@/lib/auth/session";
-import { getMembership, getSigningRequest, listDeals } from "@/lib/firestore/queries";
+import { getMembership, getOrganization, getQuestionnaireSigningRequest, getSigningRequest, listDeals } from "@/lib/firestore/queries";
 import { redirect } from "next/navigation";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -15,6 +15,8 @@ export default async function PortalHomePage() {
   if (!membership || !isInvestorGuestRole(membership.role)) redirect("/dashboard");
 
   const deals = filterDealsForMember(await listDeals(ctx.orgId), membership);
+  const org = await getOrganization(ctx.orgId);
+  const questionnaireOrgConfigured = Boolean(org?.investorQuestionnaireSignableTemplateId?.trim());
 
   const subscriptionRows = await Promise.all(
     deals.map(async (d) => ({
@@ -22,8 +24,21 @@ export default async function PortalHomePage() {
       signing: await getSigningRequest(ctx.orgId, d.id, ctx.user.uid),
     })),
   );
+  const questionnaireRows = questionnaireOrgConfigured
+    ? await Promise.all(
+        deals.map(async (d) => ({
+          deal: d,
+          signing: await getQuestionnaireSigningRequest(ctx.orgId, d.id, ctx.user.uid),
+        })),
+      )
+    : [];
   const completedSubs = subscriptionRows.filter((r) => r.signing?.status === "completed");
   const inFlightSubs = subscriptionRows.filter(
+    (r) => r.signing && r.signing.status !== "completed",
+  );
+
+  const completedQuestionnaires = questionnaireRows.filter((r) => r.signing?.status === "completed");
+  const inFlightQuestionnaires = questionnaireRows.filter(
     (r) => r.signing && r.signing.status !== "completed",
   );
 
@@ -149,6 +164,59 @@ export default async function PortalHomePage() {
           , or the deal page.
         </p>
       </section>
+
+      {questionnaireOrgConfigured ? (
+        <section className="rounded-2xl border border-border/80 bg-muted/20 p-6">
+          <div className="flex items-center gap-2 text-sm font-semibold">
+            <FileSignature className="size-4" />
+            Investor questionnaire (e-sign)
+          </div>
+          {completedQuestionnaires.length > 0 ? (
+            <ul className="mt-4 space-y-2">
+              {completedQuestionnaires.map(({ deal }) => (
+                <li
+                  key={`q-${deal.id}`}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/70 bg-card px-4 py-3 text-sm"
+                >
+                  <span className="font-medium">{deal.name}</span>
+                  <div className="flex flex-wrap gap-2">
+                    <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs font-medium text-emerald-800 dark:text-emerald-200">
+                      Signed
+                    </span>
+                    <Link
+                      href={`/api/esign/questionnaire/final-document?dealId=${encodeURIComponent(deal.id)}`}
+                      className={cn(buttonVariants({ variant: "outline", size: "sm" }), "rounded-lg")}
+                    >
+                      Download signed PDF
+                    </Link>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {inFlightQuestionnaires.length > 0 ? (
+            <ul className="mt-4 space-y-2">
+              {inFlightQuestionnaires.map(({ deal, signing }) => (
+                <li
+                  key={`qi-${deal.id}`}
+                  className="rounded-xl border border-dashed border-border/80 bg-background/50 px-4 py-3 text-sm text-muted-foreground"
+                >
+                  <span className="font-medium text-foreground">{deal.name}</span>
+                  {" · "}
+                  {signing?.awaitingSponsorPrep
+                    ? "Awaiting sponsor signature"
+                    : signing?.signingUrl
+                      ? "Ready for your signature — open the deal page"
+                      : "Questionnaire in progress"}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          <p className="mt-4 text-sm text-muted-foreground">
+            Request the investor questionnaire from each deal page when your sponsor has configured a template.
+          </p>
+        </section>
+      ) : null}
     </div>
   );
 }

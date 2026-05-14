@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
 import { getAdminBucket } from "@/lib/firebase/admin";
-import { col, dealCommitmentDocId, signingRequestDocId } from "@/lib/firestore/paths";
+import { col, dealCommitmentDocId, questionnaireRequestDocId, signingRequestDocId } from "@/lib/firestore/paths";
 import type {
   DataRoom,
   EsignEnvelope,
@@ -117,9 +117,9 @@ function stripUndefinedDeep(value: Record<string, unknown>): Record<string, unkn
 
 function roleForNext(
   template: SignableTemplate,
-  kind: "data_room_nda" | "deal_subscription" | "ad_hoc",
+  kind: "data_room_nda" | "deal_subscription" | "deal_questionnaire" | "ad_hoc",
 ): EsignSignerRole {
-  if (kind === "deal_subscription") {
+  if (kind === "deal_subscription" || kind === "deal_questionnaire") {
     return hasAssigneeFields(template.esignFields, "sponsor") ? "sponsor" : "lp";
   }
   return hasAssigneeFields(template.esignFields, "sponsor") ? "sponsor" : "investor";
@@ -185,26 +185,30 @@ export async function createNdaEnvelope(params: {
   };
 }
 
-export async function createSubscriptionEnvelope(params: {
+async function createDealLpPacketEnvelope(params: {
   db: Firestore;
   organizationId: string;
   dealId: string;
   userId: string;
   template: SignableTemplate;
+  envelopeDocId: string;
+  packetKind: "deal_subscription" | "deal_questionnaire";
 }): Promise<{
   envelope: EsignEnvelope;
   signingUrl: string | null;
   awaitingSponsorPrep: boolean;
 }> {
-  const { db, organizationId, dealId, userId, template } = params;
-  const docId = signingRequestDocId(organizationId, dealId, userId);
+  const { db, organizationId, dealId, userId, template, envelopeDocId, packetKind } = params;
   const now = Date.now();
   const bucket = getAdminBucket();
-  const workingPath = envelopeWorkingPath(organizationId, docId);
+  const workingPath = envelopeWorkingPath(organizationId, envelopeDocId);
   await copyTemplatePdfToWorking(bucket, template.storagePath, workingPath);
 
-  const next = roleForNext(template, "deal_subscription");
-  const ctx: EsignEnvelopeContext = { kind: "deal_subscription", dealId, userId };
+  const next = roleForNext(template, packetKind);
+  const ctx: EsignEnvelopeContext =
+    packetKind === "deal_subscription"
+      ? { kind: "deal_subscription", dealId, userId }
+      : { kind: "deal_questionnaire", dealId, userId };
   const exp = newExp();
 
   let sponsorSigningUrl: string | undefined;
@@ -212,11 +216,11 @@ export async function createSubscriptionEnvelope(params: {
   let awaitingSponsorPrep = false;
 
   if (next === "sponsor") {
-    const tok = mintEsignToken({ e: docId, r: "sponsor", exp });
+    const tok = mintEsignToken({ e: envelopeDocId, r: "sponsor", exp });
     sponsorSigningUrl = signingUrlFromToken(tok);
     awaitingSponsorPrep = true;
   } else {
-    const tok = mintEsignToken({ e: docId, r: "lp", exp });
+    const tok = mintEsignToken({ e: envelopeDocId, r: "lp", exp });
     lpSigningUrl = signingUrlFromToken(tok);
   }
 
@@ -235,13 +239,43 @@ export async function createSubscriptionEnvelope(params: {
     updatedAt: now,
   };
 
-  await db.collection(col.esignEnvelopes).doc(docId).set(stripUndefinedDeep(row as Record<string, unknown>));
+  await db.collection(col.esignEnvelopes).doc(envelopeDocId).set(stripUndefinedDeep(row as Record<string, unknown>));
 
   return {
-    envelope: { id: docId, ...(row as Omit<EsignEnvelope, "id">) },
+    envelope: { id: envelopeDocId, ...(row as Omit<EsignEnvelope, "id">) },
     signingUrl: lpSigningUrl ?? null,
     awaitingSponsorPrep,
   };
+}
+
+export async function createSubscriptionEnvelope(params: {
+  db: Firestore;
+  organizationId: string;
+  dealId: string;
+  userId: string;
+  template: SignableTemplate;
+}): Promise<{
+  envelope: EsignEnvelope;
+  signingUrl: string | null;
+  awaitingSponsorPrep: boolean;
+}> {
+  const docId = signingRequestDocId(params.organizationId, params.dealId, params.userId);
+  return createDealLpPacketEnvelope({ ...params, envelopeDocId: docId, packetKind: "deal_subscription" });
+}
+
+export async function createQuestionnaireEnvelope(params: {
+  db: Firestore;
+  organizationId: string;
+  dealId: string;
+  userId: string;
+  template: SignableTemplate;
+}): Promise<{
+  envelope: EsignEnvelope;
+  signingUrl: string | null;
+  awaitingSponsorPrep: boolean;
+}> {
+  const docId = questionnaireRequestDocId(params.organizationId, params.dealId, params.userId);
+  return createDealLpPacketEnvelope({ ...params, envelopeDocId: docId, packetKind: "deal_questionnaire" });
 }
 
 export async function createAdhocEnvelope(params: {
@@ -372,8 +406,8 @@ export async function completeSignerStep(input: CompleteSignerInput): Promise<
   const now = Date.now();
   const ctx = env.context;
 
-  /** advance */
-  if (ctx.kind === "deal_subscription") {
+  /** advance — LP deal packets (subscription + investor questionnaire) */
+  if (ctx.kind === "deal_subscription" || ctx.kind === "deal_questionnaire") {
     if (input.role === "sponsor") {
       const lpTok = mintEsignToken({ e: env.id, r: "lp", exp: newExp() });
       const lpSigningUrl = signingUrlFromToken(lpTok);
@@ -405,10 +439,14 @@ export async function completeSignerStep(input: CompleteSignerInput): Promise<
       },
       { merge: true },
     );
-    await input.db
+    const commitRef = input.db
       .collection(col.dealCommitments)
-      .doc(dealCommitmentDocId(env.organizationId, ctx.dealId, ctx.userId))
-      .set({ docStatus: "complete", updatedAt: now }, { merge: true });
+      .doc(dealCommitmentDocId(env.organizationId, ctx.dealId, ctx.userId));
+    if (ctx.kind === "deal_subscription") {
+      await commitRef.set({ docStatus: "complete", updatedAt: now }, { merge: true });
+    } else {
+      await commitRef.set({ questionnaireDocStatus: "complete", updatedAt: now }, { merge: true });
+    }
     return { ok: true, completed: true };
   }
 

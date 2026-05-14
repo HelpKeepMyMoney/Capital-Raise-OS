@@ -7,6 +7,7 @@ import { Wallet, Calendar } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useDealPageViewTelemetry } from "@/components/deals/deal-telemetry";
+import { RequestQuestionnairePacketButton } from "@/components/deals/request-questionnaire-packet-button";
 import { RequestSubscriptionPacketButton } from "@/components/deals/request-subscription-packet-button";
 
 export function DealDetailShell(props: {
@@ -19,6 +20,10 @@ export function DealDetailShell(props: {
   calendarBookingUrl?: string | null;
   /** Investor: subscription fully signed — sticky bar shows download instead of request. */
   subscriptionCompleted?: boolean;
+  /** Investor: org questionnaire template signed for this deal. */
+  questionnaireCompleted?: boolean;
+  /** When false, questionnaire CTA is hidden (org has no questionnaire template). */
+  questionnaireEnabled?: boolean;
   children: React.ReactNode;
 }) {
   const [showSticky, setShowSticky] = React.useState(false);
@@ -104,6 +109,14 @@ export function DealDetailShell(props: {
                   label="Request subscription packet"
                   subscriptionCompleted={props.subscriptionCompleted}
                 />
+                {props.questionnaireEnabled ? (
+                  <RequestQuestionnairePacketButton
+                    dealId={props.dealId}
+                    variant="outline"
+                    label="Request investor questionnaire"
+                    questionnaireCompleted={props.questionnaireCompleted}
+                  />
+                ) : null}
               </div>
             </div>
           </motion.div>

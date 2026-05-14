@@ -55,7 +55,7 @@ export async function GET(req: NextRequest) {
 
   /** For LP subscription step: requester’s Auth email so they can confirm identity if the session cookie is missing. */
   let subscriptionRequesterEmailHint: string | null = null;
-  if (payload.r === "lp" && env.context.kind === "deal_subscription") {
+  if (payload.r === "lp" && (env.context.kind === "deal_subscription" || env.context.kind === "deal_questionnaire")) {
     try {
       const u = await getAdminAuth().getUser(env.context.userId);
       subscriptionRequesterEmailHint = u.email?.trim().toLowerCase() ?? null;

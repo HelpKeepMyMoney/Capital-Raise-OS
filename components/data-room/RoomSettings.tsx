@@ -68,6 +68,12 @@ export function RoomSettings(props: Props) {
     })();
   }, [props.canManage]);
 
+  const signableTemplateTriggerLabel = React.useMemo(() => {
+    const id = form.signableTemplateId.trim();
+    if (!id) return "None";
+    return templates.find((t) => t.id === id)?.name ?? id;
+  }, [form.signableTemplateId, templates]);
+
   React.useEffect(() => {
     setForm({
       name: props.room.name,
@@ -206,15 +212,14 @@ export function RoomSettings(props: Props) {
           <div className="space-y-1">
             <h3 className="text-sm font-semibold text-foreground">Electronic signatures (e-sign)</h3>
             <p className="text-xs text-muted-foreground">
-              Upload PDFs and draw fields in the template library, then link a template to this room. Investors sign via
-              magic link.
+              Upload PDFs and draw fields in the template library, then pick one template <strong className="font-medium text-foreground/90">for this room</strong> (NDA or other access agreement before investors open the data room). Deal subscription packets are configured separately — see below.
             </p>
             <Button variant="outline" size="sm" className="mt-1 rounded-lg" asChild>
               <Link href="/settings/esign">Open e-sign template library</Link>
             </Button>
           </div>
           <div className="space-y-2 pt-1 border-t border-border/60">
-            <Label>NDA / agreement PDF for this room</Label>
+            <Label>NDA / room access agreement (this room)</Label>
             <Select
               value={form.signableTemplateId.trim() || "__none"}
               onValueChange={(v) =>
@@ -224,22 +229,37 @@ export function RoomSettings(props: Props) {
                 }))
               }
             >
-            <SelectTrigger className="rounded-xl">
-              <SelectValue placeholder="Choose template" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__none">None</SelectItem>
-              {templates.map((t) => (
-                <SelectItem key={t.id} value={t.id}>
-                  {t.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+              <SelectTrigger className="h-auto min-h-8 w-full min-w-0 max-w-full rounded-xl py-2 text-left whitespace-normal [&_[data-slot=select-value]]:line-clamp-none [&_[data-slot=select-value]]:whitespace-normal [&_[data-slot=select-value]]:break-words">
+                <SelectValue placeholder="Choose template">{signableTemplateTriggerLabel}</SelectValue>
+              </SelectTrigger>
+              <SelectContent
+                align="start"
+                alignItemWithTrigger={false}
+                className="max-h-[min(40vh,var(--available-height))] min-w-[min(100vw-2rem,34rem)] max-w-[min(100vw-2rem,42rem)] overflow-x-visible sm:min-w-[36rem]"
+              >
+                <SelectItem value="__none">None</SelectItem>
+                {templates.map((t) => (
+                  <SelectItem
+                    key={t.id}
+                    value={t.id}
+                    className="items-start py-1.5 [&_span]:max-w-full [&_span]:whitespace-normal [&_span]:break-words"
+                  >
+                    {t.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           <p className="text-[11px] text-muted-foreground">
             {props.esignTemplateLibraryConfigured
               ? "Pick a template from your org library, or create one in the e-sign template library."
               : "Create your first template in the e-sign template library (link above), then return here to select it."}
+          </p>
+          <p className="text-[11px] text-muted-foreground">
+            <strong className="font-medium text-foreground/90">Subscription agreements</strong> for investors who request subscription documents on a <strong className="font-medium text-foreground/90">deal</strong> are set org-wide: open{" "}
+            <Link href="/settings/esign" className="text-foreground underline underline-offset-2 hover:text-foreground">
+              Settings → E-sign
+            </Link>{" "}
+            and choose <strong className="font-medium text-foreground/90">Investor subscription packet</strong> (not in room settings).
           </p>
         </div>
 

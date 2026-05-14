@@ -76,7 +76,7 @@ export function EsignSendPanel(props: Props) {
   if (!props.ndaRequired || !props.hasNdaTemplate) {
     const reasons: string[] = [];
     if (!props.ndaRequired) reasons.push('turn on "NDA required before access" for this room');
-    if (!props.hasNdaTemplate) reasons.push("choose an agreement PDF template above");
+    if (!props.hasNdaTemplate) reasons.push("choose a room access agreement template above");
     return (
       <Card className="max-w-xl rounded-2xl border-dashed border-border bg-muted/15 shadow-sm">
         <CardHeader className="pb-2">

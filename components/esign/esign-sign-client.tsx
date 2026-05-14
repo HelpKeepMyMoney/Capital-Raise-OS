@@ -197,11 +197,14 @@ export function EsignSignClient(props: { initialToken: string }) {
     const needsEmailField =
       session.role === "sponsor" ||
       session.role === "investor" ||
-      (session.role === "lp" && session.contextKind === "deal_subscription");
+      (session.role === "lp" &&
+        (session.contextKind === "deal_subscription" || session.contextKind === "deal_questionnaire"));
     if (needsEmailField && !effectiveSignerEmail) {
       toast.error(
         session.role === "lp"
-          ? "Enter the email for the CapitalOS account that requested the subscription packet"
+          ? session.contextKind === "deal_questionnaire"
+            ? "Enter the email for the CapitalOS account that requested the investor questionnaire"
+            : "Enter the email for the CapitalOS account that requested the subscription packet"
           : "Enter your email (must match the invited address)",
       );
       return;
@@ -252,11 +255,11 @@ export function EsignSignClient(props: { initialToken: string }) {
   if (error) return <p className="text-sm text-destructive">{error}</p>;
   if (!session) return null;
 
+  const contextIsLpPacket =
+    session.contextKind === "deal_subscription" || session.contextKind === "deal_questionnaire";
   const showEmailForm =
-    session.role === "sponsor" ||
-    session.role === "investor" ||
-    (session.role === "lp" && session.contextKind === "deal_subscription");
-  const lpSubscription = session.role === "lp" && session.contextKind === "deal_subscription";
+    session.role === "sponsor" || session.role === "investor" || (session.role === "lp" && contextIsLpPacket);
+  const lpSubscription = session.role === "lp" && contextIsLpPacket;
   const pdfSrcBase =
     token.length > 0 ? `/api/esign/sign-document?token=${encodeURIComponent(token)}` : null;
 
@@ -305,14 +308,18 @@ export function EsignSignClient(props: { initialToken: string }) {
       <div className="order-1 min-w-0 space-y-6 rounded-2xl border border-border bg-card p-6 shadow-md xl:order-2 xl:sticky xl:top-4">
         <div>
           <h1 className="text-xl font-semibold">{session.templateName}</h1>
-          {session.contextKind === "deal_subscription" && session.role === "lp" ? (
+          {contextIsLpPacket && session.role === "lp" ? (
             <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-800/80 dark:bg-amber-950/40 dark:text-amber-100">
               <span className="font-medium">Investor (LP) step</span> — use the same CapitalOS account you used when you
-              clicked “Request subscription packet.” If sign-in does not stick (some browsers or email apps), confirm the
-              email below matches that account; we verify it against your login.
+              clicked
+              {session.contextKind === "deal_questionnaire"
+                ? " “Request investor questionnaire.”"
+                : " “Request subscription packet.”"}{" "}
+              If sign-in does not stick (some browsers or email apps), confirm the email below matches that account; we
+              verify it against your login.
             </p>
           ) : null}
-          {session.contextKind === "deal_subscription" && session.role === "sponsor" ? (
+          {contextIsLpPacket && session.role === "sponsor" ? (
             <p className="mt-2 rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-950 dark:border-sky-800/80 dark:bg-sky-950/40 dark:text-sky-100">
               <span className="font-medium">Sponsor step</span> — use your sponsor staff login in this browser, or
               enter your sponsor account email in the field below.
@@ -344,7 +351,9 @@ export function EsignSignClient(props: { initialToken: string }) {
               />
               <p className="text-[11px] text-muted-foreground">
                 {lpSubscription
-                  ? "Must be the account that requested subscription documents on the deal (same as your LP portal login)."
+                  ? session.contextKind === "deal_questionnaire"
+                    ? "Must be the account that requested the investor questionnaire on the deal (same as your LP portal login)."
+                    : "Must be the account that requested subscription documents on the deal (same as your LP portal login)."
                   : "Must match the email used for this signing request."}
               </p>
             </div>

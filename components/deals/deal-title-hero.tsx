@@ -11,6 +11,7 @@ import { fmtUsd } from "@/lib/deals/format";
 import type { Deal } from "@/lib/firestore/types";
 import { trackDealTelemetry } from "@/components/deals/deal-telemetry";
 import { ExpressInterestButton } from "@/components/express-interest-button";
+import { RequestQuestionnairePacketButton } from "@/components/deals/request-questionnaire-packet-button";
 import { RequestSubscriptionPacketButton } from "@/components/deals/request-subscription-packet-button";
 
 export function DealTitleHero(props: {
@@ -28,6 +29,8 @@ export function DealTitleHero(props: {
   displayProgressPct: number;
   /** Investor: subscription PDF fully signed — hero shows download instead of request. */
   subscriptionCompleted?: boolean;
+  questionnaireCompleted?: boolean;
+  questionnaireEnabled?: boolean;
 }) {
   const d = props.deal;
   const [logoFailed, setLogoFailed] = React.useState(false);
@@ -177,6 +180,14 @@ export function DealTitleHero(props: {
                   label="Request subscription packet"
                   subscriptionCompleted={props.subscriptionCompleted}
                 />
+                {props.questionnaireEnabled ? (
+                  <RequestQuestionnairePacketButton
+                    dealId={d.id}
+                    variant="outline"
+                    label="Request investor questionnaire"
+                    questionnaireCompleted={props.questionnaireCompleted}
+                  />
+                ) : null}
                 {showBook && d.calendarBookingUrl ? (
                   <a
                     href={d.calendarBookingUrl}

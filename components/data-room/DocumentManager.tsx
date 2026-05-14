@@ -219,31 +219,72 @@ export function DocumentManager(props: Props) {
   const mergedUploading = props.uploading || localBusy;
 
   async function uploadWithProgress(file: File, onPct: (n: number) => void): Promise<void> {
-    return new Promise((resolve, reject) => {
+    onPct(1);
+    const prepBody = {
+      dataRoomId: props.selectedRoomId,
+      kind,
+      parentFolderId: uploadFolderId ?? undefined,
+      fileName: file.name,
+      contentType: file.type || "application/octet-stream",
+      sizeBytes: file.size,
+    };
+    const prep = await fetch("/api/data-room/documents/prepare", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(prepBody),
+    });
+    if (!prep.ok) {
+      const j = (await prep.json().catch(() => ({}))) as { error?: string };
+      throw new Error(j.error ?? (prep.statusText || "Upload failed"));
+    }
+    const { docId, uploadUrl, contentType } = (await prep.json()) as {
+      docId: string;
+      uploadUrl: string;
+      contentType: string;
+    };
+
+    await new Promise<void>((resolve, reject) => {
       const xhr = new XMLHttpRequest();
-      xhr.open("POST", "/api/data-room/documents");
+      xhr.open("PUT", uploadUrl);
+      xhr.setRequestHeader("Content-Type", contentType);
       xhr.onload = () => {
         if (xhr.status >= 200 && xhr.status < 300) resolve();
         else {
           try {
             const j = JSON.parse(xhr.responseText) as { error?: string };
-            reject(new Error(j.error ?? xhr.statusText));
+            reject(new Error(j.error ?? `Storage upload failed (${xhr.status})`));
           } catch {
-            reject(new Error(xhr.statusText || "Upload failed"));
+            reject(new Error(`Storage upload failed (${xhr.status})`));
           }
         }
       };
       xhr.onerror = () => reject(new Error("Network error"));
       xhr.upload.onprogress = (e) => {
-        if (e.lengthComputable) onPct(Math.min(99, Math.round((e.loaded / e.total) * 100)));
+        if (e.lengthComputable) {
+          const slice = Math.min(98, Math.round((e.loaded / e.total) * 98));
+          onPct(1 + slice);
+        }
       };
-      const fd = new FormData();
-      fd.set("file", file);
-      fd.set("dataRoomId", props.selectedRoomId);
-      fd.set("kind", kind);
-      if (uploadFolderId) fd.set("parentFolderId", uploadFolderId);
-      xhr.send(fd);
+      xhr.send(file);
     });
+
+    onPct(99);
+    const fin = await fetch("/api/data-room/documents/finalize", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        docId,
+        dataRoomId: props.selectedRoomId,
+        kind,
+        parentFolderId: uploadFolderId ?? null,
+        fileName: file.name,
+      }),
+    });
+    if (!fin.ok) {
+      const j = (await fin.json().catch(() => ({}))) as { error?: string };
+      throw new Error(j.error ?? (fin.statusText || "Finalize failed"));
+    }
+    onPct(100);
   }
 
   async function onFiles(files: FileList | File[]) {

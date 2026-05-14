@@ -129,6 +129,8 @@ export type Organization = {
   };
   /** Native e-sign: `SignableTemplate` id for LP subscription packet PDF. */
   subscriptionSignableTemplateId?: string | null;
+  /** Optional org-wide questionnaire / accreditation PDF (`SignableTemplate` id) for investor workflows. */
+  investorQuestionnaireSignableTemplateId?: string | null;
   settings?: {
     defaultNdaRequired?: boolean;
     emailFromName?: string;
@@ -189,6 +191,8 @@ export type DealCommitment = {
   status: DealCommitmentStatus;
   /** Subscription / closing docs outstanding when set. */
   docStatus?: "pending" | "complete" | "none";
+  /** Investor questionnaire / accreditation PDF e-sign when set. */
+  questionnaireDocStatus?: "pending" | "complete" | "none";
   investingAs?: DealCommitmentInvestingAs;
   entityName?: string;
   accreditationStatus?: string;
@@ -511,6 +515,7 @@ export type SignableTemplate = {
 export type EsignEnvelopeContext =
   | { kind: "data_room_nda"; dataRoomId: string }
   | { kind: "deal_subscription"; dealId: string; userId: string }
+  | { kind: "deal_questionnaire"; dealId: string; userId: string }
   | { kind: "ad_hoc"; label?: string };
 
 export type EsignSignerRole = "sponsor" | "investor" | "lp";

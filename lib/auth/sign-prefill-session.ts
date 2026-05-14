@@ -24,11 +24,11 @@ export async function resolvePrefillSessionUid(
     const ctx = env.context;
 
     if (role === "lp") {
-      if (ctx.kind !== "deal_subscription") return null;
+      if (ctx.kind !== "deal_subscription" && ctx.kind !== "deal_questionnaire") return null;
       return uid === ctx.userId ? uid : null;
     }
 
-    if (role === "sponsor" && ctx.kind === "deal_subscription") {
+    if (role === "sponsor" && (ctx.kind === "deal_subscription" || ctx.kind === "deal_questionnaire")) {
       return (await userHasStaffAccessToOrg(uid, env.organizationId)) ? uid : null;
     }
 

@@ -1,5 +1,5 @@
 import { getAdminAuth, getAdminFirestore } from "@/lib/firebase/admin";
-import { col, memberDocId, dealCommitmentDocId, signingRequestDocId } from "@/lib/firestore/paths";
+import { col, memberDocId, dealCommitmentDocId, questionnaireRequestDocId, signingRequestDocId } from "@/lib/firestore/paths";
 import type {
   Activity,
   DataRoom,
@@ -539,6 +539,38 @@ export async function listOrganizationMembers(orgId: string): Promise<Organizati
     (a.displayName ?? a.email ?? a.userId).localeCompare(b.displayName ?? b.email ?? b.userId),
   );
   return out;
+}
+
+/** Latest investor questionnaire envelope / signing request for this LP + deal. */
+export async function getQuestionnaireSigningRequest(
+  orgId: string,
+  dealId: string,
+  userId: string,
+): Promise<SigningRequest | null> {
+  const db = getAdminFirestore();
+  const id = questionnaireRequestDocId(orgId, dealId, userId);
+  const ed = await db.collection(col.esignEnvelopes).doc(id).get();
+  if (ed.exists) {
+    const e = ed.data() as EsignEnvelope;
+    if (e.context.kind !== "deal_questionnaire") return null;
+    if (e.context.dealId !== dealId || e.context.userId !== userId) return null;
+    let signingUrl: string | undefined;
+    if (e.nextSignerRole === "lp") signingUrl = e.lpSigningUrl;
+    if (e.nextSignerRole === "sponsor") signingUrl = e.sponsorSigningUrl;
+    return {
+      id,
+      organizationId: orgId,
+      dealId,
+      userId,
+      nativeEnvelopeId: id,
+      status: e.status,
+      signingUrl,
+      awaitingSponsorPrep: e.nextSignerRole === "sponsor",
+      createdAt: e.createdAt,
+      updatedAt: e.updatedAt,
+    };
+  }
+  return null;
 }
 
 /** Latest subscription envelope / signing request for this LP + deal. */

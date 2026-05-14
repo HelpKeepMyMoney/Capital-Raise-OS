@@ -35,6 +35,11 @@ export function signingRequestDocId(orgId: string, dealId: string, userId: strin
   return `${orgId}__${dealId}__${userId}__sign`;
 }
 
+/** Native e-sign envelope id for LP + deal investor questionnaire (distinct from subscription packet). */
+export function questionnaireRequestDocId(orgId: string, dealId: string, userId: string) {
+  return `${orgId}__${dealId}__${userId}__questionnaire`;
+}
+
 export function investorNotesPath(orgId: string, investorId: string) {
   return `${col.investors}/${investorId}/notes`;
 }

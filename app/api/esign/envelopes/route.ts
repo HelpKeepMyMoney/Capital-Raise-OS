@@ -28,6 +28,10 @@ const CreateBodySchema = z.discriminatedUnion("kind", [
     dealId: z.string().min(1),
   }),
   z.object({
+    kind: z.literal("deal_questionnaire"),
+    dealId: z.string().min(1),
+  }),
+  z.object({
     kind: z.literal("ad_hoc"),
     templateId: z.string().uuid(),
     investorEmail: z.string().email(),
@@ -63,6 +67,13 @@ export async function POST(req: NextRequest) {
 
   if (body.kind === "deal_subscription") {
     return NextResponse.json({ error: "Use POST /api/esign/subscription/create for LP subscription" }, { status: 400 });
+  }
+
+  if (body.kind === "deal_questionnaire") {
+    return NextResponse.json(
+      { error: "Use POST /api/esign/questionnaire/create for LP investor questionnaire" },
+      { status: 400 },
+    );
   }
 
   if (body.kind === "ad_hoc") {

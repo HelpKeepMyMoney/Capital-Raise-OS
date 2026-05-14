@@ -174,10 +174,16 @@ export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: str
   const orgRef = db.collection(col.organizations).doc(session.orgId);
   const orgSnap = await orgRef.get();
   if (orgSnap.exists) {
-    const org = orgSnap.data() as { subscriptionSignableTemplateId?: string | null };
-    if (org.subscriptionSignableTemplateId === id) {
-      await orgRef.set({ subscriptionSignableTemplateId: null }, { merge: true });
+    const org = orgSnap.data() as {
+      subscriptionSignableTemplateId?: string | null;
+      investorQuestionnaireSignableTemplateId?: string | null;
+    };
+    const orgPatch: Record<string, null> = {};
+    if (org.subscriptionSignableTemplateId === id) orgPatch.subscriptionSignableTemplateId = null;
+    if (org.investorQuestionnaireSignableTemplateId === id) {
+      orgPatch.investorQuestionnaireSignableTemplateId = null;
     }
+    if (Object.keys(orgPatch).length) await orgRef.set(orgPatch, { merge: true });
   }
 
   const bucket = getAdminBucket();

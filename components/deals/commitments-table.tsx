@@ -49,16 +49,27 @@ export function CommitmentsTable(props: { rows: CommitmentRow[]; dealId: string 
                 {c.docStatus === "pending" ? "Follow on docs" : "—"}
               </td>
               <td className="px-4 py-3">
-                {c.docStatus === "complete" ? (
-                  <a
-                    href={`/api/esign/subscription/final-document?dealId=${encodeURIComponent(props.dealId)}&userId=${encodeURIComponent(c.userId)}`}
-                    className={cn(buttonVariants({ variant: "outline", size: "sm" }), "rounded-lg")}
-                  >
-                    Download signed PDF
-                  </a>
-                ) : (
-                  <span className="text-muted-foreground">—</span>
-                )}
+                <div className="flex flex-col gap-1.5">
+                  {c.docStatus === "complete" ? (
+                    <a
+                      href={`/api/esign/subscription/final-document?dealId=${encodeURIComponent(props.dealId)}&userId=${encodeURIComponent(c.userId)}`}
+                      className={cn(buttonVariants({ variant: "outline", size: "sm" }), "w-fit rounded-lg")}
+                    >
+                      Subscription PDF
+                    </a>
+                  ) : null}
+                  {c.questionnaireDocStatus === "complete" ? (
+                    <a
+                      href={`/api/esign/questionnaire/final-document?dealId=${encodeURIComponent(props.dealId)}&userId=${encodeURIComponent(c.userId)}`}
+                      className={cn(buttonVariants({ variant: "outline", size: "sm" }), "w-fit rounded-lg")}
+                    >
+                      Questionnaire PDF
+                    </a>
+                  ) : null}
+                  {c.docStatus !== "complete" && c.questionnaireDocStatus !== "complete" ? (
+                    <span className="text-muted-foreground">—</span>
+                  ) : null}
+                </div>
               </td>
             </tr>
           ))}

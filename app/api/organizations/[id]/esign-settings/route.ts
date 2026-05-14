@@ -6,9 +6,20 @@ import { getAdminFirestore } from "@/lib/firebase/admin";
 import { col } from "@/lib/firestore/paths";
 import { getMembership, getOrganization } from "@/lib/firestore/queries";
 
-const BodySchema = z.object({
-  subscriptionSignableTemplateId: z.string().uuid().nullable(),
-});
+const BodySchema = z
+  .object({
+    subscriptionSignableTemplateId: z.string().uuid().nullable().optional(),
+    investorQuestionnaireSignableTemplateId: z.string().uuid().nullable().optional(),
+  })
+  .strict();
+
+async function assertTemplateInOrg(orgId: string, templateId: string): Promise<NextResponse | null> {
+  const t = await getAdminFirestore().collection(col.signableTemplates).doc(templateId).get();
+  if (!t.exists) return NextResponse.json({ error: "Template not found" }, { status: 404 });
+  const row = t.data() as { organizationId?: string };
+  if (row.organizationId !== orgId) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  return null;
+}
 
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const session = await requireOrgSession();
@@ -38,21 +49,44 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     return NextResponse.json({ error: "Invalid body" }, { status: 400 });
   }
 
-  const { subscriptionSignableTemplateId } = parsed.data;
-  if (subscriptionSignableTemplateId) {
-    const t = await getAdminFirestore().collection(col.signableTemplates).doc(subscriptionSignableTemplateId).get();
-    if (!t.exists) return NextResponse.json({ error: "Template not found" }, { status: 404 });
-    const row = t.data() as { organizationId?: string };
-    if (row.organizationId !== orgId) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const data = parsed.data;
+  if (
+    data.subscriptionSignableTemplateId === undefined &&
+    data.investorQuestionnaireSignableTemplateId === undefined
+  ) {
+    return NextResponse.json({ error: "No updates" }, { status: 400 });
+  }
+
+  const updates: Record<string, string | null> = {};
+
+  if (data.subscriptionSignableTemplateId !== undefined) {
+    const id = data.subscriptionSignableTemplateId;
+    if (id) {
+      const err = await assertTemplateInOrg(orgId, id);
+      if (err) return err;
+    }
+    updates.subscriptionSignableTemplateId = id;
+  }
+
+  if (data.investorQuestionnaireSignableTemplateId !== undefined) {
+    const id = data.investorQuestionnaireSignableTemplateId;
+    if (id) {
+      const err = await assertTemplateInOrg(orgId, id);
+      if (err) return err;
+    }
+    updates.investorQuestionnaireSignableTemplateId = id;
   }
 
   const db = getAdminFirestore();
-  await db.collection(col.organizations).doc(orgId).set(
-    {
-      subscriptionSignableTemplateId: subscriptionSignableTemplateId ?? null,
-    },
-    { merge: true },
-  );
+  await db.collection(col.organizations).doc(orgId).set(updates, { merge: true });
 
-  return NextResponse.json({ ok: true, subscriptionSignableTemplateId: subscriptionSignableTemplateId ?? null });
+  return NextResponse.json({
+    ok: true,
+    ...(data.subscriptionSignableTemplateId !== undefined
+      ? { subscriptionSignableTemplateId: data.subscriptionSignableTemplateId ?? null }
+      : {}),
+    ...(data.investorQuestionnaireSignableTemplateId !== undefined
+      ? { investorQuestionnaireSignableTemplateId: data.investorQuestionnaireSignableTemplateId ?? null }
+      : {}),
+  });
 }
