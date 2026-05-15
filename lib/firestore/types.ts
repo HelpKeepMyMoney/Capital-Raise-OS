@@ -463,6 +463,8 @@ export type SigningRequest = {
   awaitingSponsorPrep?: boolean;
   /** LP can forward this URL to the sponsor when sponsor fields exist */
   sponsorSigningUrl?: string;
+  /** Native subscription: LP already signed; sponsor is counter-signing (investor-first flow). */
+  sponsorTurnAfterLpSigned?: boolean;
   createdAt: number;
   updatedAt: number;
 };
@@ -541,6 +543,8 @@ export type EsignEnvelope = {
   nextSignerRole?: EsignSignerRole;
   /** After sponsor-only field burn for subscription flows */
   subscriptionPrepComplete?: boolean;
+  /** Deal subscription: new envelopes are LP-first; omit on legacy sponsor-first rows. */
+  dealSubscriptionFirstSigner?: "lp" | "sponsor";
   sponsorEmailNorm?: string;
   /** Data-room NDA: new envelopes are investor-first; omit on older sponsor-first rows. */
   dataRoomNdaFirstSigner?: "investor" | "sponsor";

@@ -8,9 +8,11 @@ import { trackDealTelemetry } from "@/components/deals/deal-telemetry";
 export function ExpressInterestButton(props: {
   dealId: string;
   dealName: string;
-  variant?: "ghost" | "outline";
+  /** Primary blue on deal list; `ghost` for compact hero layout. */
+  variant?: "default" | "ghost" | "outline";
 }) {
   const [pending, setPending] = React.useState(false);
+  const visual = props.variant ?? "default";
 
   async function onExpress() {
     setPending(true);
@@ -31,15 +33,19 @@ export function ExpressInterestButton(props: {
     }
   }
 
+  const buttonVariant = visual === "outline" ? "outline" : visual === "ghost" ? "ghost" : "default";
+
   return (
     <Button
       type="button"
       size="sm"
-      variant={props.variant === "outline" ? "outline" : "ghost"}
+      variant={buttonVariant}
       className={
-        props.variant === "ghost"
+        visual === "ghost"
           ? "w-full rounded-xl border border-dashed border-border/90 text-muted-foreground hover:border-primary/40 hover:bg-muted/50 hover:text-foreground sm:w-auto"
-          : undefined
+          : visual === "default"
+            ? "rounded-xl shadow-sm"
+            : undefined
       }
       onClick={() => void onExpress()}
       disabled={pending}

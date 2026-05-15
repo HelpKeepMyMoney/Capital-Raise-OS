@@ -44,7 +44,9 @@ export default async function DealsPage() {
             }}
             canManage={canManage}
             showExpressInterest={guest}
-            expressInterestSlot={<ExpressInterestButton dealId={d.id} dealName={d.name} />}
+            expressInterestSlot={
+              <ExpressInterestButton key={d.id} dealId={d.id} dealName={d.name} />
+            }
           />
         ))}
         {deals.length === 0 ? (

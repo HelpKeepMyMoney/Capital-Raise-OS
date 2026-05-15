@@ -177,6 +177,7 @@ type Props = {
   /** Present when an incomplete room NDA envelope has an active investor signing URL for this session. */
   investorPendingNdaSigningUrl?: string;
   investorNdaAwaitingSponsor?: boolean;
+  investorNdaInvestorStepCompletedAt?: number;
   investorNdaCanRequestSponsor?: boolean;
   uploading: boolean;
   uploadProgress?: number | null;
@@ -638,6 +639,11 @@ export function DocumentManager(props: Props) {
                 </a>
               </Button>
             </div>
+          ) : typeof props.investorNdaInvestorStepCompletedAt === "number" ? (
+            <p className="mt-4 text-amber-950/95 dark:text-amber-50/95">
+              You&apos;ve signed your part of the mutual NDA. The sponsor is next to sign. The final combined PDF will
+              appear here once every party has signed.
+            </p>
           ) : props.investorNdaAwaitingSponsor ? (
             <p className="mt-4 text-amber-950/95 dark:text-amber-50/95">
               No signing link is active in this browser yet. If someone else needs to sign before you, you&apos;ll get
@@ -950,7 +956,14 @@ export function DocumentManager(props: Props) {
                         <span className="min-w-0">{d.name}</span>
                       </button>
                     ) : (
-                      <span className="line-clamp-2">{d.name}</span>
+                      <a
+                        href={`/api/data-room/documents/${encodeURIComponent(d.id)}/file`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="line-clamp-2 text-primary hover:underline"
+                      >
+                        {d.name}
+                      </a>
                     )}
                   </TableCell>
                   <TableCell>{kindLabel(d.kind)}</TableCell>

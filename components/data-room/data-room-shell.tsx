@@ -76,6 +76,14 @@ export function DataRoomShell(props: Props) {
     return rs;
   }, [props.rooms, dealFilterId, searchRooms]);
 
+  /** Base UI Select can show the raw value when the selected item is missing from the list; keep a human label. */
+  const alignDealSelectLabel = React.useMemo(() => {
+    if (!dealFilterId) return undefined;
+    const fromPicker = props.deals.find((d) => d.id === dealFilterId)?.name;
+    const fromRoom = props.roomDealMap[dealFilterId]?.name;
+    return fromPicker ?? fromRoom ?? dealFilterId;
+  }, [dealFilterId, props.deals, props.roomDealMap]);
+
   const selectedRoom = props.rooms.find((r) => r.id === selectedRoomId);
 
   const dealForRoom = selectedRoom?.dealId ? props.roomDealMap[selectedRoom.dealId] ?? null : null;
@@ -220,7 +228,7 @@ export function DataRoomShell(props: Props) {
         onUpload={() => wsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
       />
 
-      <RoomMetrics metrics={props.metrics} />
+      {props.canManage ? <RoomMetrics metrics={props.metrics} /> : null}
 
       <div ref={wsRef} className="grid gap-6 lg:grid-cols-[minmax(280px,340px),minmax(0,1fr)]">
         <aside className="space-y-4">
@@ -243,7 +251,7 @@ export function DataRoomShell(props: Props) {
                 }
               >
                 <SelectTrigger className="rounded-xl border-border">
-                  <SelectValue placeholder="All deals" />
+                  <SelectValue placeholder="All deals">{dealFilterId ? alignDealSelectLabel : undefined}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__all">All deals</SelectItem>

@@ -93,7 +93,7 @@ export async function listInvestorLatestCompletedNdaByRoom(
 /** In-flight native data-room NDA for this investor email (not yet completed). */
 export type InvestorRoomNdaPendingState =
   | { kind: "sign_now"; signingUrl: string }
-  | { kind: "await_sponsor" }
+  | { kind: "await_sponsor"; /** Present when the investor has signed and the sponsor is next. */ investorStepCompletedAt?: number }
   | { kind: "no_actionable_envelope" };
 
 /**
@@ -151,7 +151,9 @@ export async function resolveInvestorPendingDataRoomNdaForRooms(
       }
     }
     if (env.nextSignerRole === "sponsor") {
-      out.set(id, { kind: "await_sponsor" });
+      const investorStepCompletedAt =
+        typeof env.investorSignedAt === "number" && env.investorSignedAt > 0 ? env.investorSignedAt : undefined;
+      out.set(id, { kind: "await_sponsor", investorStepCompletedAt });
       continue;
     }
     out.set(id, { kind: "no_actionable_envelope" });

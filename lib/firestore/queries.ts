@@ -556,7 +556,10 @@ export async function getQuestionnaireSigningRequest(
     if (e.context.dealId !== dealId || e.context.userId !== userId) return null;
     let signingUrl: string | undefined;
     if (e.nextSignerRole === "lp") signingUrl = e.lpSigningUrl;
-    if (e.nextSignerRole === "sponsor") signingUrl = e.sponsorSigningUrl;
+    const sponsorSigningUrl =
+      typeof e.sponsorSigningUrl === "string" && e.sponsorSigningUrl.trim().length > 0
+        ? e.sponsorSigningUrl
+        : undefined;
     return {
       id,
       organizationId: orgId,
@@ -565,6 +568,7 @@ export async function getQuestionnaireSigningRequest(
       nativeEnvelopeId: id,
       status: e.status,
       signingUrl,
+      sponsorSigningUrl,
       awaitingSponsorPrep: e.nextSignerRole === "sponsor",
       createdAt: e.createdAt,
       updatedAt: e.updatedAt,
@@ -588,7 +592,15 @@ export async function getSigningRequest(
     if (e.context.dealId !== dealId || e.context.userId !== userId) return null;
     let signingUrl: string | undefined;
     if (e.nextSignerRole === "lp") signingUrl = e.lpSigningUrl;
-    if (e.nextSignerRole === "sponsor") signingUrl = e.sponsorSigningUrl;
+    const sponsorSigningUrl =
+      typeof e.sponsorSigningUrl === "string" && e.sponsorSigningUrl.trim().length > 0
+        ? e.sponsorSigningUrl
+        : undefined;
+    const awaitingSponsorPrep = e.nextSignerRole === "sponsor";
+    const sponsorTurnAfterLpSigned =
+      awaitingSponsorPrep &&
+      e.dealSubscriptionFirstSigner === "lp" &&
+      Boolean(e.subscriptionPrepComplete);
     return {
       id,
       organizationId: orgId,
@@ -597,7 +609,9 @@ export async function getSigningRequest(
       nativeEnvelopeId: id,
       status: e.status,
       signingUrl,
-      awaitingSponsorPrep: e.nextSignerRole === "sponsor",
+      sponsorSigningUrl,
+      awaitingSponsorPrep,
+      sponsorTurnAfterLpSigned,
       createdAt: e.createdAt,
       updatedAt: e.updatedAt,
     };

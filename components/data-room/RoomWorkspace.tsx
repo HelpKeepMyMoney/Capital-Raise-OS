@@ -3,6 +3,7 @@
 import * as React from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { DocumentManager } from "@/components/data-room/DocumentManager";
 import { ActivityAnalytics } from "@/components/data-room/ActivityAnalytics";
 import { InvestorAccessTable } from "@/components/data-room/InvestorAccessTable";
@@ -13,7 +14,6 @@ import type { SerializedDataRoom, SerializedRoomDocument, SerializedDealLite } f
 import type { InviteRow } from "@/lib/data-room/server-queries";
 import type { ActivityFeedItemDTO } from "@/lib/data-room/server-queries";
 import type { Deal } from "@/lib/firestore/types";
-import { cn } from "@/lib/utils";
 import { Search } from "lucide-react";
 
 type Props = {
@@ -44,15 +44,61 @@ export function RoomWorkspace(props: Props) {
   }
 
   const [query, setQuery] = React.useState("");
+  const [investorDocumentsOpen, setInvestorDocumentsOpen] = React.useState(false);
 
   React.useEffect(() => {
-    if (canManage) return;
-    if (workspaceTab === "investors") {
-      onWorkspaceTabChange?.("preview");
-    } else if (workspaceTab === undefined && internalTab === "investors") {
-      setInternalTab("preview");
-    }
-  }, [canManage, workspaceTab, internalTab, onWorkspaceTabChange]);
+    setInvestorDocumentsOpen(false);
+  }, [props.room.id]);
+
+  if (!props.canManage) {
+    return (
+      <div className="space-y-4">
+        <div className="relative max-w-md">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search files in this room…"
+            className="rounded-xl border-border bg-card pl-10"
+          />
+        </div>
+
+        {investorDocumentsOpen ? (
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold text-foreground">All documents</h3>
+              <Button type="button" size="sm" className="rounded-lg" onClick={() => setInvestorDocumentsOpen(false)}>
+                Back to portal
+              </Button>
+            </div>
+            <DocumentManager
+              rooms={props.roomSelectList}
+              documents={props.documentsForRoom}
+              documentSearch={query}
+              selectedRoomId={props.room.id}
+              canManage={false}
+              investorDocsLockedByNda={props.room.investorDocsLockedByNda}
+              investorPendingNdaSigningUrl={props.room.investorPendingNdaSigningUrl}
+              investorNdaAwaitingSponsor={props.room.investorNdaAwaitingSponsor}
+              investorNdaInvestorStepCompletedAt={props.room.investorNdaInvestorStepCompletedAt}
+              investorNdaCanRequestSponsor={props.room.investorNdaCanRequestSponsor}
+              uploading={false}
+              uploadProgress={null}
+            />
+          </div>
+        ) : (
+          <InvestorPreview
+            room={props.room}
+            deal={props.dealForRoom}
+            documentsForRoom={props.documentsForRoom}
+            lastLoginAtMs={props.lastLoginAtMs}
+            activitySinceMs={props.activitySinceMs}
+            onOpenDocuments={() => setInvestorDocumentsOpen(true)}
+          />
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -67,12 +113,7 @@ export function RoomWorkspace(props: Props) {
       </div>
 
       <Tabs value={tab} onValueChange={goTab} className="w-full">
-        <TabsList
-          className={cn(
-            "grid h-auto w-full max-w-3xl grid-cols-2 flex-wrap rounded-2xl bg-muted/60 p-1",
-            props.canManage ? "lg:grid-cols-5" : "lg:grid-cols-4",
-          )}
-        >
+        <TabsList className="grid h-auto w-full max-w-3xl grid-cols-2 flex-wrap rounded-2xl bg-muted/60 p-1 lg:grid-cols-5">
           <TabsTrigger value="preview" className="rounded-xl data-[state=active]:bg-card data-[state=active]:shadow-sm">
             Investor view
           </TabsTrigger>
@@ -113,6 +154,7 @@ export function RoomWorkspace(props: Props) {
             investorDocsLockedByNda={props.room.investorDocsLockedByNda}
             investorPendingNdaSigningUrl={props.room.investorPendingNdaSigningUrl}
             investorNdaAwaitingSponsor={props.room.investorNdaAwaitingSponsor}
+            investorNdaInvestorStepCompletedAt={props.room.investorNdaInvestorStepCompletedAt}
             investorNdaCanRequestSponsor={props.room.investorNdaCanRequestSponsor}
             uploading={false}
             uploadProgress={null}

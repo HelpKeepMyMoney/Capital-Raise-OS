@@ -20,6 +20,8 @@ export function DealDetailShell(props: {
   calendarBookingUrl?: string | null;
   /** Investor: subscription fully signed — sticky bar shows download instead of request. */
   subscriptionCompleted?: boolean;
+  subscriptionSigningUrl?: string;
+  subscriptionSponsorSigningNext?: boolean;
   /** Investor: org questionnaire template signed for this deal. */
   questionnaireCompleted?: boolean;
   /** Investor: show questionnaire CTA in sticky bar (same visibility as subscription). */
@@ -108,6 +110,8 @@ export function DealDetailShell(props: {
                   variant="outline"
                   label="Request subscription packet"
                   subscriptionCompleted={props.subscriptionCompleted}
+                  subscriptionSigningUrl={props.subscriptionSigningUrl}
+                  subscriptionSponsorSigningNext={props.subscriptionSponsorSigningNext}
                 />
                 {props.questionnaireEnabled ? (
                   <RequestQuestionnairePacketButton

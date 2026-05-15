@@ -202,6 +202,16 @@ export default async function DealDetailPage(props: { params: Promise<{ id: stri
 
   const subscriptionCompleted = signingRow?.status === "completed";
   const questionnaireCompleted = questionnaireSigningRow?.status === "completed";
+  const subscriptionSigningUrl =
+    guest &&
+    signingRow &&
+    signingRow.status !== "completed" &&
+    !signingRow.awaitingSponsorPrep &&
+    typeof signingRow.signingUrl === "string" &&
+    signingRow.signingUrl.trim().length > 0
+      ? signingRow.signingUrl.trim()
+      : undefined;
+  const subscriptionSponsorSigningNext = Boolean(guest && signingRow?.sponsorTurnAfterLpSigned);
 
   return (
     <DealDetailShell
@@ -212,8 +222,10 @@ export default async function DealDetailPage(props: { params: Promise<{ id: stri
       showBookCall={showBookCallCta}
       calendarBookingUrl={deal.calendarBookingUrl}
       subscriptionCompleted={subscriptionCompleted}
+      subscriptionSigningUrl={subscriptionSigningUrl}
+      subscriptionSponsorSigningNext={subscriptionSponsorSigningNext}
       questionnaireCompleted={questionnaireCompleted}
-      questionnaireEnabled={guest}
+      questionnaireEnabled={guest && questionnaireConfigured}
     >
       <div className="mx-auto max-w-4xl space-y-12 px-4 pb-20 pt-6 md:px-6">
         <Link
@@ -238,8 +250,10 @@ export default async function DealDetailPage(props: { params: Promise<{ id: stri
             momentumHints={momentumHints}
             displayProgressPct={displayProgressPct}
             subscriptionCompleted={subscriptionCompleted}
+            subscriptionSigningUrl={subscriptionSigningUrl}
+            subscriptionSponsorSigningNext={subscriptionSponsorSigningNext}
             questionnaireCompleted={questionnaireCompleted}
-            questionnaireEnabled={guest}
+            questionnaireEnabled={guest && questionnaireConfigured}
           />
         </div>
 
@@ -258,7 +272,7 @@ export default async function DealDetailPage(props: { params: Promise<{ id: stri
 
         <WhyInvest deal={deal} />
 
-        <TractionSection metrics={deal.tractionMetrics} />
+        <TractionSection metrics={deal.tractionMetrics} hideWhenEmpty={guest} />
 
         <FounderCredibility founder={deal.founder} sponsorProfileFallback={deal.sponsorProfile} />
 
@@ -288,6 +302,7 @@ export default async function DealDetailPage(props: { params: Promise<{ id: stri
               ? `/data-room?deal=${encodeURIComponent(deal.id)}#faq`
               : "#faq"
           }
+          hideWhenNoDocuments={guest}
         />
 
         {deal.investorUpdates && deal.investorUpdates.length > 0 ? (
@@ -372,7 +387,8 @@ export default async function DealDetailPage(props: { params: Promise<{ id: stri
           />
         ) : null}
 
-        {!hasWhyInvestNarrativeOnDeal(deal) &&
+        {!guest &&
+        !hasWhyInvestNarrativeOnDeal(deal) &&
         !deal.sponsorProfile &&
         !(deal.faqs && deal.faqs.length > 0) &&
         !deal.investorUpdates?.length ? (

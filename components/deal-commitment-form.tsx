@@ -40,6 +40,19 @@ function StatusRow(props: { label: string; state: "done" | "pending" | "open"; d
   );
 }
 
+const ACCREDITATION_SELECT_NONE = "__none__";
+const ACCREDITATION_VALUES = new Set(["accredited", "sophisticated", "unaccredited"]);
+
+function normalizeAccreditationStatus(raw: string | undefined): string {
+  if (!raw?.trim()) return "";
+  const v = raw.trim();
+  if (v === "non_accredited") return "unaccredited";
+  if (v === "qualified_client") return "sophisticated";
+  if (v === "unset") return "";
+  if (!ACCREDITATION_VALUES.has(v)) return "";
+  return v;
+}
+
 export function DealCommitmentForm(props: {
   dealId: string;
   dealName: string;
@@ -56,7 +69,9 @@ export function DealCommitmentForm(props: {
     init?.investingAs ?? "individual",
   );
   const [entityName, setEntityName] = React.useState(init?.entityName ?? "");
-  const [accreditation, setAccreditation] = React.useState(init?.accreditationStatus ?? "");
+  const [accreditation, setAccreditation] = React.useState(
+    normalizeAccreditationStatus(init?.accreditationStatus),
+  );
   const [preferredContact, setPreferredContact] = React.useState<"email" | "phone" | "either">(
     (init?.preferredContact as "email" | "phone" | "either" | undefined) ?? "email",
   );
@@ -67,7 +82,7 @@ export function DealCommitmentForm(props: {
     if (i?.status === "active" && i.amount) setAmount(String(i.amount));
     if (i?.investingAs) setInvestingAs(i.investingAs);
     setEntityName(i?.entityName ?? "");
-    setAccreditation(i?.accreditationStatus ?? "");
+    setAccreditation(normalizeAccreditationStatus(i?.accreditationStatus));
     if (i?.preferredContact === "email" || i?.preferredContact === "phone" || i?.preferredContact === "either") {
       setPreferredContact(i.preferredContact);
     }
@@ -198,17 +213,21 @@ export function DealCommitmentForm(props: {
             <div className="space-y-2">
               <Label>Accreditation (self-reported)</Label>
               <Select
-                value={accreditation || "unset"}
-                onValueChange={(v) => setAccreditation(!v || v === "unset" ? "" : v)}
+                value={accreditation === "" ? ACCREDITATION_SELECT_NONE : accreditation}
+                onValueChange={(v) =>
+                  setAccreditation(v === ACCREDITATION_SELECT_NONE ? "" : typeof v === "string" ? v : "")
+                }
               >
                 <SelectTrigger className="rounded-xl">
-                  <SelectValue placeholder="Select" />
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="unset">Prefer not to say</SelectItem>
-                  <SelectItem value="accredited">Accredited investor</SelectItem>
-                  <SelectItem value="qualified_client">Qualified client / purchaser</SelectItem>
-                  <SelectItem value="non_accredited">Not accredited</SelectItem>
+                  <SelectItem value={ACCREDITATION_SELECT_NONE} className="text-muted-foreground">
+                    Select
+                  </SelectItem>
+                  <SelectItem value="accredited">Accredited</SelectItem>
+                  <SelectItem value="sophisticated">Sophisticated</SelectItem>
+                  <SelectItem value="unaccredited">Unaccredited</SelectItem>
                 </SelectContent>
               </Select>
             </div>

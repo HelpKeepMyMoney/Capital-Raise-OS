@@ -39,8 +39,8 @@ export default async function DataRoomPage(props: {
 
   const sp = props.searchParams ? await props.searchParams : {};
   const dealParam = typeof sp.deal === "string" ? sp.deal.trim() : "";
-  const initialDealFilterId =
-    dealParam && (await getDeal(ctx.orgId, dealParam)) ? dealParam : undefined;
+  const urlDeal = dealParam ? await getDeal(ctx.orgId, dealParam) : null;
+  const initialDealFilterId = urlDeal ? dealParam : undefined;
 
   const db = getAdminFirestore();
   const [roomsSnap, docsSnap] = await Promise.all([
@@ -108,6 +108,10 @@ export default async function DataRoomPage(props: {
       investorNdaEnvelopeId: completedNdaByRoom.get(r.id)?.envelopeId,
       investorPendingNdaSigningUrl: pending?.kind === "sign_now" ? pending.signingUrl : undefined,
       investorNdaAwaitingSponsor: pending?.kind === "await_sponsor",
+      investorNdaInvestorStepCompletedAt:
+        pending?.kind === "await_sponsor" && typeof pending.investorStepCompletedAt === "number"
+          ? pending.investorStepCompletedAt
+          : undefined,
       investorNdaCanRequestSponsor: canRequestSponsor,
     };
   });
@@ -174,6 +178,33 @@ export default async function DataRoomPage(props: {
     roomDealMap[did] = await getDeal(ctx.orgId, did);
   }
 
+  /** Picker must list every deal we can filter by (including linked deals omitted from `dealsList` for guests). */
+  function dealToShellLite(d: Deal) {
+    return {
+      id: d.id,
+      name: d.name,
+      targetRaise: d.targetRaise,
+      minimumInvestment: d.minimumInvestment,
+      closeDate: d.closeDate,
+      status: d.status,
+    };
+  }
+  const dealPickerById = new Map<string, ReturnType<typeof dealToShellLite>>();
+  for (const d of dealsList) {
+    dealPickerById.set(d.id, dealToShellLite(d));
+  }
+  for (const did of dealIdsNeeded) {
+    if (dealPickerById.has(did)) continue;
+    const full = roomDealMap[did];
+    if (full) dealPickerById.set(did, dealToShellLite(full));
+  }
+  if (initialDealFilterId && !dealPickerById.has(initialDealFilterId) && urlDeal) {
+    dealPickerById.set(urlDeal.id, dealToShellLite(urlDeal));
+  }
+  const dealsForShell = [...dealPickerById.values()].sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
+  );
+
   const tplSnap = await db.collection(col.signableTemplates).where("organizationId", "==", ctx.orgId).limit(1).get();
   const esignTemplateLibraryConfigured = !tplSnap.empty;
 
@@ -182,14 +213,7 @@ export default async function DataRoomPage(props: {
       <DataRoomShell
         rooms={rooms}
         documents={documents}
-        deals={dealsList.map((d) => ({
-          id: d.id,
-          name: d.name,
-          targetRaise: d.targetRaise,
-          minimumInvestment: d.minimumInvestment,
-          closeDate: d.closeDate,
-          status: d.status,
-        }))}
+        deals={dealsForShell}
         roomDealMap={roomDealMap}
         metrics={metrics}
         invitations={invitationsOrEmpty}

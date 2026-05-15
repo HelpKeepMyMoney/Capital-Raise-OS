@@ -6,33 +6,13 @@ import type { Deal } from "@/lib/firestore/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
 import { Separator } from "@/components/ui/separator";
-import { buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
 import * as React from "react";
 import { formatDistanceToNow } from "date-fns";
 import { useMounted } from "@/hooks/use-mounted";
 import { InvestorNdaRequestButton } from "@/components/data-room/investor-nda-request-button";
-
-const KIND_ORDER: Partial<Record<SerializedRoomDocument["kind"], number>> = {
-  deck: 0,
-  ppm: 1,
-  legal: 2,
-  model: 3,
-  video: 4,
-  other: 5,
-  folder: 99,
-};
-
-function sortKeyDocuments(docs: SerializedRoomDocument[]) {
-  const filesOnly = docs.filter((d) => d.kind !== "folder");
-  return [...filesOnly].sort((a, b) => {
-    const ka = KIND_ORDER[a.kind] ?? 99;
-    const kb = KIND_ORDER[b.kind] ?? 99;
-    if (ka !== kb) return ka - kb;
-    return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
-  });
-}
+import { pickInvestorSpotlightDocuments } from "@/components/data-room/investor-spotlight-docs";
 
 type Props = {
   room: SerializedDataRoom;
@@ -82,7 +62,14 @@ export function InvestorPreview(props: Props) {
     ? props.room.welcomeMessage
     : "Welcome to the diligence room. Review materials and reach out with diligence questions.";
 
-  const keyDocs = React.useMemo(() => sortKeyDocuments(props.documentsForRoom), [props.documentsForRoom]);
+  const keyDocs = React.useMemo(
+    () => pickInvestorSpotlightDocuments(props.documentsForRoom),
+    [props.documentsForRoom],
+  );
+  const hasAnyFiles = React.useMemo(
+    () => props.documentsForRoom.some((d) => d.kind !== "folder"),
+    [props.documentsForRoom],
+  );
 
   const recentRows = React.useMemo(
     () => buildRecentRows(props.deal, props.documentsForRoom, props.activitySinceMs),
@@ -93,13 +80,16 @@ export function InvestorPreview(props: Props) {
 
   const loginUnavailable = props.lastLoginAtMs == null;
   const ndaLocked = Boolean(props.room.investorDocsLockedByNda);
+  const investorStepAt = props.room.investorNdaInvestorStepCompletedAt;
+  const investorNdaStepDoneAwaitingSponsor =
+    typeof investorStepAt === "number" && !props.room.investorNdaSignedAt;
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr),280px]">
+    <div className="space-y-4">
       {ndaLocked ? (
         <div
           role="alert"
-          className="rounded-2xl border border-amber-500/40 bg-amber-50 px-5 py-4 text-sm text-amber-950 lg:col-span-2 dark:border-amber-400/35 dark:bg-amber-950/40 dark:text-amber-50"
+          className="rounded-2xl border border-amber-500/40 bg-amber-50 px-5 py-4 text-sm text-amber-950 dark:border-amber-400/35 dark:bg-amber-950/40 dark:text-amber-50"
         >
           <p className="font-semibold">Mutual NDA required before you can open diligence files</p>
           <p className="mt-2 leading-relaxed text-amber-950/90 dark:text-amber-50/95">
@@ -110,15 +100,17 @@ export function InvestorPreview(props: Props) {
           {typeof props.room.investorPendingNdaSigningUrl === "string" &&
           props.room.investorPendingNdaSigningUrl.length > 0 ? (
             <div className="mt-4 flex flex-wrap gap-2">
-              <a
-                href={props.room.investorPendingNdaSigningUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={cn(buttonVariants({ className: "rounded-lg" }))}
-              >
-                Open NDA signing
-              </a>
+              <Button asChild className="rounded-lg">
+                <a href={props.room.investorPendingNdaSigningUrl} target="_blank" rel="noopener noreferrer">
+                  Open NDA signing
+                </a>
+              </Button>
             </div>
+          ) : investorNdaStepDoneAwaitingSponsor ? (
+            <p className="mt-4 text-sm font-medium text-amber-950 dark:text-amber-50">
+              You&apos;ve completed your part of the mutual NDA. The sponsor is next to sign; once they finish, the
+              envelope completes and the final PDF will be available here.
+            </p>
           ) : props.room.investorNdaAwaitingSponsor ? (
             <p className="mt-4 text-sm font-medium text-amber-950 dark:text-amber-50">
               You don&apos;t have an active signing link in this browser yet. Check your email or refresh this page when
@@ -159,6 +151,10 @@ export function InvestorPreview(props: Props) {
                       ? `Signed ${new Date(props.room.investorNdaSignedAt).toLocaleDateString()}`
                       : "Signed"}
                   </Badge>
+                ) : investorNdaStepDoneAwaitingSponsor ? (
+                  <Badge variant="secondary" className="rounded-full">
+                    Awaiting sponsor
+                  </Badge>
                 ) : (
                   <Badge variant="outline" className="rounded-full">
                     Pending
@@ -175,12 +171,23 @@ export function InvestorPreview(props: Props) {
                       </span>
                       .
                     </p>
-                    <a
-                      href={`/api/esign/room-nda/final-document?roomId=${encodeURIComponent(props.room.id)}`}
-                      className={cn(buttonVariants({ variant: "outline", size: "sm" }), "rounded-lg")}
-                    >
-                      Download signed NDA
-                    </a>
+                    <Button asChild variant="outline" size="sm" className="rounded-lg">
+                      <a href={`/api/esign/room-nda/final-document?roomId=${encodeURIComponent(props.room.id)}`}>
+                        Download signed NDA
+                      </a>
+                    </Button>
+                  </div>
+                ) : investorNdaStepDoneAwaitingSponsor ? (
+                  <div className="space-y-2">
+                    <p className="text-muted-foreground">
+                      You&apos;ve signed your part of the mutual NDA. The sponsor is next to sign. Diligence materials
+                      unlock after your signing step; the final combined PDF appears here once every party has signed.
+                    </p>
+                    {mounted ? (
+                      <p className="text-xs text-muted-foreground">
+                        Your step completed {formatDistanceToNow(investorStepAt, { addSuffix: true })}.
+                      </p>
+                    ) : null}
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -190,14 +197,15 @@ export function InvestorPreview(props: Props) {
                     </p>
                     {typeof props.room.investorPendingNdaSigningUrl === "string" &&
                     props.room.investorPendingNdaSigningUrl.length > 0 ? (
-                      <a
-                        href={props.room.investorPendingNdaSigningUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={cn(buttonVariants({ size: "sm", className: "inline-flex rounded-lg" }))}
-                      >
-                        Open NDA signing
-                      </a>
+                      <Button asChild size="sm" className="inline-flex rounded-lg">
+                        <a
+                          href={props.room.investorPendingNdaSigningUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Open NDA signing
+                        </a>
+                      </Button>
                     ) : props.room.investorNdaAwaitingSponsor ? (
                       <p className="text-sm text-muted-foreground">
                         No active signing link here yet. Check your email or refresh after others sign, if you&apos;re
@@ -214,13 +222,9 @@ export function InvestorPreview(props: Props) {
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h4 className="text-sm font-semibold text-foreground">Key documents</h4>
               {!ndaLocked ? (
-                <button
-                  type="button"
-                  onClick={props.onOpenDocuments}
-                  className="text-xs font-medium text-primary underline-offset-4 hover:underline"
-                >
-                  Open Documents tab
-                </button>
+                <Button type="button" size="sm" className="rounded-lg" onClick={props.onOpenDocuments}>
+                  View documents
+                </Button>
               ) : null}
             </div>
             {ndaLocked ? (
@@ -228,14 +232,25 @@ export function InvestorPreview(props: Props) {
                 Files are locked until your NDA is completed.
               </p>
             ) : keyDocs.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No documents in this room yet.</p>
+              <p className="text-sm text-muted-foreground">
+                {!hasAnyFiles
+                  ? "No documents in this room yet."
+                  : "No pitch deck, PPM, term sheet, financial projections, or articles-style file matched yet. Use View documents for the full library."}
+              </p>
             ) : (
               <ul className="divide-y divide-border rounded-xl border border-border">
-                {keyDocs.map((d) => (
+                {keyDocs.map(({ doc: d, label }) => (
                   <li key={d.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm">
-                    <span className="min-w-0 truncate font-medium text-foreground">{d.name}</span>
-                    <Badge variant="secondary" className="shrink-0 capitalize">
-                      {d.kind}
+                    <a
+                      href={`/api/data-room/documents/${encodeURIComponent(d.id)}/file`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="min-w-0 truncate font-medium text-primary hover:underline"
+                    >
+                      {d.name}
+                    </a>
+                    <Badge variant="secondary" className="shrink-0">
+                      {label}
                     </Badge>
                   </li>
                 ))}
@@ -258,8 +273,8 @@ export function InvestorPreview(props: Props) {
             ) : recentRows.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 {loginUnavailable
-                  ? "No deal notes or new uploads showed up in roughly the last 90 days. Open the Documents tab for the full library."
-                  : "No new deal notes or uploads since your last sign-in. Check the Documents tab for the full library."}
+                  ? "No deal notes or new uploads showed up in roughly the last 90 days. Use View documents for the full library."
+                  : "No new deal notes or uploads since your last sign-in. Use View documents for the full library."}
               </p>
             ) : (
               <ul className="space-y-4">
@@ -277,7 +292,17 @@ export function InvestorPreview(props: Props) {
                   ) : (
                     <li key={row.key} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border px-4 py-3 text-sm">
                       <div className="min-w-0">
-                        <span className="font-medium text-foreground">New file: {row.doc.name}</span>
+                        <span className="text-foreground">
+                          New file:{" "}
+                          <a
+                            href={`/api/data-room/documents/${encodeURIComponent(row.doc.id)}/file`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-medium text-primary hover:underline"
+                          >
+                            {row.doc.name}
+                          </a>
+                        </span>
                         <Badge variant="outline" className="ml-2 capitalize">
                           {row.doc.kind}
                         </Badge>
@@ -312,68 +337,21 @@ export function InvestorPreview(props: Props) {
 
           <Separator />
           <div className="flex flex-wrap gap-3">
-            <Link href="mailto:" className={cn(buttonVariants({ className: "rounded-xl" }))}>
-              Contact sponsor
-            </Link>
-            <Link
-              href={
-                props.deal?.calendarBookingUrl && props.deal.calendarBookingUrl.startsWith("http")
-                  ? props.deal.calendarBookingUrl
-                  : "#"
-              }
-              className={cn(buttonVariants({ variant: "outline", className: "rounded-xl" }))}
-            >
-              Book a call
-            </Link>
+            <Button asChild className="rounded-xl">
+              <Link href="mailto:">Contact sponsor</Link>
+            </Button>
+            <Button asChild variant="outline" className="rounded-xl">
+              <Link
+                href={
+                  props.deal?.calendarBookingUrl && props.deal.calendarBookingUrl.startsWith("http")
+                    ? props.deal.calendarBookingUrl
+                    : "#"
+                }
+              >
+                Book a call
+              </Link>
+            </Button>
           </div>
-        </CardContent>
-      </Card>
-
-      <Card className="h-fit rounded-2xl border-border shadow-sm">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base font-semibold">Raise snapshot</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4 text-sm">
-          {!props.room.dealId || !props.deal ? (
-            <p className="text-muted-foreground">
-              Link a deal in <span className="font-medium text-foreground">Settings</span> to populate target, minimum, and timeline.
-            </p>
-          ) : (
-            <>
-              <div>
-                <p className="text-xs uppercase text-muted-foreground">Raise target</p>
-                <p className="mt-1 font-medium tabular-nums">
-                  {props.deal.targetRaise != null ? `$${props.deal.targetRaise.toLocaleString("en-US")}` : "—"}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs uppercase text-muted-foreground">Minimum</p>
-                <p className="mt-1 font-medium tabular-nums">
-                  {props.deal.minimumInvestment != null
-                    ? `$${props.deal.minimumInvestment.toLocaleString("en-US")}`
-                    : "—"}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs uppercase text-muted-foreground">Timeline</p>
-                <p className="mt-1 font-medium">
-                  {props.deal.closeDate
-                    ? mounted
-                      ? new Date(props.deal.closeDate).toLocaleDateString(undefined, {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                        })
-                      : "…"
-                    : "TBD"}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs uppercase text-muted-foreground">Status</p>
-                <p className="mt-1 font-medium capitalize">{props.deal.status.replace(/_/g, " ")}</p>
-              </div>
-            </>
-          )}
         </CardContent>
       </Card>
     </div>

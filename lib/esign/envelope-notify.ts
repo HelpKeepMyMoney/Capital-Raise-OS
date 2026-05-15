@@ -108,13 +108,15 @@ export async function sendEsignSponsorTurnEmail(args: {
   }
 }
 
-/** Investor requested subscription docs — sponsor must sign first (deal subscription flow). */
+/** Investor requested subscription docs — sponsor must sign first (legacy), or sponsor turn after LP (new). */
 export async function sendDealSubscriptionSponsorSigningEmail(args: {
   orgName: string;
   sponsorEmails: string[];
   sponsorSigningUrl: string;
   dealName: string;
   investorLabel: string;
+  /** `sponsor_first` = legacy kickoff; `after_lp` = LP already signed, sponsor counter-signs. */
+  variant?: "sponsor_first" | "after_lp";
 }): Promise<void> {
   if (!process.env.RESEND_API_KEY || args.sponsorEmails.length === 0) return;
 
@@ -124,17 +126,29 @@ export async function sendDealSubscriptionSponsorSigningEmail(args: {
   const org = escapeHtmlForEmail(args.orgName);
 
   const href = args.sponsorSigningUrl.replace(/"/g, "&quot;");
+  const variant = args.variant ?? "sponsor_first";
+  const subject =
+    variant === "after_lp"
+      ? `Subscription packet — sponsor signature — ${args.orgName}`
+      : `Subscription packet — your signature needed — ${args.orgName}`;
+  const bodyHtml =
+    variant === "after_lp"
+      ? `<p><strong>${inv}</strong> has signed their part of the subscription documents on <strong>${deal}</strong> (${org}).</p>
+<p>Please add your sponsor signature to finish the packet:</p>
+<p><a href="${href}">Open sponsor signing page</a></p>
+<p style="font-size:13px;color:#666">If the button does not work, paste this URL into your browser:<br/>${href}</p>`
+      : `<p>An investor requested subscription documents on <strong>${deal}</strong> (${org}).</p>
+<p><strong>${inv}</strong> is waiting while you complete the sponsor signing step first.</p>
+<p>After you finish, they will receive an email with their personal signing link.</p>
+<p><a href="${href}">Open sponsor signing page</a></p>
+<p style="font-size:13px;color:#666">If the button does not work, paste this URL into your browser:<br/>${href}</p>`;
 
   try {
     await sendTransactionalEmail({
       from,
       to: args.sponsorEmails.length === 1 ? args.sponsorEmails[0]! : args.sponsorEmails,
-      subject: `Subscription packet — your signature needed — ${args.orgName}`,
-      html: `<p>An investor requested subscription documents on <strong>${deal}</strong> (${org}).</p>
-<p><strong>${inv}</strong> is waiting while you complete the sponsor signing step first.</p>
-<p>After you finish, they will receive an email with their personal signing link.</p>
-<p><a href="${href}">Open sponsor signing page</a></p>
-<p style="font-size:13px;color:#666">If the button does not work, paste this URL into your browser:<br/>${href}</p>`,
+      subject,
+      html: bodyHtml,
     });
   } catch (e) {
     console.error("[deal subscription sponsor kickoff email]", e);

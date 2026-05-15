@@ -135,8 +135,16 @@ export function RoomCard(props: Props) {
         ) : null}
         {!props.canManage && props.room.investorDocsLockedByNda && props.room.investorNdaAwaitingSponsor ? (
           <p className="text-[11px] leading-snug text-muted-foreground" onClick={(e) => e.stopPropagation()}>
-            When it&apos;s your turn to sign, check your email or refresh this page — an{" "}
-            <span className="font-medium text-foreground">Open NDA signing</span> button will appear here.
+            {typeof props.room.investorNdaInvestorStepCompletedAt === "number" ? (
+              <>
+                You&apos;ve signed; the sponsor is next. The final PDF will show here when the envelope completes.
+              </>
+            ) : (
+              <>
+                When it&apos;s your turn to sign, check your email or refresh this page — an{" "}
+                <span className="font-medium text-foreground">Open NDA signing</span> button will appear here.
+              </>
+            )}
           </p>
         ) : null}
 

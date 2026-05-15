@@ -17,6 +17,7 @@ export type SubscriptionPacketApiResponse = {
   signingUrl?: string | null;
   sponsorSigningUrl?: string | null;
   awaitingSponsorPrep?: boolean;
+  sponsorTurnAfterLpSigned?: boolean;
   sponsorNotificationSent?: boolean;
   status?: SigningRequestStatus;
 };
@@ -36,11 +37,17 @@ export async function postSubscriptionPacketRequest(dealId: string): Promise<Sub
 }
 
 export function subscriptionPacketToast(json: SubscriptionPacketApiResponse) {
-  if (json.awaitingSponsorPrep) {
+  if (json.awaitingSponsorPrep && !json.sponsorTurnAfterLpSigned) {
     toast.success(
       json.sponsorNotificationSent === false
         ? "Request recorded. Your sponsor must sign first—share the manual link in Subscription documents if they did not get an email. You will receive your signing link after they finish."
         : "Request sent. Your sponsor must sign first. You will get an email with your signing link after they finish.",
+    );
+  } else if (json.awaitingSponsorPrep && json.sponsorTurnAfterLpSigned) {
+    toast.success(
+      json.sponsorNotificationSent === false
+        ? "Your part is signed. We could not email your sponsor automatically—share the sponsor signing link from Subscription documents below."
+        : "Your part is signed. We emailed your sponsor to complete their signature.",
     );
   } else if (json.signingUrl) {
     window.open(json.signingUrl, "_blank", "noopener,noreferrer");
@@ -54,6 +61,10 @@ type ButtonProps = {
   dealId: string;
   /** When the native subscription envelope is fully signed, show download instead of request. */
   subscriptionCompleted?: boolean;
+  /** When an in-flight envelope already has an LP signing URL (e.g. after request), show this instead of Request. */
+  subscriptionSigningUrl?: string | null;
+  /** LP has signed; sponsor must counter-sign (no LP URL in this state). */
+  subscriptionSponsorSigningNext?: boolean;
   className?: string;
   variant?: "default" | "outline" | "secondary" | "ghost";
   size?: "default" | "sm" | "lg";
@@ -72,6 +83,10 @@ export function RequestSubscriptionPacketButton(props: ButtonProps) {
   const [loading, setLoading] = React.useState(false);
   const label = props.label ?? "Request subscription packet";
   const downloadLabel = "Download subscription packet";
+  const signHref =
+    typeof props.subscriptionSigningUrl === "string" && props.subscriptionSigningUrl.trim().length > 0
+      ? props.subscriptionSigningUrl.trim()
+      : null;
 
   if (props.subscriptionCompleted) {
     return (
@@ -89,6 +104,40 @@ export function RequestSubscriptionPacketButton(props: ButtonProps) {
         {props.showIcon !== false ? <Download className="size-4 shrink-0" /> : null}
         {downloadLabel}
       </Link>
+    );
+  }
+
+  if (signHref) {
+    return (
+      <a
+        href={signHref}
+        target="_blank"
+        rel="noreferrer"
+        className={cn(
+          buttonVariants({ variant: props.variant ?? "outline", size: props.size ?? "default" }),
+          "justify-center gap-2 rounded-xl",
+          props.fullWidth !== false && "w-full sm:w-auto",
+          props.className,
+        )}
+      >
+        {props.showIcon !== false ? <FileSignature className="size-4 shrink-0" /> : null}
+        Sign subscription documents
+      </a>
+    );
+  }
+
+  if (props.subscriptionSponsorSigningNext) {
+    return (
+      <span
+        className={cn(
+          buttonVariants({ variant: props.variant ?? "outline", size: props.size ?? "default" }),
+          "pointer-events-none cursor-default justify-center gap-2 rounded-xl opacity-90",
+          props.fullWidth !== false && "w-full sm:w-auto",
+          props.className,
+        )}
+      >
+        Awaiting sponsor signature
+      </span>
     );
   }
 

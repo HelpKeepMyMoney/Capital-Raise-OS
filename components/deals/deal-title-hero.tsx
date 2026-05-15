@@ -29,6 +29,8 @@ export function DealTitleHero(props: {
   displayProgressPct: number;
   /** Investor: subscription PDF fully signed — hero shows download instead of request. */
   subscriptionCompleted?: boolean;
+  subscriptionSigningUrl?: string;
+  subscriptionSponsorSigningNext?: boolean;
   questionnaireCompleted?: boolean;
   questionnaireEnabled?: boolean;
 }) {
@@ -179,6 +181,8 @@ export function DealTitleHero(props: {
                   variant="outline"
                   label="Request subscription packet"
                   subscriptionCompleted={props.subscriptionCompleted}
+                  subscriptionSigningUrl={props.subscriptionSigningUrl}
+                  subscriptionSponsorSigningNext={props.subscriptionSponsorSigningNext}
                 />
                 {props.questionnaireEnabled ? (
                   <RequestQuestionnairePacketButton

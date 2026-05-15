@@ -60,10 +60,15 @@ export async function POST(req: NextRequest) {
     if (e.context.kind === "deal_subscription") {
       let signingUrl: string | null = null;
       if (e.nextSignerRole === "lp") signingUrl = e.lpSigningUrl ?? null;
-      if (e.nextSignerRole === "sponsor") signingUrl = e.sponsorSigningUrl ?? null;
+      const sponsorSigningUrl =
+        typeof e.sponsorSigningUrl === "string" && e.sponsorSigningUrl.trim().length > 0 ? e.sponsorSigningUrl : null;
+
+      const awaitingSponsorPrep = e.nextSignerRole === "sponsor";
+      const sponsorTurnAfterLpSigned =
+        awaitingSponsorPrep && e.dealSubscriptionFirstSigner === "lp" && Boolean(e.subscriptionPrepComplete);
 
       let sponsorNotificationSent = false;
-      if (e.nextSignerRole === "sponsor" && e.sponsorSigningUrl && org) {
+      if (awaitingSponsorPrep && sponsorSigningUrl && org && !sponsorTurnAfterLpSigned) {
         const sponsorEmails = await resolveDealSubscriptionSponsorEmails(org);
         const authUser = await getAdminAuth().getUser(ctx.user.uid);
         const investorLabel =
@@ -73,9 +78,10 @@ export async function POST(req: NextRequest) {
         await sendDealSubscriptionSponsorSigningEmail({
           orgName: org.name,
           sponsorEmails,
-          sponsorSigningUrl: e.sponsorSigningUrl,
+          sponsorSigningUrl,
           dealName,
           investorLabel,
+          variant: "sponsor_first",
         });
         sponsorNotificationSent =
           sponsorEmails.length > 0 && Boolean(process.env.RESEND_API_KEY?.trim());
@@ -86,8 +92,9 @@ export async function POST(req: NextRequest) {
         id: docId,
         nativeEnvelopeId: docId,
         signingUrl,
-        sponsorSigningUrl: e.sponsorSigningUrl ?? null,
-        awaitingSponsorPrep: e.nextSignerRole === "sponsor",
+        sponsorSigningUrl,
+        awaitingSponsorPrep,
+        sponsorTurnAfterLpSigned,
         sponsorNotificationSent,
         status: e.status,
       });
@@ -117,6 +124,7 @@ export async function POST(req: NextRequest) {
         sponsorSigningUrl: envelope.sponsorSigningUrl,
         dealName,
         investorLabel,
+        variant: "sponsor_first",
       });
       sponsorNotificationSent =
         sponsorEmails.length > 0 && Boolean(process.env.RESEND_API_KEY?.trim());
@@ -130,6 +138,7 @@ export async function POST(req: NextRequest) {
       sponsorSigningUrl: envelope.sponsorSigningUrl ?? null,
       awaitingSponsorPrep,
       sponsorNotificationSent,
+      sponsorTurnAfterLpSigned: false,
       status: envelope.status,
     });
   } catch (e) {

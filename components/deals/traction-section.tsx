@@ -7,10 +7,13 @@ import { cn } from "@/lib/utils";
 export function TractionSection(props: {
   metrics?: DealTractionMetric[];
   className?: string;
+  /** When true, render nothing if there are no metrics (omit sponsor setup hints for investors). */
+  hideWhenEmpty?: boolean;
 }) {
   const m = props.metrics?.filter((x) => x.label.trim() && x.value.trim()) ?? [];
 
   if (m.length === 0) {
+    if (props.hideWhenEmpty) return null;
     return (
       <section className={cn("rounded-2xl border border-dashed border-border/80 bg-card/50 p-8", props.className)}>
         <h2 className="font-heading text-2xl font-bold tracking-tight">Traction</h2>

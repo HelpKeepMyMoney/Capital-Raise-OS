@@ -6,10 +6,10 @@ import { col } from "@/lib/firestore/paths";
 import type { EsignEnvelope } from "@/lib/firestore/types";
 import { verifyEsignToken } from "@/lib/esign/tokens";
 import { completeSignerStep } from "@/lib/esign/envelope-service";
-import { sendEsignCompletedEmails, sendEsignInvestorTurnEmail, sendEsignSponsorTurnEmail } from "@/lib/esign/envelope-notify";
+import { sendDealSubscriptionSponsorSigningEmail, sendEsignCompletedEmails, sendEsignInvestorTurnEmail, sendEsignSponsorTurnEmail } from "@/lib/esign/envelope-notify";
 import { resolveDealSubscriptionSponsorEmails } from "@/lib/esign/subscription-sponsor-emails";
 import { recordCrmTouchFromCompletedEnvelope } from "@/lib/investors/esign-crm-touch";
-import { getOrganization } from "@/lib/firestore/queries";
+import { getDeal, getOrganization } from "@/lib/firestore/queries";
 export async function POST(req: NextRequest) {
   const json = (await req.json()) as {
     token?: string;
@@ -201,6 +201,39 @@ export async function POST(req: NextRequest) {
 
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: result.status ?? 400 });
+  }
+
+  if (!result.completed && payload.r === "lp" && env.context.kind === "deal_subscription") {
+    const afterSnap = await db.collection(col.esignEnvelopes).doc(env.id).get();
+    if (afterSnap.exists) {
+      const after = { id: afterSnap.id, ...(afterSnap.data() as Omit<EsignEnvelope, "id">) };
+      const spo = after.sponsorSigningUrl?.trim();
+      if (after.dealSubscriptionFirstSigner === "lp" && after.nextSignerRole === "sponsor" && spo) {
+        try {
+          const subCtx = after.context;
+          if (subCtx.kind === "deal_subscription") {
+            const [org, dealRow, lpUser] = await Promise.all([
+              getOrganization(after.organizationId),
+              getDeal(after.organizationId, subCtx.dealId),
+              getAdminAuth().getUser(subCtx.userId),
+            ]);
+            const sponsorEmails = org ? await resolveDealSubscriptionSponsorEmails(org) : [];
+            const investorLabel =
+              lpUser.displayName?.trim() || lpUser.email?.trim() || "Investor";
+            await sendDealSubscriptionSponsorSigningEmail({
+              orgName: org?.name ?? "CapitalOS",
+              sponsorEmails,
+              sponsorSigningUrl: spo,
+              dealName: dealRow?.name?.trim() || "Deal",
+              investorLabel,
+              variant: "after_lp",
+            });
+          }
+        } catch (e) {
+          console.error("[esign sign-complete subscription sponsor-after-lp email]", e);
+        }
+      }
+    }
   }
 
   if (!result.completed && result.nextUrl && payload.r === "investor" && env.context.kind === "data_room_nda") {

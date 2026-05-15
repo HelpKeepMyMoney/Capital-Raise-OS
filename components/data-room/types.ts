@@ -27,8 +27,10 @@ export type SerializedDataRoom = {
   investorNdaEnvelopeId?: string;
   /** When set for `investor_guest`, opens native e-sign for an in-flight room NDA. */
   investorPendingNdaSigningUrl?: string;
-  /** Sponsor must sign before the investor link is active. */
+  /** True when the in-flight envelope is waiting on the sponsor (before or after the investor’s step). */
   investorNdaAwaitingSponsor?: boolean;
+  /** When the investor has signed their part but the envelope is not fully completed yet (sponsor is next). */
+  investorNdaInvestorStepCompletedAt?: number;
   /** Last time this guest clicked “Request NDA from sponsor” (server-only doc). */
   investorNdaLastRequestedAt?: number;
   /** True when guest is NDA-locked and has no in-flight signing step to open. */

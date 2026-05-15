@@ -212,7 +212,8 @@ export function EsignSettingsClient(props: {
           <div className="space-y-2">
             <Label>Investor subscription packet</Label>
             <p className="text-xs text-muted-foreground">
-              LP guests sign this template when they request subscription documents on a deal.
+              LP guests sign first when they request subscription documents on a deal. If the template includes sponsor
+              fields, your team receives a link to counter-sign after the LP finishes.
             </p>
             <OrgTemplateSelect
               value={subscriptionId}

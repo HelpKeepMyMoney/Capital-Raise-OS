@@ -12,7 +12,7 @@ const PRIMARY_NOTIFY_ROLES = new Set([
 ]);
 
 /**
- * Resolves who should receive “subscription packet — sponsor signs first” emails.
+ * Resolves who should receive subscription packet sponsor notifications (counter-signature or legacy sponsor-first).
  * Uses org contact email when set; otherwise Firebase Auth emails for org members.
  */
 export async function resolveDealSubscriptionSponsorEmails(org: Organization): Promise<string[]> {

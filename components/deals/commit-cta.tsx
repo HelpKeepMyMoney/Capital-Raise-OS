@@ -43,7 +43,7 @@ export function CommitCTA(props: {
         {props.showCommit ? (
           <a
             href="#express-interest"
-            className={cn(buttonVariants({ variant: "outline", size: "lg" }), "inline-flex rounded-xl")}
+            className={cn(buttonVariants({ size: "lg" }), "inline-flex rounded-xl shadow-sm")}
           >
             Express interest
           </a>
@@ -53,7 +53,7 @@ export function CommitCTA(props: {
             href={props.calendarUrl}
             target="_blank"
             rel="noreferrer"
-            className={cn(buttonVariants({ variant: "secondary", size: "lg" }), "rounded-xl")}
+            className={cn(buttonVariants({ size: "lg" }), "rounded-xl shadow-sm")}
             onClick={() => void trackDealTelemetry(props.dealId, "cta_book_call_click")}
           >
             <Phone className="mr-2 size-5" />
@@ -63,7 +63,7 @@ export function CommitCTA(props: {
         {props.showDataRoom && props.dataRoomHref ? (
           <Link
             href={props.dataRoomHref}
-            className={cn(buttonVariants({ variant: "outline", size: "lg" }), "rounded-xl")}
+            className={cn(buttonVariants({ size: "lg" }), "rounded-xl shadow-sm")}
             onClick={() => void trackDealTelemetry(props.dealId, "cta_data_room_click")}
           >
             <Calendar className="mr-2 size-5" />

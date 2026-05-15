@@ -117,9 +117,9 @@ function stripUndefinedDeep(value: Record<string, unknown>): Record<string, unkn
 
 function roleForNext(
   template: SignableTemplate,
-  kind: "data_room_nda" | "deal_subscription" | "deal_questionnaire" | "ad_hoc",
+  kind: "data_room_nda" | "deal_questionnaire" | "ad_hoc",
 ): EsignSignerRole {
-  if (kind === "deal_subscription" || kind === "deal_questionnaire") {
+  if (kind === "deal_questionnaire") {
     return hasAssigneeFields(template.esignFields, "sponsor") ? "sponsor" : "lp";
   }
   return hasAssigneeFields(template.esignFields, "sponsor") ? "sponsor" : "investor";
@@ -199,7 +199,8 @@ async function createDealLpPacketEnvelope(params: {
   const workingPath = envelopeWorkingPath(organizationId, envelopeDocId);
   await copyTemplatePdfToWorking(bucket, template.storagePath, workingPath);
 
-  const next = roleForNext(template, packetKind);
+  const next: EsignSignerRole =
+    packetKind === "deal_subscription" ? "lp" : roleForNext(template, "deal_questionnaire");
   const ctx: EsignEnvelopeContext =
     packetKind === "deal_subscription"
       ? { kind: "deal_subscription", dealId, userId }
@@ -230,6 +231,7 @@ async function createDealLpPacketEnvelope(params: {
     sponsorSigningUrl,
     lpSigningUrl,
     subscriptionPrepComplete: next === "lp",
+    ...(packetKind === "deal_subscription" ? { dealSubscriptionFirstSigner: "lp" as const } : {}),
     createdAt: now,
     updatedAt: now,
   };
@@ -404,6 +406,27 @@ export async function completeSignerStep(input: CompleteSignerInput): Promise<
   /** advance — LP deal packets (subscription + investor questionnaire) */
   if (ctx.kind === "deal_subscription" || ctx.kind === "deal_questionnaire") {
     if (input.role === "sponsor") {
+      if (ctx.kind === "deal_subscription" && env.dealSubscriptionFirstSigner === "lp") {
+        const finalPath = envelopeFinalPath(env.organizationId, env.id);
+        await writePdfBytes(bucket, finalPath, outBytes);
+        await ref.set(
+          {
+            status: "completed" as const,
+            nextSignerRole: null,
+            finalPdfStoragePath: finalPath,
+            lpSigningUrl: null,
+            sponsorSigningUrl: null,
+            updatedAt: now,
+            lastEventAt: now,
+          },
+          { merge: true },
+        );
+        const commitRef = input.db
+          .collection(col.dealCommitments)
+          .doc(dealCommitmentDocId(env.organizationId, ctx.dealId, ctx.userId));
+        await commitRef.set({ docStatus: "complete", updatedAt: now }, { merge: true });
+        return { ok: true, completed: true };
+      }
       const lpTok = mintEsignToken({ e: env.id, r: "lp", exp: newExp() });
       const lpSigningUrl = signingUrlFromToken(lpTok);
       await ref.set(
@@ -420,7 +443,28 @@ export async function completeSignerStep(input: CompleteSignerInput): Promise<
       );
       return { ok: true, completed: false, nextUrl: lpSigningUrl };
     }
-    /** lp finished */
+    /** LP step on subscription: investor-first envelopes may hand off to sponsor */
+    if (ctx.kind === "deal_subscription" && env.dealSubscriptionFirstSigner === "lp") {
+      const spoFields = hasAssigneeFields(template.esignFields, "sponsor");
+      if (spoFields) {
+        const sponsorTok = mintEsignToken({ e: env.id, r: "sponsor", exp: newExp() });
+        const sponsorSigningUrl = signingUrlFromToken(sponsorTok);
+        await ref.set(
+          {
+            nextSignerRole: "sponsor" as const,
+            subscriptionPrepComplete: true,
+            lpSigningUrl: null,
+            sponsorSigningUrl,
+            status: "sent" as const,
+            updatedAt: now,
+            lastEventAt: now,
+          },
+          { merge: true },
+        );
+        return { ok: true, completed: false };
+      }
+    }
+    /** lp finished (questionnaire, legacy subscription sponsor-then-LP, or LP-only subscription template) */
     const finalPath = envelopeFinalPath(env.organizationId, env.id);
     await writePdfBytes(bucket, finalPath, outBytes);
     await ref.set(
@@ -429,6 +473,7 @@ export async function completeSignerStep(input: CompleteSignerInput): Promise<
         nextSignerRole: null,
         finalPdfStoragePath: finalPath,
         lpSigningUrl: null,
+        sponsorSigningUrl: null,
         updatedAt: now,
         lastEventAt: now,
       },
