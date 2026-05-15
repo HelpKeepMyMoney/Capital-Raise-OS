@@ -341,6 +341,25 @@ export function SponsorGuideClient() {
                 Log touches with quick notes and keep the pipeline stage current. Bulk-select investors to move stages
                 together when you are cleaning up after a roadshow.
               </p>
+              <p>
+                <strong>Edit investor profile.</strong> Open any investor and choose <strong>Edit</strong> to open the
+                edit dialog. The editor has five tabs (Basic, Capital, Intelligence, Deals, Notes) to capture contact
+                details, check size / commitments, relationship intelligence, deal interests, and a running notes feed.
+                Use the <em>Deals</em> tab to mark which offerings the investor is interested in so they appear in deal
+                pickers and NDA eligibility lists.
+              </p>
+              <p>
+                <strong>Log interactions &amp; timeline.</strong> From the investor card or edit dialog you can add
+                interaction records (calls, emails, meetings) that appear in the activity timeline. Each timeline row
+                supports actions from its <strong>⋯</strong> menu — edit the entry to clarify details or delete it when
+                it was added in error. These interaction logs drive tasks and analytics (for example smart suggestions
+                and follow-up reminders).
+              </p>
+              <p>
+                <strong>Pipeline stage &amp; ownership.</strong> Update the investor's pipeline stage from the board or
+                the profile; set a relationship owner so tasks and notifications target the right teammate. When you set
+                a <strong>Next follow-up</strong> date in the profile, Tasks may surface a reminder aligned to that date.
+              </p>
             </Section>
           </TabsContent>
 
@@ -367,9 +386,13 @@ export function SponsorGuideClient() {
 
             <Section id="sg-inv-accept" title="Accepting invites">
               <p>
-                Investors open their invite URL (for example <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/invite/[token]</code>
-                ) to join with the access you granted. They then see deal room and data room items according to role and
-                invite scope.
+                Investors open their invite URL (for example{" "}
+                <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/invite/[token]</code>) to join with the access
+                you granted. When they open the invite, investors are offered to <strong>sign in</strong> if they already
+                have an account, or <strong>sign up</strong> to create a new account. Signing up requires only creating a
+                password; they can complete or update their profile information later from the Investor portal. After
+                signing in or signing up, invited users see the deal room and data room items according to their role and
+                the invite scope.
               </p>
             </Section>
           </TabsContent>

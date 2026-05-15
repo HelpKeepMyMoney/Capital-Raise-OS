@@ -163,6 +163,18 @@ Use **Board**, **Table**, **Map**, **List**, and **Calendar** views with toolbar
 
 Log notes and interactions and keep pipeline stages current; use bulk actions for stage changes at scale.
 
+#### Edit investor profile
+
+Open an investor and choose **Edit** to open the five-tab editor: **Basic**, **Capital**, **Intelligence**, **Deals**, and **Notes**. These tabs capture contact fields, commitment/check-size details, relationship intelligence and signals, which deals the investor is interested in, and a chronological notes feed. Use the **Deals** tab to mark interested offerings so the investor becomes eligible in deal-scoped flows.
+
+#### Log interactions & timeline
+
+Add interaction records (call, email, meeting) from the investor card or edit dialog; they append to the activity timeline. Each timeline entry provides a **⋯** menu allowing you to edit or delete that activity when corrections are needed. Interaction logs feed Tasks and Smart Suggestions.
+
+#### Pipeline stage & ownership
+
+Update the investor's pipeline stage from the board or profile and assign a relationship owner. Setting **Next follow-up** on the profile schedules a follow-up reminder and helps Tasks keep your outreach synchronized.
+
 ## Invitations
 
 ### Deal and portal invites
@@ -175,7 +187,11 @@ Manage per-room investor access from the data room. Deal-scoped invitations incl
 
 ### Accepting invites
 
-Investors use the invite URL (for example `/invite/[token]`) to join with the access you granted.
+Investors use the invite URL (for example `/invite/[token]`) to join with the access you granted. When an
+investor opens an invite they will be offered the choice to sign in (if they already have an account) or to sign
+up. Signing up requires only picking a password; investors can add or update profile details later from their
+Investor portal. After signing in/up they receive the access assigned by the invite and view deal room and data
+room items according to their role and invite scope.
 
 ## Platform (sidebar)
 
