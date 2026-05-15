@@ -2,7 +2,9 @@
 
 import * as React from "react";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
+import { isCheckboxCheckedValue } from "@/lib/esign/native/pdf";
 
 /** Must match `components/settings/esign-template-field-editor.tsx` — normalized rects are relative to this viewport. */
 export const ESIGN_PDF_VIEW_SCALE = 1.25;
@@ -10,7 +12,7 @@ export const ESIGN_PDF_VIEW_SCALE = 1.25;
 export type PlacedSignField = {
   id: string;
   label: string;
-  fieldType: "text" | "date" | "signature";
+  fieldType: "text" | "date" | "signature" | "checkbox";
   required: boolean;
   pageIndex: number;
   rectNorm: { x: number; y: number; w: number; h: number };
@@ -113,6 +115,29 @@ export function SignPdfFieldLayer(props: {
                       Signature
                     </span>
                   </div>
+                );
+              }
+
+              if (f.fieldType === "checkbox") {
+                const checked = isCheckboxCheckedValue(values[f.id] ?? "");
+                return (
+                  <label
+                    key={f.id}
+                    className={cn(
+                      "absolute box-border flex cursor-pointer items-center justify-center rounded border-2 border-primary/80 bg-background/95 shadow-sm",
+                    )}
+                    style={commonStyle}
+                    title={f.label}
+                  >
+                    <Checkbox
+                      id={`field-${f.id}`}
+                      tabIndex={tabIndexForFieldId(f.id)}
+                      checked={checked}
+                      onCheckedChange={(v) => onFieldChange(f.id, v === true ? "true" : "")}
+                      aria-label={f.label + (f.required ? " (required)" : "")}
+                      className="size-[min(100%,1.25rem)]"
+                    />
+                  </label>
                 );
               }
 

@@ -1,5 +1,5 @@
 import type { EsignTemplateField } from "@/lib/firestore/types";
-import { normalizeDateFieldValue } from "@/lib/esign/native/pdf";
+import { isCheckboxCheckedValue, normalizeDateFieldValue } from "@/lib/esign/native/pdf";
 
 export function fieldsForRole(
   fields: EsignTemplateField[],
@@ -22,6 +22,14 @@ export function validateFieldPayload(
     }
     const raw = values[f.id];
     const str = raw == null ? "" : String(raw).trim();
+    if (f.fieldType === "checkbox") {
+      const checked = isCheckboxCheckedValue(str);
+      if (f.required !== false && !checked) {
+        return { ok: false, error: `Missing required checkbox: ${f.label ?? f.id}` };
+      }
+      if (checked) normalized[f.id] = "true";
+      continue;
+    }
     if (f.required !== false && str === "") {
       return { ok: false, error: `Missing field: ${f.label ?? f.id}` };
     }

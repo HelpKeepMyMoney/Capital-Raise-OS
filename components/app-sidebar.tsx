@@ -30,6 +30,7 @@ import {
   Shield,
   Building2,
   Wallet,
+  BookOpen,
 } from "lucide-react";
 import type { Organization } from "@/lib/firestore/types";
 import { isInvestorGuestRole } from "@/lib/auth/rbac";
@@ -67,7 +68,10 @@ const insightsNav: NavItem[] = [
   { href: "/analytics", label: "Analytics", icon: BarChart3, suffix: "(coming soon)" },
 ];
 
-const systemNav: NavItem[] = [{ href: "/settings", label: "Settings", icon: Settings }];
+const systemNav: NavItem[] = [
+  { href: "/help", label: "Sponsor Guide", icon: BookOpen },
+  { href: "/settings", label: "Settings", icon: Settings },
+];
 
 const navInvestorGuest: NavItem[] = [
   { href: "/portal", label: "Portal home", icon: Building2 },

@@ -3,6 +3,12 @@ import type { EsignTemplateField } from "@/lib/firestore/types";
 
 const ISO_DATE_FMT = /^(\d{4})-(\d{2})-(\d{2})$/;
 
+/** Checkbox fields store canonical `"true"` when checked; anything else is unchecked. */
+export function isCheckboxCheckedValue(raw: string): boolean {
+  const t = raw.trim().toLowerCase();
+  return t === "true" || t === "1" || t === "yes" || t === "on";
+}
+
 export function normalizeDateFieldValue(raw: string): string {
   const t = raw.trim();
   if (ISO_DATE_FMT.test(t)) return t;
@@ -64,6 +70,36 @@ export async function drawFieldsOnPdf(
       const cx = x + (w - dw) / 2;
       const cy = y + (h - dh) / 2;
       page.drawImage(sigImage, { x: cx, y: cy, width: dw, height: dh });
+      continue;
+    }
+
+    if (f.fieldType === "checkbox") {
+      const raw = fieldValues[f.id];
+      if (!isCheckboxCheckedValue(raw == null ? "" : String(raw))) continue;
+      const page = pages[f.pageIndex];
+      if (!page) continue;
+      const { x, y, w, h } = rectToPdfCoords(page, f.rectNorm);
+      const pad = Math.min(w, h) * 0.12;
+      const ix = x + pad;
+      const iy = y + pad;
+      const iw = Math.max(2, w - pad * 2);
+      const ih = Math.max(2, h - pad * 2);
+      page.drawRectangle({
+        x: ix,
+        y: iy,
+        width: iw,
+        height: ih,
+        borderColor: rgb(0.15, 0.15, 0.18),
+        borderWidth: 1,
+      });
+      const markSize = Math.max(8, Math.min(18, ih * 0.75));
+      page.drawText("X", {
+        x: ix + iw * 0.2,
+        y: iy + (ih - markSize) * 0.35,
+        size: markSize,
+        font,
+        color: rgb(0.08, 0.08, 0.1),
+      });
       continue;
     }
 

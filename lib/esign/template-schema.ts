@@ -10,7 +10,7 @@ export const EsignFieldRectSchema = z.object({
 export const EsignTemplateFieldSchema = z.object({
   id: z.string().min(1).max(80),
   label: z.string().max(200).optional(),
-  fieldType: z.enum(["text", "date", "signature"]),
+  fieldType: z.enum(["text", "date", "signature", "checkbox"]),
   pageIndex: z.number().int().min(0).max(500),
   rectNorm: EsignFieldRectSchema,
   assignee: z.enum(["sponsor", "investor"]),

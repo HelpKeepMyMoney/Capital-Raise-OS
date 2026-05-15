@@ -31,7 +31,7 @@ export default async function EsignSettingsPage() {
         <h1 className="text-3xl font-semibold tracking-tight">E-sign templates</h1>
       </div>
       <p className="text-sm text-muted-foreground">
-        Upload PDFs, place text and date fields for sponsors or investors, and choose which template investors use for
+        Upload PDFs, place text, date, checkbox, and signature fields for sponsors or investors, and choose which template investors use for
         subscription packets. Data rooms link a template in room settings.
       </p>
       <Card className="border-border bg-card shadow-sm">

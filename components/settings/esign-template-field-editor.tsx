@@ -157,12 +157,20 @@ export function EsignTemplateFieldEditor(props: {
 
   const fieldsRef = React.useRef(fields);
   const pageIndexRef = React.useRef(pageIndex);
+  const nameRef = React.useRef(name);
+  const baselineSnapRef = React.useRef("");
+  const wasLoadingRef = React.useRef(true);
+  const autosaveTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
   React.useEffect(() => {
     fieldsRef.current = fields;
   }, [fields]);
   React.useEffect(() => {
     pageIndexRef.current = pageIndex;
   }, [pageIndex]);
+  React.useEffect(() => {
+    nameRef.current = name;
+  }, [name]);
 
   const beginResize = React.useCallback((e: React.PointerEvent, fieldId: string, handle: ResizeHandle) => {
     e.stopPropagation();
@@ -274,6 +282,73 @@ export function EsignTemplateFieldEditor(props: {
   React.useEffect(() => {
     void loadDetail();
   }, [loadDetail]);
+
+  /** After a fetch completes, reset autosave baseline so the next edit schedules a save. */
+  React.useEffect(() => {
+    if (loading) {
+      wasLoadingRef.current = true;
+      return;
+    }
+    if (wasLoadingRef.current) {
+      wasLoadingRef.current = false;
+      baselineSnapRef.current = JSON.stringify({ name: name.trim(), fields });
+    }
+  }, [loading, name, fields]);
+
+  const onRenamedRef = React.useRef(props.onRenamed);
+  const onFieldsSavedRef = React.useRef(props.onFieldsSaved);
+  React.useEffect(() => {
+    onRenamedRef.current = props.onRenamed;
+  }, [props.onRenamed]);
+  React.useEffect(() => {
+    onFieldsSavedRef.current = props.onFieldsSaved;
+  }, [props.onFieldsSaved]);
+
+  const applyPersist = React.useCallback(
+    async (opts: { showToast: boolean }) => {
+      const nameTrim = nameRef.current.trim();
+      if (!nameTrim) {
+        if (opts.showToast) toast.error("Name required");
+        throw new Error("Name required");
+      }
+      const currentFields = fieldsRef.current;
+      const res = await fetch(`/api/esign/templates/${props.templateId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: nameTrim, esignFields: currentFields }),
+      });
+      const json = (await res.json()) as { ok?: boolean; error?: string };
+      if (!res.ok) throw new Error(json.error ?? "Save failed");
+      baselineSnapRef.current = JSON.stringify({ name: nameTrim, fields: currentFields });
+      onRenamedRef.current(nameTrim);
+      onFieldsSavedRef.current(currentFields);
+      if (opts.showToast) toast.success("Saved");
+    },
+    [props.templateId],
+  );
+
+  React.useEffect(() => {
+    if (loading) return;
+    const snap = JSON.stringify({ name: name.trim(), fields });
+    if (snap === baselineSnapRef.current) return;
+    if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+    autosaveTimerRef.current = setTimeout(() => {
+      autosaveTimerRef.current = null;
+      void (async () => {
+        try {
+          await applyPersist({ showToast: false });
+        } catch (e) {
+          toast.error(e instanceof Error ? e.message : "Save failed");
+        }
+      })();
+    }, 1000);
+    return () => {
+      if (autosaveTimerRef.current) {
+        clearTimeout(autosaveTimerRef.current);
+        autosaveTimerRef.current = null;
+      }
+    };
+  }, [loading, name, fields, applyPersist]);
 
   const renderPage = React.useCallback(async (pdfjs: PdfjsModule, pageIdx: number) => {
     const pdf = pdfRef.current;
@@ -388,20 +463,13 @@ export function EsignTemplateFieldEditor(props: {
   }
 
   async function saveAll() {
+    if (autosaveTimerRef.current) {
+      clearTimeout(autosaveTimerRef.current);
+      autosaveTimerRef.current = null;
+    }
     setSaving(true);
     try {
-      const nameTrim = name.trim();
-      if (!nameTrim) throw new Error("Name required");
-      const res = await fetch(`/api/esign/templates/${props.templateId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: nameTrim, esignFields: fields }),
-      });
-      const json = (await res.json()) as { ok?: boolean; error?: string };
-      if (!res.ok) throw new Error(json.error ?? "Save failed");
-      props.onRenamed(nameTrim);
-      props.onFieldsSaved(fields);
-      toast.success("Saved");
+      await applyPersist({ showToast: true });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Save failed");
     } finally {
@@ -543,8 +611,8 @@ export function EsignTemplateFieldEditor(props: {
       <details className="rounded-xl border border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
         <summary className="cursor-pointer font-medium text-foreground">Merge field IDs (auto-fill)</summary>
         <p className="mt-2 mb-1">
-          Use these exact <strong className="text-foreground">Field id</strong> values on text or date fields. Signature
-          placement boxes ignore merge data.
+          Use these exact <strong className="text-foreground">Field id</strong> values on text or date fields. Checkbox
+          and signature placement boxes ignore merge data.
         </p>
         <ul className="list-disc pl-4 space-y-1 font-mono text-[11px]">
           <li className="list-none font-sans text-muted-foreground mb-1">Sponsor assignee — organization (Settings → Organization contact):</li>
@@ -726,6 +794,7 @@ export function EsignTemplateFieldEditor(props: {
                   <SelectContent>
                     <SelectItem value="text">Text</SelectItem>
                     <SelectItem value="date">Date</SelectItem>
+                    <SelectItem value="checkbox">Checkbox</SelectItem>
                     <SelectItem value="signature">Signature (image in box)</SelectItem>
                   </SelectContent>
                 </Select>

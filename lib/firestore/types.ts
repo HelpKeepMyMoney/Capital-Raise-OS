@@ -489,7 +489,7 @@ export type MndaSigningRequest = {
 
 export type EsignFieldAssignee = "sponsor" | "investor";
 
-export type EsignFieldType = "text" | "date" | "signature";
+export type EsignFieldType = "text" | "date" | "signature" | "checkbox";
 
 export type EsignFieldRectNorm = { x: number; y: number; w: number; h: number };
 
