@@ -125,13 +125,6 @@ function roleForNext(
   return hasAssigneeFields(template.esignFields, "sponsor") ? "sponsor" : "investor";
 }
 
-/** Data-room mutual NDA: investor signs first when they have template fields (no sponsor-first gate). */
-function firstSignerForDataRoomNda(template: SignableTemplate): "sponsor" | "investor" {
-  if (hasAssigneeFields(template.esignFields, "investor")) return "investor";
-  if (hasAssigneeFields(template.esignFields, "sponsor")) return "sponsor";
-  return "investor";
-}
-
 export async function createNdaEnvelope(params: {
   db: Firestore;
   organizationId: string;
@@ -150,21 +143,15 @@ export async function createNdaEnvelope(params: {
   const workingPath = envelopeWorkingPath(organizationId, id);
   await copyTemplatePdfToWorking(bucket, template.storagePath, workingPath);
 
-  const next = firstSignerForDataRoomNda(template);
-  const dataRoomNdaFirstSigner: "investor" | "sponsor" = next === "investor" ? "investor" : "sponsor";
+  /** Room NDAs always include investor fields — investor must sign first. */
+  const next = "investor" as const;
+  const dataRoomNdaFirstSigner = "investor" as const;
   const ctx: EsignEnvelopeContext = { kind: "data_room_nda", dataRoomId: room.id };
   const investorEmailNorm = investorEmail.trim().toLowerCase();
 
-  let sponsorSigningUrl: string | undefined;
-  let investorSigningUrl: string | undefined;
   const exp = newExp();
-  if (next === "sponsor") {
-    const tok = mintEsignToken({ e: id, r: "sponsor", exp });
-    sponsorSigningUrl = signingUrlFromToken(tok);
-  } else {
-    const tok = mintEsignToken({ e: id, r: "investor", exp });
-    investorSigningUrl = signingUrlFromToken(tok);
-  }
+  const invTok = mintEsignToken({ e: id, r: "investor", exp });
+  const investorSigningUrl = signingUrlFromToken(invTok);
 
   const row: Omit<EsignEnvelope, "id"> & Record<string, unknown> = {
     organizationId,
@@ -177,7 +164,6 @@ export async function createNdaEnvelope(params: {
     investorName,
     workingPdfStoragePath: workingPath,
     nextSignerRole: next,
-    sponsorSigningUrl,
     investorSigningUrl,
     sponsorEmailNorm: sponsorEmailNorm.trim().toLowerCase(),
     dataRoomNdaFirstSigner,
@@ -189,7 +175,7 @@ export async function createNdaEnvelope(params: {
 
   return {
     envelope: { id, ...(row as Omit<EsignEnvelope, "id">) },
-    sponsorUrl: sponsorSigningUrl ?? null,
+    sponsorUrl: null,
     investorUrl: investorSigningUrl ?? null,
   };
 }
