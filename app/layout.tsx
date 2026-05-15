@@ -25,6 +25,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "CPIN Capital Management System",
   description: "AI-powered private capital fundraising platform",
+  icons: {
+    icon: "/cpin-logo.jpg",
+  },
 };
 
 export default function RootLayout({
