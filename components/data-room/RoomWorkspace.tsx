@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { DocumentManager } from "@/components/data-room/DocumentManager";
 import { ActivityAnalytics } from "@/components/data-room/ActivityAnalytics";
 import { InvestorAccessTable } from "@/components/data-room/InvestorAccessTable";
+import { RoomNdaEnvelopesPanel } from "@/components/data-room/room-nda-envelopes-panel";
 import { RoomSettings } from "@/components/data-room/RoomSettings";
 import { InvestorPreview } from "@/components/data-room/InvestorPreview";
 import type { SerializedDataRoom, SerializedRoomDocument, SerializedDealLite } from "@/components/data-room/types";
@@ -121,7 +122,8 @@ export function RoomWorkspace(props: Props) {
           <ActivityAnalytics documents={props.documentsForRoom} activityPreview={props.activityPreview} />
         </TabsContent>
         {props.canManage ? (
-          <TabsContent value="investors" className="mt-4 focus-visible:outline-none">
+          <TabsContent value="investors" className="mt-4 space-y-6 focus-visible:outline-none">
+            <RoomNdaEnvelopesPanel roomId={props.room.id} />
             <InvestorAccessTable
               invitations={props.invitations}
               selectedDealId={props.selectedDealId ?? props.room.dealId}

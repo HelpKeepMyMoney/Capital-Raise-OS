@@ -209,6 +209,20 @@ export function InvestorAccessTable(props: Props) {
     }
   }
 
+  async function copySigningLink(label: string, url: string | null | undefined) {
+    const u = typeof url === "string" ? url.trim() : "";
+    if (!u) {
+      toast.message(`No ${label} signing link on file. Use NDA envelopes (this room) above or check email.`);
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(u);
+      toast.message(`${label} signing link copied`);
+    } catch {
+      toast.error("Could not copy link");
+    }
+  }
+
   async function patchInvestor(inv: InviteRow, action: "mark_warm" | "move_docs_sent" | "move_committed") {
     setBusyKey(`${inv.id}:${action}`);
     try {
@@ -449,6 +463,43 @@ export function InvestorAccessTable(props: Props) {
                           >
                             Download signed NDA
                           </DropdownMenuItem>
+                          {inv.ndaOpenSponsorSigningUrl ? (
+                            <DropdownMenuItem
+                              onClick={() =>
+                                window.open(inv.ndaOpenSponsorSigningUrl!, "_blank", "noopener,noreferrer")
+                              }
+                            >
+                              Open sponsor signing
+                            </DropdownMenuItem>
+                          ) : inv.ndaOpenEnvelopeId && inv.ndaOpenNextSigner === "sponsor" ? (
+                            <DropdownMenuItem disabled>Open sponsor signing (link not on file)</DropdownMenuItem>
+                          ) : null}
+                          {inv.ndaOpenInvestorSigningUrl ? (
+                            <DropdownMenuItem
+                              onClick={() =>
+                                window.open(inv.ndaOpenInvestorSigningUrl!, "_blank", "noopener,noreferrer")
+                              }
+                            >
+                              Open investor signing
+                            </DropdownMenuItem>
+                          ) : inv.ndaOpenEnvelopeId && inv.ndaOpenNextSigner === "investor" ? (
+                            <DropdownMenuItem disabled>Open investor signing (link not on file)</DropdownMenuItem>
+                          ) : null}
+                          {inv.ndaOpenEnvelopeId ? (
+                            <>
+                              <DropdownMenuItem
+                                onClick={() => void copySigningLink("Sponsor", inv.ndaOpenSponsorSigningUrl)}
+                              >
+                                Copy sponsor signing link
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => void copySigningLink("Investor", inv.ndaOpenInvestorSigningUrl)}
+                              >
+                                Copy investor signing link
+                              </DropdownMenuItem>
+                            </>
+                          ) : null}
+                          <DropdownMenuSeparator />
                           <DropdownMenuItem
                             disabled={!crmOk || rowBusy}
                             onClick={() => void patchInvestor(inv, "mark_warm")}

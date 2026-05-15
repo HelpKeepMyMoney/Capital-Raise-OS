@@ -24,6 +24,9 @@ export type InviteRow = Pick<
   ndaOpenNextSigner?: "sponsor" | "investor";
   /** Latest guest “Request NDA” timestamp for this invite’s accepted user + room scope. */
   ndaRequestedAt?: number;
+  /** Active signing links from the in-flight envelope (if still stored on the doc). */
+  ndaOpenSponsorSigningUrl?: string | null;
+  ndaOpenInvestorSigningUrl?: string | null;
 };
 
 export async function listInvestorInvitationsForOrganization(orgId: string, limit = 100): Promise<InviteRow[]> {
@@ -42,7 +45,13 @@ export async function listInvestorInvitationsForOrganization(orgId: string, limi
   const latestNdaByRoomAndEmail = new Map<string, { envelopeId: string; signedAt: number }>();
   const openNdaByRoomAndEmail = new Map<
     string,
-    { envelopeId: string; nextSignerRole: "sponsor" | "investor" | undefined; updatedAt: number }
+    {
+      envelopeId: string;
+      nextSignerRole: "sponsor" | "investor" | undefined;
+      updatedAt: number;
+      sponsorSigningUrl: string | null;
+      investorSigningUrl: string | null;
+    }
   >();
 
   for (const d of envSnap.docs) {
@@ -66,9 +75,23 @@ export async function listInvestorInvitationsForOrganization(orgId: string, limi
     if (env.status === "declined" || env.status === "error") continue;
 
     const next = env.nextSignerRole === "sponsor" || env.nextSignerRole === "investor" ? env.nextSignerRole : undefined;
+    const sponsorSigningUrl =
+      typeof env.sponsorSigningUrl === "string" && env.sponsorSigningUrl.trim().length > 0
+        ? env.sponsorSigningUrl.trim()
+        : null;
+    const investorSigningUrl =
+      typeof env.investorSigningUrl === "string" && env.investorSigningUrl.trim().length > 0
+        ? env.investorSigningUrl.trim()
+        : null;
     const prevOpen = openNdaByRoomAndEmail.get(key);
     if (!prevOpen || updatedAt > prevOpen.updatedAt) {
-      openNdaByRoomAndEmail.set(key, { envelopeId: d.id, nextSignerRole: next, updatedAt });
+      openNdaByRoomAndEmail.set(key, {
+        envelopeId: d.id,
+        nextSignerRole: next,
+        updatedAt,
+        sponsorSigningUrl,
+        investorSigningUrl,
+      });
     }
   }
 
@@ -92,11 +115,19 @@ export async function listInvestorInvitationsForOrganization(orgId: string, limi
     let ndaEnvelopeId: string | undefined;
     let ndaOpenEnvelopeId: string | undefined;
     let ndaOpenNextSigner: "sponsor" | "investor" | undefined;
+    let ndaOpenSponsorSigningUrl: string | null | undefined;
+    let ndaOpenInvestorSigningUrl: string | null | undefined;
     let ndaRequestedAt: number | undefined;
     const acceptedUid = typeof row.acceptedUserId === "string" ? row.acceptedUserId : undefined;
 
     let bestOpen:
-      | { envelopeId: string; nextSignerRole: "sponsor" | "investor" | undefined; updatedAt: number }
+      | {
+          envelopeId: string;
+          nextSignerRole: "sponsor" | "investor" | undefined;
+          updatedAt: number;
+          sponsorSigningUrl: string | null;
+          investorSigningUrl: string | null;
+        }
       | undefined;
 
     for (const roomId of roomIds) {
@@ -119,6 +150,8 @@ export async function listInvestorInvitationsForOrganization(orgId: string, limi
     if (bestOpen) {
       ndaOpenEnvelopeId = bestOpen.envelopeId;
       ndaOpenNextSigner = bestOpen.nextSignerRole;
+      ndaOpenSponsorSigningUrl = bestOpen.sponsorSigningUrl;
+      ndaOpenInvestorSigningUrl = bestOpen.investorSigningUrl;
     }
 
     return {
@@ -138,6 +171,8 @@ export async function listInvestorInvitationsForOrganization(orgId: string, limi
       ndaEnvelopeId,
       ndaOpenEnvelopeId,
       ndaOpenNextSigner,
+      ndaOpenSponsorSigningUrl,
+      ndaOpenInvestorSigningUrl,
       ndaRequestedAt,
     };
   });
