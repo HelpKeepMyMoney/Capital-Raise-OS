@@ -14,6 +14,14 @@ AI-powered private capital platform: investor CRM, discovery, outreach, data roo
 - **Documents (`components/data-room/DocumentManager.tsx`):** Category filter chips (**Financials**, **Legal**, **Pitch**, **Media**, **Hidden**) list matching **files across every folder** in the room (not only the current folder), with a **folder path** under each file name, **Category view** helper copy, **Back to folder tree**, and workspace search matching **folder paths** in that mode. **All** still browses the normal folder tree.
 - **Room rail (`components/data-room/RoomCard.tsx`, `data-room-shell.tsx`):** Pencil **Edit** selects the room and switches the workspace to the **Settings** tab (with scroll-into-view). Trash/delete affordance includes a **tooltip** (archive/delete via Settings). **`onEditRoom`** wired from the shell.
 
+### Sponsor Guide, e-sign improvements, checkbox fields, and autosave
+
+- **Sponsor Guide (`/help`)** — In-app, tabbed Sponsor Guide with sticky TOC covering Setup (Settings → Organization, Your profile, E-sign), Workflow (E-sign → Deal room → Data room → Tasks), Investors & CRM, Invitations, and Platform mapping. The guide UI is implemented under `components/help/*` and a repo copy lives at `docs/SPONSOR_GUIDE.md`.
+- **E-sign template editor autosave** — Template name and field-layout now auto-save after a short debounce when editing; manual **Save name & fields** still forces an immediate save. This improves authoring flow in `components/settings/esign-template-field-editor.tsx`.
+- **Checkbox field type** — Added `"checkbox"` as a first-class e-sign field type end-to-end: schema, editor, signing UI, validation, and PDF rendering (`lib/firestore/types.ts`, `lib/esign/template-schema.ts`, `components/settings/esign-template-field-editor.tsx`, `components/esign/sign-pdf-layer.tsx`, `lib/esign/native/pdf.ts`, `lib/esign/field-validate.ts`).
+- **Docs & examples** — `docs/SPONSOR_GUIDE.md` mirrors the live guide wording for Sponsors. See that file for exact in-app copy and step-by-step guidance.
+
+
 ### LP portal — investor deal room, data room, subscription & questionnaire polish
 
 - **Data room (`app/(shell)/data-room/page.tsx`, `components/data-room/types.ts`, `lib/data-room/investor-nda-gate.ts`):** Serialized rooms expose **`investorNdaInvestorStepCompletedAt`** when the LP has finished their NDA step and the envelope is **`await_sponsor`**. **`dealsForShell`** merges deal-picker options from member-visible deals, room-linked deals, and **`?deal=`** so **Align to deal** can show names (not raw ids).
