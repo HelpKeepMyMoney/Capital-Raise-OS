@@ -125,6 +125,13 @@ function roleForNext(
   return hasAssigneeFields(template.esignFields, "sponsor") ? "sponsor" : "investor";
 }
 
+/** Data-room mutual NDA: investor signs first when they have template fields (no sponsor-first gate). */
+function firstSignerForDataRoomNda(template: SignableTemplate): "sponsor" | "investor" {
+  if (hasAssigneeFields(template.esignFields, "investor")) return "investor";
+  if (hasAssigneeFields(template.esignFields, "sponsor")) return "sponsor";
+  return "investor";
+}
+
 export async function createNdaEnvelope(params: {
   db: Firestore;
   organizationId: string;
@@ -143,7 +150,8 @@ export async function createNdaEnvelope(params: {
   const workingPath = envelopeWorkingPath(organizationId, id);
   await copyTemplatePdfToWorking(bucket, template.storagePath, workingPath);
 
-  const next = roleForNext(template, "data_room_nda");
+  const next = firstSignerForDataRoomNda(template);
+  const dataRoomNdaFirstSigner: "investor" | "sponsor" = next === "investor" ? "investor" : "sponsor";
   const ctx: EsignEnvelopeContext = { kind: "data_room_nda", dataRoomId: room.id };
   const investorEmailNorm = investorEmail.trim().toLowerCase();
 
@@ -172,6 +180,7 @@ export async function createNdaEnvelope(params: {
     sponsorSigningUrl,
     investorSigningUrl,
     sponsorEmailNorm: sponsorEmailNorm.trim().toLowerCase(),
+    dataRoomNdaFirstSigner,
     createdAt: now,
     updatedAt: now,
   };
@@ -450,37 +459,112 @@ export async function completeSignerStep(input: CompleteSignerInput): Promise<
     return { ok: true, completed: true };
   }
 
-  /** MNDA + ad_hoc two-party */
-  if (input.role === "sponsor") {
-    const invTok = mintEsignToken({ e: env.id, r: "investor", exp: newExp() });
-    const investorSigningUrl = signingUrlFromToken(invTok);
+  /** Native data-room mutual NDA — investor may sign first; unlock after investor step. */
+  if (ctx.kind === "data_room_nda") {
+    const spoFields = hasAssigneeFields(template.esignFields, "sponsor");
+    const invFields = hasAssigneeFields(template.esignFields, "investor");
+    const sponsorDone = typeof env.sponsorSignedAt === "number";
+    const investorDone = typeof env.investorSignedAt === "number";
+
+    const finalizeDataRoomNda = async () => {
+      const finalPath = envelopeFinalPath(env.organizationId, env.id);
+      await writePdfBytes(bucket, finalPath, outBytes);
+      const merge: Record<string, unknown> = {
+        status: "completed" as const,
+        nextSignerRole: null,
+        finalPdfStoragePath: finalPath,
+        investorSigningUrl: null,
+        sponsorSigningUrl: null,
+        updatedAt: now,
+        lastEventAt: now,
+      };
+      if (!investorDone) merge.investorSignedAt = now;
+      if (!sponsorDone && spoFields) merge.sponsorSignedAt = now;
+      await ref.set(merge, { merge: true });
+    };
+
+    const firstSigner = env.dataRoomNdaFirstSigner ?? "sponsor";
+
+    if (input.role === "investor") {
+      if (spoFields && typeof env.sponsorSignedAt !== "number" && firstSigner === "investor") {
+        const sponsorTok = mintEsignToken({ e: env.id, r: "sponsor", exp: newExp() });
+        const sponsorSigningUrl = signingUrlFromToken(sponsorTok);
+        await ref.set(
+          {
+            nextSignerRole: "sponsor" as const,
+            sponsorSigningUrl,
+            investorSigningUrl: null,
+            investorSignedAt: now,
+            status: "sent" as const,
+            updatedAt: now,
+            lastEventAt: now,
+          },
+          { merge: true },
+        );
+        return { ok: true, completed: false, nextUrl: sponsorSigningUrl };
+      }
+      await finalizeDataRoomNda();
+      return { ok: true, completed: true };
+    }
+
+    if (input.role === "sponsor") {
+      if (invFields && !investorDone) {
+        const invTok = mintEsignToken({ e: env.id, r: "investor", exp: newExp() });
+        const investorSigningUrl = signingUrlFromToken(invTok);
+        await ref.set(
+          {
+            nextSignerRole: "investor" as const,
+            investorSigningUrl,
+            sponsorSigningUrl: null,
+            sponsorSignedAt: now,
+            status: "sent" as const,
+            updatedAt: now,
+            lastEventAt: now,
+          },
+          { merge: true },
+        );
+        return { ok: true, completed: false, nextUrl: investorSigningUrl };
+      }
+      await finalizeDataRoomNda();
+      return { ok: true, completed: true };
+    }
+  }
+
+  /** ad_hoc two-party */
+  if (ctx.kind === "ad_hoc") {
+    if (input.role === "sponsor") {
+      const invTok = mintEsignToken({ e: env.id, r: "investor", exp: newExp() });
+      const investorSigningUrl = signingUrlFromToken(invTok);
+      await ref.set(
+        {
+          nextSignerRole: "investor" as const,
+          investorSigningUrl,
+          sponsorSigningUrl: null,
+          status: "sent" as const,
+          updatedAt: now,
+          lastEventAt: now,
+        },
+        { merge: true },
+      );
+      return { ok: true, completed: false, nextUrl: investorSigningUrl };
+    }
+
+    const finalPath = envelopeFinalPath(env.organizationId, env.id);
+    await writePdfBytes(bucket, finalPath, outBytes);
     await ref.set(
       {
-        nextSignerRole: "investor" as const,
-        investorSigningUrl,
+        status: "completed" as const,
+        nextSignerRole: null,
+        finalPdfStoragePath: finalPath,
+        investorSigningUrl: null,
         sponsorSigningUrl: null,
-        status: "sent" as const,
         updatedAt: now,
         lastEventAt: now,
       },
       { merge: true },
     );
-    return { ok: true, completed: false, nextUrl: investorSigningUrl };
+    return { ok: true, completed: true };
   }
 
-  /** investor completes */
-  const finalPath = envelopeFinalPath(env.organizationId, env.id);
-  await writePdfBytes(bucket, finalPath, outBytes);
-  await ref.set(
-    {
-      status: "completed" as const,
-      nextSignerRole: null,
-      finalPdfStoragePath: finalPath,
-      investorSigningUrl: null,
-      updatedAt: now,
-      lastEventAt: now,
-    },
-    { merge: true },
-  );
-  return { ok: true, completed: true };
+  return { ok: false, error: "Unsupported envelope signing flow", status: 500 };
 }

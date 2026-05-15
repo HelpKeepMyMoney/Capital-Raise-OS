@@ -627,8 +627,8 @@ export function DocumentManager(props: Props) {
         >
           <p className="font-semibold">Mutual NDA required</p>
           <p className="mt-2 text-amber-950/90 dark:text-amber-50/95">
-            You can&apos;t preview or download files in this room until the mutual NDA for your email address is
-            completed.
+            You can&apos;t preview or download files in this room until your required mutual NDA step is done for your
+            email address on this room.
           </p>
           {typeof props.investorPendingNdaSigningUrl === "string" && props.investorPendingNdaSigningUrl.length > 0 ? (
             <div className="mt-4">
@@ -640,7 +640,9 @@ export function DocumentManager(props: Props) {
             </div>
           ) : props.investorNdaAwaitingSponsor ? (
             <p className="mt-4 text-amber-950/95 dark:text-amber-50/95">
-              The sponsor is signing first. You&apos;ll receive a link by email when it&apos;s your turn.
+              No signing link is active in this browser yet. If someone else needs to sign before you, you&apos;ll get
+              an email when it&apos;s your turn — then refresh this page for an{" "}
+              <span className="font-medium text-foreground">Open NDA signing</span> button.
             </p>
           ) : props.investorNdaCanRequestSponsor ? (
             <div className="mt-4 flex flex-col gap-3">

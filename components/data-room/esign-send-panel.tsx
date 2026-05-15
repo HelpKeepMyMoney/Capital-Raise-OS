@@ -200,7 +200,8 @@ export function EsignSendPanel(props: Props) {
         </div>
 
         <p className="text-[11px] text-muted-foreground">
-          Sponsor signs first when the template has sponsor fields; otherwise the investor link is active immediately.
+          When the template includes investor fields, the investor can sign first; otherwise the sponsor opens first.
+          Deal room documents unlock for the investor after they complete their signing step.
           Uses the template selected above (save room settings to store it as this room&apos;s default).
         </p>
         <Button

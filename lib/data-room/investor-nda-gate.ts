@@ -35,14 +35,18 @@ export async function listInvestorCompletedNdaRoomIds(
     .collection(col.esignEnvelopes)
     .where("organizationId", "==", organizationId)
     .where("investorEmailNorm", "==", investorEmailNorm)
-    .where("status", "==", "completed")
-    .limit(200)
+    .limit(300)
     .get();
 
   for (const d of snap.docs) {
     const x = d.data() as EsignEnvelope;
     if (x.context.kind !== "data_room_nda") continue;
-    if (typeof x.context.dataRoomId === "string" && x.context.dataRoomId.length > 0) {
+    if (typeof x.context.dataRoomId !== "string" || x.context.dataRoomId.length === 0) continue;
+    if (x.status === "completed") {
+      out.add(x.context.dataRoomId);
+      continue;
+    }
+    if (typeof x.investorSignedAt === "number" && x.investorSignedAt > 0) {
       out.add(x.context.dataRoomId);
     }
   }

@@ -66,7 +66,7 @@ export async function authorizeRoomDocumentRead(
         return {
           ok: false,
           status: 403,
-          error: "You must complete the sponsor’s mutual NDA for this room before viewing documents.",
+          error: "Sign the mutual NDA for this room (your signing step) before viewing documents.",
         };
       }
     }

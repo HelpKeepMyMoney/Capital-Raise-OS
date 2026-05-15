@@ -6,7 +6,7 @@ import { col } from "@/lib/firestore/paths";
 import type { EsignEnvelope } from "@/lib/firestore/types";
 import { verifyEsignToken } from "@/lib/esign/tokens";
 import { completeSignerStep } from "@/lib/esign/envelope-service";
-import { sendEsignCompletedEmails, sendEsignInvestorTurnEmail } from "@/lib/esign/envelope-notify";
+import { sendEsignCompletedEmails, sendEsignInvestorTurnEmail, sendEsignSponsorTurnEmail } from "@/lib/esign/envelope-notify";
 import { resolveDealSubscriptionSponsorEmails } from "@/lib/esign/subscription-sponsor-emails";
 import { recordCrmTouchFromCompletedEnvelope } from "@/lib/investors/esign-crm-touch";
 import { getOrganization } from "@/lib/firestore/queries";
@@ -201,6 +201,30 @@ export async function POST(req: NextRequest) {
 
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: result.status ?? 400 });
+  }
+
+  if (!result.completed && result.nextUrl && payload.r === "investor" && env.context.kind === "data_room_nda") {
+    let sponsorEmail = env.sponsorEmailNorm?.trim().toLowerCase() ?? "";
+    if (!sponsorEmail) {
+      const org = await getOrganization(env.organizationId);
+      if (org) {
+        const extras = await resolveDealSubscriptionSponsorEmails(org);
+        sponsorEmail = extras[0]?.trim().toLowerCase() ?? "";
+      }
+    }
+    if (sponsorEmail) {
+      try {
+        const org = await getOrganization(env.organizationId);
+        await sendEsignSponsorTurnEmail({
+          orgName: org?.name ?? "CapitalOS",
+          sponsorEmail,
+          signingUrl: result.nextUrl,
+          investorLabel: env.investorName ?? env.investorEmailNorm ?? undefined,
+        });
+      } catch (e) {
+        console.error("[esign sign-complete data room sponsor turn email]", e);
+      }
+    }
   }
 
   if (!result.completed && result.nextUrl && payload.r === "sponsor") {

@@ -55,7 +55,7 @@ export async function sendEsignEnvelopeCreatedEmails(args: {
         from,
         to: sponsorEmail,
         subject: `Signing request sent — ${orgName}`,
-        html: `<p>Your signing request was created. <strong>${invMail}</strong> (${invLabel}) has been emailed a link to sign first.</p>${ctxBlock}`,
+      html: `<p>A mutual NDA envelope was created for this data room.</p>${ctxBlock}<p><strong>${invMail}</strong> (${invLabel}) has been sent a secure link to sign.</p>`,
       });
     }
   } catch (e) {
@@ -75,11 +75,36 @@ export async function sendEsignEnvelopeCreatedEmails(args: {
         from,
         to: investorEmail,
         subject: `Signing started — ${orgName}`,
-        html: `<p>Hi ${invLabel},</p><p><strong>${roomOrDoc}</strong> is being signed. The sponsor is signing first. You will receive another email with your personal signing link when it is your turn.</p>${ctxBlock}`,
+        html: `<p>Hi ${invLabel},</p><p><strong>${roomOrDoc}</strong> is ready for signatures. You will receive another email with your personal signing link when it is your turn.</p>${ctxBlock}`,
       });
     }
   } catch (e) {
     console.error("[esign envelope notify investor]", e);
+  }
+}
+
+/** Data-room mutual NDA: investor signed; sponsor must complete their step. */
+export async function sendEsignSponsorTurnEmail(args: {
+  orgName: string;
+  sponsorEmail: string;
+  signingUrl: string;
+  investorLabel?: string;
+}): Promise<void> {
+  if (!process.env.RESEND_API_KEY) return;
+
+  const from = invitationsTransactionalFrom();
+  const inv = escapeHtmlForEmail(args.investorLabel?.trim() || "The investor");
+  const href = args.signingUrl.replace(/"/g, "&quot;");
+
+  try {
+    await sendTransactionalEmail({
+      from,
+      to: args.sponsorEmail.trim().toLowerCase(),
+      subject: `Data room NDA — your signature — ${args.orgName}`,
+      html: `<p>${inv} has completed their part of the mutual NDA. Please add your signature:</p><p><a href="${href}">Open signing page</a></p><p style="font-size:13px;color:#666">If the link does not work, paste this URL into your browser:<br/>${href}</p>`,
+    });
+  } catch (e) {
+    console.error("[esign envelope notify sponsor turn]", e);
   }
 }
 

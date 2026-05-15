@@ -542,6 +542,12 @@ export type EsignEnvelope = {
   /** After sponsor-only field burn for subscription flows */
   subscriptionPrepComplete?: boolean;
   sponsorEmailNorm?: string;
+  /** Data-room NDA: who was invited to sign first (legacy rows omit → treat as sponsor-first). */
+  dataRoomNdaFirstSigner?: "investor" | "sponsor";
+  /** Data-room NDA: set when the investor finishes their signing step (may still await sponsor). */
+  investorSignedAt?: number;
+  /** Data-room NDA: set when the sponsor finishes their signing step (may still await investor). */
+  sponsorSignedAt?: number;
   lastEventAt?: number;
   createdAt: number;
   updatedAt: number;

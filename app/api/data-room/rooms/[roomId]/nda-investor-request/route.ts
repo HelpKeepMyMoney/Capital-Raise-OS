@@ -99,7 +99,7 @@ async function postNdaInvestorRequest(
   }
   if (pending?.kind === "await_sponsor") {
     return NextResponse.json(
-      { error: "The sponsor is signing first. Watch your email for a link when it is your turn." },
+      { error: "It is not your turn to sign yet. Watch your email for a link when it is your turn." },
       { status: 409 },
     );
   }

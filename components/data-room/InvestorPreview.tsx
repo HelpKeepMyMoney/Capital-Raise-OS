@@ -103,9 +103,9 @@ export function InvestorPreview(props: Props) {
         >
           <p className="font-semibold">Mutual NDA required before you can open diligence files</p>
           <p className="mt-2 leading-relaxed text-amber-950/90 dark:text-amber-50/95">
-            This room requires a completed mutual NDA. Your sponsor may email you a signing link — use{" "}
-            <span className="font-medium">the same email you use here</span> so completion matches your account.
-            After both parties finish signing, refresh this page; materials will unlock automatically.
+            This room requires a mutual NDA. Use <span className="font-medium">the same email you use here</span> so
+            your signature matches your account. After you sign, diligence materials unlock; the final PDF appears here
+            once all parties have signed.
           </p>
           {typeof props.room.investorPendingNdaSigningUrl === "string" &&
           props.room.investorPendingNdaSigningUrl.length > 0 ? (
@@ -121,7 +121,8 @@ export function InvestorPreview(props: Props) {
             </div>
           ) : props.room.investorNdaAwaitingSponsor ? (
             <p className="mt-4 text-sm font-medium text-amber-950 dark:text-amber-50">
-              Waiting for the sponsor to sign first. You&apos;ll get an email when it&apos;s your turn.
+              You don&apos;t have an active signing link in this browser yet. Check your email or refresh this page when
+              it&apos;s your turn.
             </p>
           ) : props.room.investorNdaCanRequestSponsor ? (
             <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
@@ -132,9 +133,9 @@ export function InvestorPreview(props: Props) {
             </div>
           ) : (
             <p className="mt-4 text-sm text-amber-950/90 dark:text-amber-50/95">
-              If you don&apos;t see <span className="font-medium">Open NDA signing</span>, the sponsor still needs to
-              send the envelope from Data room → Settings, or your login email must match the one they used for you in
-              CRM.
+              If you don&apos;t see <span className="font-medium">Open NDA signing</span>, the envelope may still be
+              getting set up — your sponsor can send it from Data room → Settings, and your login email must match the
+              one they use for you in CRM.
             </p>
           )}
         </div>
@@ -184,7 +185,8 @@ export function InvestorPreview(props: Props) {
                 ) : (
                   <div className="space-y-3">
                     <p className="text-muted-foreground">
-                      The NDA must be signed by both parties before the final document is available here.
+                      Sign the mutual NDA when your link is active. Diligence files unlock after you complete your
+                      signing step; the final combined PDF appears once every party has signed.
                     </p>
                     {typeof props.room.investorPendingNdaSigningUrl === "string" &&
                     props.room.investorPendingNdaSigningUrl.length > 0 ? (
@@ -198,8 +200,8 @@ export function InvestorPreview(props: Props) {
                       </a>
                     ) : props.room.investorNdaAwaitingSponsor ? (
                       <p className="text-sm text-muted-foreground">
-                        Waiting for the sponsor to sign first. Refresh after they finish, or watch for an email with
-                        your link.
+                        No active signing link here yet. Check your email or refresh after others sign, if you&apos;re
+                        waiting for a turn.
                       </p>
                     ) : null}
                   </div>
