@@ -36,7 +36,7 @@ type Props = {
 export function RoomWorkspace(props: Props) {
   const [internalTab, setInternalTab] = React.useState("preview");
   const tab = props.workspaceTab ?? internalTab;
-  const { canManage, workspaceTab, onWorkspaceTabChange } = props;
+  const { workspaceTab, onWorkspaceTabChange } = props;
 
   function goTab(next: string) {
     if (workspaceTab === undefined) setInternalTab(next);
@@ -113,9 +113,12 @@ export function RoomWorkspace(props: Props) {
       </div>
 
       <Tabs value={tab} onValueChange={goTab} className="w-full">
-        <TabsList className="grid h-auto w-full max-w-3xl grid-cols-2 flex-wrap rounded-2xl bg-muted/60 p-1 lg:grid-cols-5">
+        <TabsList className="grid h-auto w-full max-w-3xl grid-cols-2 flex-wrap rounded-2xl bg-muted/60 p-1 lg:grid-cols-6">
           <TabsTrigger value="preview" className="rounded-xl data-[state=active]:bg-card data-[state=active]:shadow-sm">
             Investor view
+          </TabsTrigger>
+          <TabsTrigger value="nda" className="rounded-xl data-[state=active]:bg-card data-[state=active]:shadow-sm">
+            NDA
           </TabsTrigger>
           <TabsTrigger value="documents" className="rounded-xl data-[state=active]:bg-card data-[state=active]:shadow-sm">
             Documents
@@ -123,11 +126,9 @@ export function RoomWorkspace(props: Props) {
           <TabsTrigger value="activity" className="rounded-xl data-[state=active]:bg-card data-[state=active]:shadow-sm">
             Activity
           </TabsTrigger>
-          {props.canManage ? (
-            <TabsTrigger value="investors" className="rounded-xl data-[state=active]:bg-card data-[state=active]:shadow-sm">
-              Investors
-            </TabsTrigger>
-          ) : null}
+          <TabsTrigger value="investors" className="rounded-xl data-[state=active]:bg-card data-[state=active]:shadow-sm">
+            Investors
+          </TabsTrigger>
           <TabsTrigger value="settings" className="rounded-xl data-[state=active]:bg-card data-[state=active]:shadow-sm">
             Settings
           </TabsTrigger>
@@ -142,6 +143,10 @@ export function RoomWorkspace(props: Props) {
             activitySinceMs={props.activitySinceMs}
             onOpenDocuments={() => goTab("documents")}
           />
+        </TabsContent>
+
+        <TabsContent value="nda" className="mt-4 focus-visible:outline-none">
+          <RoomNdaEnvelopesPanel roomId={props.room.id} />
         </TabsContent>
 
         <TabsContent value="documents" className="mt-4 focus-visible:outline-none">
@@ -163,16 +168,13 @@ export function RoomWorkspace(props: Props) {
         <TabsContent value="activity" className="mt-4 focus-visible:outline-none">
           <ActivityAnalytics documents={props.documentsForRoom} activityPreview={props.activityPreview} />
         </TabsContent>
-        {props.canManage ? (
-          <TabsContent value="investors" className="mt-4 space-y-6 focus-visible:outline-none">
-            <RoomNdaEnvelopesPanel roomId={props.room.id} />
-            <InvestorAccessTable
-              invitations={props.invitations}
-              selectedDealId={props.selectedDealId ?? props.room.dealId}
-              selectedRoomId={props.room.id}
-            />
-          </TabsContent>
-        ) : null}
+        <TabsContent value="investors" className="mt-4 space-y-6 focus-visible:outline-none">
+          <InvestorAccessTable
+            invitations={props.invitations}
+            selectedDealId={props.selectedDealId ?? props.room.dealId}
+            selectedRoomId={props.room.id}
+          />
+        </TabsContent>
         <TabsContent value="settings" className="mt-4 focus-visible:outline-none">
           <RoomSettings
             room={props.room}

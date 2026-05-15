@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { canEditOrgData } from "@/lib/auth/rbac";
 import { requireOrgSession } from "@/lib/auth/session";
+import { normalizeInvestorEmailForNda } from "@/lib/data-room/investor-nda-gate";
 import { getAdminBucket, getAdminFirestore } from "@/lib/firebase/admin";
 import { col } from "@/lib/firestore/paths";
 import { getMembership } from "@/lib/firestore/queries";
@@ -11,7 +12,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
   if (!sess) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const membership = await getMembership(sess.orgId, sess.user.uid);
-  if (!membership || !canEditOrgData(membership.role)) {
+  if (!membership) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -25,8 +26,21 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
   const env = { id: snap.id, ...(snap.data() as Omit<EsignEnvelope, "id">) };
   if (env.organizationId !== sess.orgId) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   if (env.status !== "completed") return NextResponse.json({ error: "Document not completed" }, { status: 409 });
-  if (env.context.kind !== "data_room_nda" && env.context.kind !== "ad_hoc") {
-    return NextResponse.json({ error: "Unsupported envelope type" }, { status: 400 });
+
+  const isStaff = canEditOrgData(membership.role);
+  if (isStaff) {
+    if (env.context.kind !== "data_room_nda" && env.context.kind !== "ad_hoc") {
+      return NextResponse.json({ error: "Unsupported envelope type" }, { status: 400 });
+    }
+  } else {
+    if (env.context.kind !== "data_room_nda") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    const norm = normalizeInvestorEmailForNda(sess.user.email);
+    const envNorm = (env.investorEmailNorm ?? env.investorEmail)?.trim().toLowerCase() ?? "";
+    if (!norm || envNorm !== norm) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
   }
 
   const finalPath = env.finalPdfStoragePath?.trim();

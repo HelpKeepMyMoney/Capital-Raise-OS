@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { toast } from "sonner";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, ArrowDown, ArrowUp } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -54,6 +54,67 @@ function nextLabel(next: "sponsor" | "investor" | null): string {
   return "—";
 }
 
+function displayInvestorName(row: EnvelopeRow): string {
+  return (
+    row.investorName ??
+    (row.investorEmail.includes("@") ? (row.investorEmail.split("@")[0] ?? row.investorEmail) : row.investorEmail)
+  );
+}
+
+/** Lower = closer to done (for status column sorting). */
+function statusSortRank(status: string): number {
+  switch (status) {
+    case "completed":
+      return 0;
+    case "sent":
+      return 1;
+    case "viewed":
+      return 2;
+    case "draft":
+      return 3;
+    case "declined":
+    case "error":
+      return 4;
+    default:
+      return 5;
+  }
+}
+
+function nextSignerSortRank(role: "sponsor" | "investor" | null): number {
+  if (role === "investor") return 0;
+  if (role === "sponsor") return 1;
+  return 2;
+}
+
+type SortKey = "investor" | "email" | "status" | "next" | "created";
+
+function SortHead(props: {
+  label: string;
+  active: boolean;
+  dir: "asc" | "desc";
+  onClick: () => void;
+  className?: string;
+}) {
+  return (
+    <TableHead className={cn("whitespace-nowrap", props.className)}>
+      <button
+        type="button"
+        className="inline-flex items-center gap-1 font-medium text-foreground hover:underline"
+        onClick={props.onClick}
+      >
+        {props.label}
+        {props.active ? (
+          props.dir === "desc" ? (
+            <ArrowDown className="size-3.5 shrink-0 opacity-70" aria-hidden />
+          ) : (
+            <ArrowUp className="size-3.5 shrink-0 opacity-70" aria-hidden />
+          )
+        ) : null}
+      </button>
+    </TableHead>
+  );
+}
+
 async function copyUrl(label: string, url: string | null) {
   if (!url) {
     toast.message(`No ${label} link on file (it may have expired after signing).`);
@@ -78,6 +139,8 @@ export function RoomNdaEnvelopesPanel(props: Props) {
   const [rows, setRows] = React.useState<EnvelopeRow[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+  const [sortKey, setSortKey] = React.useState<SortKey>("created");
+  const [sortDir, setSortDir] = React.useState<"asc" | "desc">("desc");
 
   React.useEffect(() => {
     let cancelled = false;
@@ -103,6 +166,46 @@ export function RoomNdaEnvelopesPanel(props: Props) {
     };
   }, [props.roomId, tick]);
 
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "desc" ? "asc" : "desc"));
+    } else {
+      setSortKey(key);
+      setSortDir(key === "created" ? "desc" : "asc");
+    }
+  }
+
+  const sortedRows = React.useMemo(() => {
+    const copy = [...rows];
+    copy.sort((a, b) => {
+      let cmp = 0;
+      switch (sortKey) {
+        case "investor":
+          cmp = displayInvestorName(a).localeCompare(displayInvestorName(b), undefined, { sensitivity: "base" });
+          break;
+        case "email":
+          cmp = a.investorEmail.localeCompare(b.investorEmail, undefined, { sensitivity: "base" });
+          break;
+        case "status":
+          cmp = statusSortRank(a.status) - statusSortRank(b.status);
+          if (cmp === 0) cmp = a.status.localeCompare(b.status);
+          break;
+        case "next":
+          cmp = nextSignerSortRank(a.nextSignerRole) - nextSignerSortRank(b.nextSignerRole);
+          if (cmp === 0) cmp = nextLabel(a.nextSignerRole).localeCompare(nextLabel(b.nextSignerRole));
+          break;
+        case "created":
+          cmp = a.createdAt - b.createdAt;
+          break;
+        default:
+          cmp = 0;
+      }
+      if (cmp === 0) cmp = (a.updatedAt || a.createdAt) - (b.updatedAt || b.createdAt);
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+    return copy;
+  }, [rows, sortDir, sortKey]);
+
   return (
     <Card className="rounded-2xl border-border shadow-sm">
       <CardHeader className="pb-2">
@@ -117,9 +220,9 @@ export function RoomNdaEnvelopesPanel(props: Props) {
           </div>
           <Button
             type="button"
-            variant="outline"
+            variant="default"
             size="sm"
-            className="shrink-0 rounded-lg"
+            className="shrink-0 rounded-lg shadow-sm"
             disabled={loading}
             onClick={() => setTick((t) => t + 1)}
           >
@@ -141,22 +244,47 @@ export function RoomNdaEnvelopesPanel(props: Props) {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Investor</TableHead>
-                  <TableHead className="hidden sm:table-cell">Email</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="hidden md:table-cell">Next signer</TableHead>
-                  <TableHead className="hidden lg:table-cell">Created</TableHead>
+                  <SortHead
+                    label="Investor"
+                    active={sortKey === "investor"}
+                    dir={sortDir}
+                    onClick={() => toggleSort("investor")}
+                  />
+                  <SortHead
+                    label="Email"
+                    active={sortKey === "email"}
+                    dir={sortDir}
+                    onClick={() => toggleSort("email")}
+                    className="hidden sm:table-cell"
+                  />
+                  <SortHead
+                    label="Status"
+                    active={sortKey === "status"}
+                    dir={sortDir}
+                    onClick={() => toggleSort("status")}
+                  />
+                  <SortHead
+                    label="Next signer"
+                    active={sortKey === "next"}
+                    dir={sortDir}
+                    onClick={() => toggleSort("next")}
+                    className="hidden md:table-cell"
+                  />
+                  <SortHead
+                    label="Created"
+                    active={sortKey === "created"}
+                    dir={sortDir}
+                    onClick={() => toggleSort("created")}
+                    className="hidden lg:table-cell"
+                  />
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rows.map((row) => (
+                {sortedRows.map((row) => (
                   <TableRow key={row.id}>
                     <TableCell className="max-w-[160px] truncate font-medium">
-                      {row.investorName ??
-                        (row.investorEmail.includes("@")
-                          ? (row.investorEmail.split("@")[0] ?? row.investorEmail)
-                          : row.investorEmail)}
+                      {displayInvestorName(row)}
                     </TableCell>
                     <TableCell className="hidden max-w-[200px] truncate text-muted-foreground sm:table-cell">
                       {row.investorEmail}
@@ -179,10 +307,10 @@ export function RoomNdaEnvelopesPanel(props: Props) {
                             href={row.sponsorSigningUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-8 gap-1 rounded-lg text-xs")}
+                            className={cn(buttonVariants({ variant: "default", size: "sm" }), "h-8 gap-1 rounded-lg text-xs shadow-sm")}
                           >
                             Sponsor
-                            <ExternalLink className="size-3 opacity-70" />
+                            <ExternalLink className="size-3 opacity-90" />
                           </a>
                         ) : null}
                         {row.investorSigningUrl ? (
@@ -190,10 +318,10 @@ export function RoomNdaEnvelopesPanel(props: Props) {
                             href={row.investorSigningUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-8 gap-1 rounded-lg text-xs")}
+                            className={cn(buttonVariants({ variant: "default", size: "sm" }), "h-8 gap-1 rounded-lg text-xs shadow-sm")}
                           >
                             Investor
-                            <ExternalLink className="size-3 opacity-70" />
+                            <ExternalLink className="size-3 opacity-90" />
                           </a>
                         ) : null}
                         {row.status === "completed" ? (
@@ -201,28 +329,28 @@ export function RoomNdaEnvelopesPanel(props: Props) {
                             href={`/api/esign/envelopes/${encodeURIComponent(row.id)}/final-document`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className={cn(buttonVariants({ variant: "secondary", size: "sm" }), "h-8 gap-1 rounded-lg text-xs")}
+                            className={cn(buttonVariants({ variant: "default", size: "sm" }), "h-8 gap-1 rounded-lg text-xs shadow-sm")}
                           >
                             PDF
-                            <ExternalLink className="size-3 opacity-70" />
+                            <ExternalLink className="size-3 opacity-90" />
                           </a>
                         ) : null}
                         {row.status !== "completed" ? (
                           <>
                             <Button
                               type="button"
-                              variant="ghost"
+                              variant="default"
                               size="sm"
-                              className="h-8 rounded-lg text-xs"
+                              className="h-8 rounded-lg text-xs shadow-sm"
                               onClick={() => void copyUrl("Sponsor", row.sponsorSigningUrl)}
                             >
                               Copy sponsor
                             </Button>
                             <Button
                               type="button"
-                              variant="ghost"
+                              variant="default"
                               size="sm"
-                              className="h-8 rounded-lg text-xs"
+                              className="h-8 rounded-lg text-xs shadow-sm"
                               onClick={() => void copyUrl("Investor", row.investorSigningUrl)}
                             >
                               Copy investor

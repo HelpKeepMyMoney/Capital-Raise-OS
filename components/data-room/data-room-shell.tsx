@@ -26,6 +26,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Copy } from "lucide-react";
 
 type Props = {
   rooms: SerializedDataRoom[];
@@ -83,6 +84,20 @@ export function DataRoomShell(props: Props) {
     const fromRoom = props.roomDealMap[dealFilterId]?.name;
     return fromPicker ?? fromRoom ?? dealFilterId;
   }, [dealFilterId, props.deals, props.roomDealMap]);
+
+  /** Prefer deal name; fall back to linked data room name so the trigger never shows a bare UUID when a room exists. */
+  const dealInviteLabel = React.useCallback(
+    (dealId: string) => {
+      const fromLite = props.deals.find((d) => d.id === dealId)?.name?.trim();
+      if (fromLite) return fromLite;
+      const fromMap = props.roomDealMap[dealId]?.name?.trim();
+      if (fromMap) return fromMap;
+      const linkedRoom = props.rooms.find((r) => r.dealId === dealId);
+      if (linkedRoom?.name?.trim()) return linkedRoom.name.trim();
+      return dealId;
+    },
+    [props.deals, props.roomDealMap, props.rooms],
+  );
 
   const selectedRoom = props.rooms.find((r) => r.id === selectedRoomId);
 
@@ -164,6 +179,14 @@ export function DataRoomShell(props: Props) {
   const [inviteMessage, setInviteMessage] = React.useState("");
   const [inviteSendEmail, setInviteSendEmail] = React.useState(false);
   const [inviting, setInviting] = React.useState(false);
+  const [inviteCreatedUrl, setInviteCreatedUrl] = React.useState<string | null>(null);
+
+  function resetInviteModalState() {
+    setInviteCreatedUrl(null);
+    setInviteEmail("");
+    setInviteMessage("");
+    setInviteSendEmail(false);
+  }
 
   async function sendInvite() {
     if (!inviteDealId) {
@@ -187,25 +210,21 @@ export function DataRoomShell(props: Props) {
           sendEmail: inviteSendEmail,
         }),
       });
-      const data = (await res.json()) as {
-        error?: string;
-        inviteUrl?: string;
-        inviteToken?: string;
-      };
+      const raw = await res.text();
+      let data: { error?: string; inviteUrl?: string; inviteToken?: string } = {};
+      if (raw) {
+        try {
+          data = JSON.parse(raw) as typeof data;
+        } catch {
+          throw new Error(res.ok ? "Invalid response from server." : `Invite failed (${res.status})`);
+        }
+      } else if (!res.ok) {
+        throw new Error(`Invite failed (${res.status})`);
+      }
       if (!res.ok) throw new Error(data.error ?? "Invite failed");
       toast.success("Invitation created");
-      if (data.inviteUrl) {
-        try {
-          await navigator.clipboard.writeText(data.inviteUrl);
-          toast.message("Invite link copied to clipboard");
-        } catch {
-          /* ignore */
-        }
-      }
-      setInviteOpen(false);
-      setInviteEmail("");
-      setInviteMessage("");
-      setInviteSendEmail(false);
+      if (data.inviteUrl) setInviteCreatedUrl(data.inviteUrl);
+      else toast.error("Invitation saved but no link was returned.");
       router.refresh();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Invite failed");
@@ -222,6 +241,7 @@ export function DataRoomShell(props: Props) {
         canManage={props.canManage}
         onNewRoom={() => setCreateOpen(true)}
         onInvite={() => {
+          setInviteCreatedUrl(null);
           setInviteDealId(dealFilterId || selectedRoom?.dealId || props.deals[0]?.id || "");
           setInviteOpen(true);
         }}
@@ -290,6 +310,7 @@ export function DataRoomShell(props: Props) {
                     canManage={props.canManage}
                     dealFilterId={dealFilterId || undefined}
                     onInvite={() => {
+                      setInviteCreatedUrl(null);
                       if (r.dealId) setInviteDealId(r.dealId);
                       setInviteOpen(true);
                     }}
@@ -304,6 +325,11 @@ export function DataRoomShell(props: Props) {
                     onOpenAnalytics={() => {
                       setSelectedRoomId(r.id);
                       setWorkspaceTab("activity");
+                      wsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+                    }}
+                    onEditRoom={() => {
+                      setSelectedRoomId(r.id);
+                      setWorkspaceTab("settings");
                       wsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
                     }}
                   />
@@ -406,63 +432,131 @@ export function DataRoomShell(props: Props) {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
-        <DialogContent className="sm:max-w-md rounded-2xl">
+      <Dialog
+        open={inviteOpen}
+        onOpenChange={(open) => {
+          if (!open) resetInviteModalState();
+          setInviteOpen(open);
+        }}
+      >
+        <DialogContent className="sm:max-w-lg rounded-2xl">
           <DialogHeader>
-            <DialogTitle>Invite investor</DialogTitle>
+            <DialogTitle>{inviteCreatedUrl ? "Invitation ready" : "Invite investor"}</DialogTitle>
             <DialogDescription>
-              Deal-scoped invitation — includes data rooms tagged with this deal. Copy the link or email it from CPIN.
+              {inviteCreatedUrl
+                ? "Share this link with your investor. Anyone with the link can use it until it expires."
+                : "Deal-scoped invitation — includes data rooms tagged with this deal. Copy the link or email it from CPIN."}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-3">
-            <div className="space-y-2">
-              <Label>Deal</Label>
-              <Select value={inviteDealId || ""} onValueChange={(v) => setInviteDealId(typeof v === "string" ? v : "")}>
-                <SelectTrigger className="rounded-xl">
-                  <SelectValue placeholder="Select deal (required)" />
-                </SelectTrigger>
-                <SelectContent>
-                  {props.deals.map((d) => (
-                    <SelectItem key={d.id} value={d.id}>
-                      {d.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          {inviteCreatedUrl ? (
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <Label htmlFor="inv-created-url">Invite link</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="inv-created-url"
+                    readOnly
+                    value={inviteCreatedUrl}
+                    className="min-w-0 flex-1 rounded-xl font-mono text-xs"
+                  />
+                  <Button
+                    type="button"
+                    variant="default"
+                    size="icon"
+                    className="h-10 w-10 shrink-0 rounded-xl"
+                    aria-label="Copy invite link"
+                    onClick={() => {
+                      void navigator.clipboard.writeText(inviteCreatedUrl).then(
+                        () => toast.message("Invite link copied"),
+                        () => toast.error("Could not copy link"),
+                      );
+                    }}
+                  >
+                    <Copy className="size-4" />
+                  </Button>
+                </div>
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="inv-email">Email (optional unless sending)</Label>
-              <Input
-                id="inv-email"
-                type="email"
-                value={inviteEmail}
-                onChange={(e) => setInviteEmail(e.target.value)}
-                className="rounded-xl"
-                placeholder="investor@company.com"
-              />
+          ) : (
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <Label>Deal</Label>
+                <Select value={inviteDealId || ""} onValueChange={(v) => setInviteDealId(typeof v === "string" ? v : "")}>
+                  <SelectTrigger className="rounded-xl">
+                    <SelectValue placeholder="Select deal (required)">
+                      {inviteDealId ? dealInviteLabel(inviteDealId) : undefined}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {props.deals.map((d) => (
+                      <SelectItem key={d.id} value={d.id}>
+                        {dealInviteLabel(d.id)}
+                      </SelectItem>
+                    ))}
+                    {inviteDealId && !props.deals.some((d) => d.id === inviteDealId) ? (
+                      <SelectItem key={`__invite_${inviteDealId}`} value={inviteDealId}>
+                        {dealInviteLabel(inviteDealId)}
+                      </SelectItem>
+                    ) : null}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="inv-email">Email (optional unless sending)</Label>
+                <Input
+                  id="inv-email"
+                  type="email"
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  className="rounded-xl"
+                  placeholder="investor@company.com"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="inv-msg">Message</Label>
+                <Textarea
+                  id="inv-msg"
+                  value={inviteMessage}
+                  onChange={(e) => setInviteMessage(e.target.value)}
+                  className="min-h-[80px] rounded-xl"
+                  placeholder="Short personal note (optional)"
+                />
+              </div>
+              <label className="flex items-center gap-2 text-sm">
+                <Checkbox checked={inviteSendEmail} onCheckedChange={(v) => setInviteSendEmail(v === true)} />
+                Send email
+              </label>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="inv-msg">Message</Label>
-              <Textarea
-                id="inv-msg"
-                value={inviteMessage}
-                onChange={(e) => setInviteMessage(e.target.value)}
-                className="min-h-[80px] rounded-xl"
-                placeholder="Short personal note (optional)"
-              />
-            </div>
-            <label className="flex items-center gap-2 text-sm">
-              <Checkbox checked={inviteSendEmail} onCheckedChange={(v) => setInviteSendEmail(v === true)} />
-              Send email via Resend (requires API key)
-            </label>
-          </div>
+          )}
           <DialogFooter className="border-0">
-            <Button variant="outline" className="rounded-xl" onClick={() => setInviteOpen(false)}>
-              Cancel
-            </Button>
-            <Button className="rounded-xl" disabled={inviting} onClick={() => void sendInvite()}>
-              {inviting ? "Creating…" : "Create invite"}
-            </Button>
+            {inviteCreatedUrl ? (
+              <>
+                <Button
+                  variant="outline"
+                  className="rounded-xl"
+                  onClick={() => {
+                    setInviteCreatedUrl(null);
+                    setInviteEmail("");
+                    setInviteMessage("");
+                    setInviteSendEmail(false);
+                  }}
+                >
+                  Create another
+                </Button>
+                <Button className="rounded-xl" onClick={() => setInviteOpen(false)}>
+                  Done
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="outline" className="rounded-xl" onClick={() => setInviteOpen(false)}>
+                  Cancel
+                </Button>
+                <Button className="rounded-xl" disabled={inviting} onClick={() => void sendInvite()}>
+                  {inviting ? "Creating…" : "Create invite"}
+                </Button>
+              </>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

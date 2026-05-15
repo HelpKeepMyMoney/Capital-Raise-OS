@@ -8,7 +8,8 @@ import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { useMounted } from "@/hooks/use-mounted";
 import { InvestorNdaRequestButton } from "@/components/data-room/investor-nda-request-button";
-import { Archive, BarChart3, FolderOpen, Link2, Pencil } from "lucide-react";
+import { BarChart3, FolderOpen, Link2, Pencil, Trash2 } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 const NDA_REQUEST_BADGE_RECENT_MS = 14 * 24 * 60 * 60 * 1000;
 
@@ -28,6 +29,8 @@ type Props = {
   onCopyInviteLink?: () => void;
   /** Open workspace Activity tab for this room. */
   onOpenAnalytics?: () => void;
+  /** Select this room and open the workspace Settings tab. */
+  onEditRoom?: () => void;
 };
 
 function statusBadges(room: SerializedDataRoom) {
@@ -206,12 +209,12 @@ export function RoomCard(props: Props) {
               variant="outline"
               size="sm"
               className="h-8 rounded-lg px-2"
-              aria-label="Edit via settings tab"
+              aria-label="Edit room settings"
               onClick={(e) => {
                 e.stopPropagation();
-                props.onSelect();
+                if (props.onEditRoom) props.onEditRoom();
+                else props.onSelect();
               }}
-              title="Open room, then use Settings tab"
             >
               <Pencil className="h-3.5 w-3.5" />
             </Button>
@@ -229,9 +232,25 @@ export function RoomCard(props: Props) {
             >
               Invite
             </Button>
-            <Button type="button" variant="outline" size="sm" className="h-8 rounded-lg px-2" aria-label="Archive" disabled title="Coming soon via settings">
-              <Archive className="h-3.5 w-3.5" />
-            </Button>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <span className="inline-flex shrink-0" onClick={(e) => e.stopPropagation()}>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 rounded-lg px-2"
+                      aria-label="Delete or archive room"
+                      disabled
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </span>
+                }
+              />
+              <TooltipContent side="top">Delete or archive this room from the Settings tab.</TooltipContent>
+            </Tooltip>
           </div>
         ) : null}
       </div>

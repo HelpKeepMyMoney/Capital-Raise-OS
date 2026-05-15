@@ -6,7 +6,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { ArrowRight, Briefcase, LineChart, Pencil, Share2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { fmtUsd, computeProgressPct } from "@/lib/deals/format";
 import type { Deal, DealStatus } from "@/lib/firestore/types";
@@ -53,6 +53,9 @@ export function DealCard(props: {
 
   const showLogo = Boolean(d.logoUrl?.trim()) && !logoFailed;
   const initial = d.name.trim().slice(0, 1).toUpperCase() || "?";
+  const dealHref = `/deals/${d.id}`;
+  const investorViewHref = `${dealHref}?view=investor`;
+  const sponsorDealHref = props.canManage ? investorViewHref : dealHref;
 
   return (
     <motion.div
@@ -89,7 +92,7 @@ export function DealCard(props: {
           <div className="min-w-0 flex-1 space-y-2">
             <div className="flex flex-wrap items-center gap-2">
             <Link
-              href={`/deals/${d.id}`}
+              href={sponsorDealHref}
               className="font-heading text-lg font-semibold tracking-tight text-foreground hover:text-blue-600"
             >
               {d.name}
@@ -142,8 +145,8 @@ export function DealCard(props: {
         </div>
         <div className="flex shrink-0 flex-col gap-2 sm:flex-row lg:flex-col lg:items-end">
           <div className="flex flex-wrap gap-2">
-            <Link href={`/deals/${d.id}`} className={cn(buttonVariants({ size: "sm" }), "rounded-xl shadow-sm")}>
-              View deal
+            <Link href={sponsorDealHref} className={cn(buttonVariants({ size: "sm" }), "rounded-xl shadow-sm")}>
+              {props.canManage ? "View deal room" : "View deal"}
               <ArrowRight className="ml-1 size-4" />
             </Link>
             {props.canManage ? (
@@ -153,21 +156,15 @@ export function DealCard(props: {
                   className={cn(buttonVariants({ variant: "outline", size: "sm" }), "rounded-xl")}
                 >
                   <Pencil className="mr-1 size-4" />
-                  Edit
+                  Edit deal room
                 </Link>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="rounded-xl"
-                  onClick={() => {
-                    const url = typeof window !== "undefined" ? `${window.location.origin}/deals/${d.id}` : "";
-                    if (url) void navigator.clipboard.writeText(url);
-                  }}
+                <Link
+                  href={`/deals/${d.id}?tab=invite`}
+                  className={cn(buttonVariants({ variant: "outline", size: "sm" }), "rounded-xl")}
                 >
                   <Share2 className="mr-1 size-4" />
-                  Share
-                </Button>
+                  Share deal
+                </Link>
                 <Link
                   href="/analytics"
                   className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "rounded-xl")}

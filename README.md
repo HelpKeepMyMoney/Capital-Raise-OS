@@ -4,6 +4,16 @@ AI-powered private capital platform: investor CRM, discovery, outreach, data roo
 
 ## Changelog
 
+### Data room NDA tab, invitations, cross-folder filters, and deal sponsor preview
+
+- **Deal detail & cards (`app/(shell)/deals/[id]/page.tsx`, `components/deals/deal-card.tsx`, `components/deals/deal-title-hero.tsx`, `components/deals/deal-manager-panel.tsx`):** Sponsors can open an **investor-style preview** of the linked deal room (**`?view=investor`**) with a clear **back to sponsor** path; **Deal manager** stays at the top of the page; hero CTAs respect **`investorPreview`** (investor-safe actions). Deal card links carry query params for **Edit deal / Share / View deal room** as appropriate.
+- **Data room workspace (`components/data-room/RoomWorkspace.tsx`):** **NDA** tab for sponsor/staff lists native room NDA envelopes; **Investors** tab focuses on access/invitations without duplicating envelope lists; investor guest layout omits sponsor-only NDA list where consolidated.
+- **NDA envelopes panel (`components/data-room/room-nda-envelopes-panel.tsx`):** Sortable table (investor, email, status, next signer, created) with consistent primary actions; sponsor/investor links and refresh aligned to the design system.
+- **E-sign final document (`app/api/esign/envelopes/[id]/final-document/route.ts`):** Allows **completed** **`data_room_nda`** downloads for the investor when the session email matches the envelope investor (in addition to staff paths).
+- **Invitations API & UI (`app/api/invitations/route.ts`, `components/data-room/data-room-shell.tsx`):** Invitation and audit Firestore writes **omit `undefined` fields** (fixes failures when optional email/message are absent). **Invite investor** deal picker shows human labels (**deal name**, **`roomDealMap`**, linked **data room** name before raw id). Checkbox label **Send email**; after a successful create the modal shows the **invite URL**, **Copy**, **Create another**, and **Done**; client parses **`res.text()`** safely when the body is empty or non-JSON.
+- **Documents (`components/data-room/DocumentManager.tsx`):** Category filter chips (**Financials**, **Legal**, **Pitch**, **Media**, **Hidden**) list matching **files across every folder** in the room (not only the current folder), with a **folder path** under each file name, **Category view** helper copy, **Back to folder tree**, and workspace search matching **folder paths** in that mode. **All** still browses the normal folder tree.
+- **Room rail (`components/data-room/RoomCard.tsx`, `data-room-shell.tsx`):** Pencil **Edit** selects the room and switches the workspace to the **Settings** tab (with scroll-into-view). Trash/delete affordance includes a **tooltip** (archive/delete via Settings). **`onEditRoom`** wired from the shell.
+
 ### LP portal — investor deal room, data room, subscription & questionnaire polish
 
 - **Data room (`app/(shell)/data-room/page.tsx`, `components/data-room/types.ts`, `lib/data-room/investor-nda-gate.ts`):** Serialized rooms expose **`investorNdaInvestorStepCompletedAt`** when the LP has finished their NDA step and the envelope is **`await_sponsor`**. **`dealsForShell`** merges deal-picker options from member-visible deals, room-linked deals, and **`?deal=`** so **Align to deal** can show names (not raw ids).

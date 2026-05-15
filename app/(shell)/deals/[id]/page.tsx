@@ -66,10 +66,20 @@ async function commitmentsWithEmails(
   return out;
 }
 
-export default async function DealDetailPage(props: { params: Promise<{ id: string }> }) {
+function firstSearchParam(v: string | string[] | undefined): string | undefined {
+  if (v == null) return undefined;
+  return Array.isArray(v) ? v[0] : v;
+}
+
+export default async function DealDetailPage(props: {
+  params: Promise<{ id: string }>;
+  searchParams?: Promise<{ view?: string | string[] }>;
+}) {
   const ctx = await requireOrgSession();
   if (!ctx) redirect("/login");
   const { id } = await props.params;
+  const query = props.searchParams ? await props.searchParams : {};
+  const viewParam = firstSearchParam(query.view);
 
   const [deal, membership, raised] = await Promise.all([
     getDeal(ctx.orgId, id),
@@ -86,6 +96,7 @@ export default async function DealDetailPage(props: { params: Promise<{ id: stri
     listDocumentsForDeal(ctx.orgId, id),
   ]);
   const guest = membership?.role === "investor_guest";
+  const investorPreview = canManage && !guest && viewParam === "investor";
 
   if (!memberCanAccessDeal(membership, id)) notFound();
 
@@ -111,15 +122,18 @@ export default async function DealDetailPage(props: { params: Promise<{ id: stri
     commitmentRows = await commitmentsWithEmails(activeCommitments);
   }
 
+  let questionnaireTemplateConfigured = false;
+  if (guest || canManage) {
+    const org = await getOrganization(ctx.orgId);
+    questionnaireTemplateConfigured = Boolean(org?.investorQuestionnaireSignableTemplateId?.trim());
+  }
+
   let myCommitment: DealCommitment | null = null;
   let signingRow: SigningRequest | null = null;
   let questionnaireSigningRow: SigningRequest | null = null;
-  let questionnaireConfigured = false;
   if (guest) {
     myCommitment = await getDealCommitmentForUser(ctx.orgId, id, ctx.user.uid);
     signingRow = await getSigningRequest(ctx.orgId, id, ctx.user.uid);
-    const org = await getOrganization(ctx.orgId);
-    questionnaireConfigured = Boolean(org?.investorQuestionnaireSignableTemplateId?.trim());
     questionnaireSigningRow = await getQuestionnaireSigningRequest(ctx.orgId, id, ctx.user.uid);
   }
 
@@ -225,7 +239,7 @@ export default async function DealDetailPage(props: { params: Promise<{ id: stri
       subscriptionSigningUrl={subscriptionSigningUrl}
       subscriptionSponsorSigningNext={subscriptionSponsorSigningNext}
       questionnaireCompleted={questionnaireCompleted}
-      questionnaireEnabled={guest && questionnaireConfigured}
+      questionnaireEnabled={guest && questionnaireTemplateConfigured}
     >
       <div className="mx-auto max-w-4xl space-y-12 px-4 pb-20 pt-6 md:px-6">
         <Link
@@ -234,6 +248,35 @@ export default async function DealDetailPage(props: { params: Promise<{ id: stri
         >
           ← Deal room
         </Link>
+
+        {investorPreview ? (
+          <div className="flex flex-col gap-3 rounded-2xl border border-primary/25 bg-primary/5 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+            <div className="space-y-1">
+              <p className="text-xs font-bold uppercase tracking-wider text-primary">Investor view</p>
+              <p className="text-sm text-foreground/90">
+                Preview what invited investors see on this deal room. Sponsor tools are hidden.
+              </p>
+            </div>
+            <Link
+              href={`/deals/${deal.id}`}
+              className={cn(
+                buttonVariants({ variant: "default", size: "sm" }),
+                "shrink-0 self-start rounded-xl shadow-sm sm:self-center",
+              )}
+            >
+              Back to sponsor view
+            </Link>
+          </div>
+        ) : null}
+
+        {canManage && !investorPreview ? (
+          <DealManagerPanel
+            deal={deal}
+            analytics={analyticsPayload}
+            commitments={commitmentRows}
+            linkedDataRooms={linkedDataRoomSummaries}
+          />
+        ) : null}
 
         <div id="deal-hero-anchor">
           <DealTitleHero
@@ -244,6 +287,7 @@ export default async function DealDetailPage(props: { params: Promise<{ id: stri
             investorCount={investorCount}
             avgCheck={avgCheck}
             guest={guest}
+            investorPreview={investorPreview}
             hasDataRoom={hasDataRoom}
             showDataRoomCta={showDataRoomCta}
             daysRemaining={daysRemaining}
@@ -253,7 +297,7 @@ export default async function DealDetailPage(props: { params: Promise<{ id: stri
             subscriptionSigningUrl={subscriptionSigningUrl}
             subscriptionSponsorSigningNext={subscriptionSponsorSigningNext}
             questionnaireCompleted={questionnaireCompleted}
-            questionnaireEnabled={guest && questionnaireConfigured}
+            questionnaireEnabled={(guest || investorPreview) && questionnaireTemplateConfigured}
           />
         </div>
 
@@ -272,7 +316,7 @@ export default async function DealDetailPage(props: { params: Promise<{ id: stri
 
         <WhyInvest deal={deal} />
 
-        <TractionSection metrics={deal.tractionMetrics} hideWhenEmpty={guest} />
+        <TractionSection metrics={deal.tractionMetrics} hideWhenEmpty={guest || investorPreview} />
 
         <FounderCredibility founder={deal.founder} sponsorProfileFallback={deal.sponsorProfile} />
 
@@ -302,7 +346,7 @@ export default async function DealDetailPage(props: { params: Promise<{ id: stri
               ? `/data-room?deal=${encodeURIComponent(deal.id)}#faq`
               : "#faq"
           }
-          hideWhenNoDocuments={guest}
+          hideWhenNoDocuments={guest || investorPreview}
         />
 
         {deal.investorUpdates && deal.investorUpdates.length > 0 ? (
@@ -345,7 +389,7 @@ export default async function DealDetailPage(props: { params: Promise<{ id: stri
               userId={ctx.user.uid}
               initial={signingRow}
               initialQuestionnaire={questionnaireSigningRow}
-              questionnaireConfigured={questionnaireConfigured}
+              questionnaireConfigured={questionnaireTemplateConfigured}
             />
             <SoftCommitChips dealId={deal.id} dealName={deal.name} minAmount={deal.minimumInvestment} />
             <Card id="commit" className="rounded-2xl border-border/80 shadow-md">
@@ -375,15 +419,6 @@ export default async function DealDetailPage(props: { params: Promise<{ id: stri
             calendarUrl={deal.calendarBookingUrl}
             showDataRoom={showDataRoomCta && hasDataRoom}
             dataRoomHref={`/data-room?deal=${encodeURIComponent(deal.id)}`}
-          />
-        ) : null}
-
-        {canManage ? (
-          <DealManagerPanel
-            deal={deal}
-            analytics={analyticsPayload}
-            commitments={commitmentRows}
-            linkedDataRooms={linkedDataRoomSummaries}
           />
         ) : null}
 

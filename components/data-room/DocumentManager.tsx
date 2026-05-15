@@ -84,17 +84,36 @@ const DATA_ROOM_FOLDER_SELECT_TRIGGER_CLASS =
 const DATA_ROOM_FOLDER_SELECT_CONTENT_CLASS =
   "max-h-72 w-max min-w-72 max-w-[min(40rem,calc(100vw-2rem))]";
 
-function docSearchMatches(d: SerializedRoomDocument, q: string): boolean {
+function docSearchMatches(d: SerializedRoomDocument, q: string, folderPath?: string): boolean {
   const s = q.trim().toLowerCase();
   if (!s) return true;
   return (
     d.name.toLowerCase().includes(s) ||
     d.kind.toLowerCase().includes(s) ||
-    (d.mimeType?.toLowerCase().includes(s) ?? false)
+    (d.mimeType?.toLowerCase().includes(s) ?? false) ||
+    (folderPath ? folderPath.toLowerCase().includes(s) : false)
   );
 }
 
 type DocFilter = "all" | "financials" | "legal" | "pitch" | "media" | "hidden";
+
+function folderPathForDocument(
+  doc: SerializedRoomDocument,
+  folderById: Map<string, SerializedRoomDocument>,
+): string {
+  const parts: string[] = [];
+  let cur = normParentId(doc.parentFolderId);
+  const seen = new Set<string>();
+  while (cur) {
+    if (seen.has(cur)) break;
+    seen.add(cur);
+    const f = folderById.get(cur);
+    if (!f || f.kind !== "folder") break;
+    parts.unshift(f.name);
+    cur = normParentId(f.parentFolderId);
+  }
+  return parts.length ? parts.join(" / ") : "Room root";
+}
 
 function docMatches(d: SerializedRoomDocument, f: DocFilter): boolean {
   if (d.kind === "folder") return f === "all";
@@ -168,7 +187,7 @@ function SortableTableHead(props: {
 
 type Props = {
   documents: SerializedRoomDocument[];
-  /** Search text from room workspace (filters rows in the current folder). */
+  /** Search text from room workspace (filters the table; in category filters, matches file name/kind and folder path). */
   documentSearch?: string;
   selectedRoomId: string;
   canManage: boolean;
@@ -504,20 +523,33 @@ export function DocumentManager(props: Props) {
 
   const activeDocs = props.documents.filter((d) => !props.selectedRoomId || d.dataRoomId === props.selectedRoomId);
 
+  const folderByIdMap = React.useMemo(
+    () => new Map(activeDocs.filter((d) => d.kind === "folder").map((f) => [f.id, f])),
+    [activeDocs],
+  );
+
   const filteredByCategory = React.useMemo(
     () => activeDocs.filter((d) => docMatches(d, docFilter)),
     [activeDocs, docFilter],
   );
 
-  const atFolderLevel = React.useMemo(
-    () => filteredByCategory.filter((d) => normParentId(d.parentFolderId) === normParentId(currentFolderId)),
-    [filteredByCategory, currentFolderId],
-  );
+  const listSource = React.useMemo(() => {
+    if (docFilter === "all") {
+      return filteredByCategory.filter(
+        (d) => normParentId(d.parentFolderId) === normParentId(currentFolderId),
+      );
+    }
+    return filteredByCategory;
+  }, [filteredByCategory, docFilter, currentFolderId]);
 
-  const searchedDocs = React.useMemo(
-    () => atFolderLevel.filter((d) => docSearchMatches(d, searchQ)),
-    [atFolderLevel, searchQ],
-  );
+  const searchedDocs = React.useMemo(() => {
+    if (!searchQ.trim()) return listSource;
+    if (docFilter === "all") return listSource.filter((d) => docSearchMatches(d, searchQ));
+    return listSource.filter((d) => {
+      const path = d.kind === "folder" ? undefined : folderPathForDocument(d, folderByIdMap);
+      return docSearchMatches(d, searchQ, path);
+    });
+  }, [listSource, searchQ, docFilter, folderByIdMap]);
 
   const breadcrumbSegments = React.useMemo(() => {
     if (!currentFolderId) return [] as { id: string; name: string }[];
@@ -788,37 +820,52 @@ export function DocumentManager(props: Props) {
       ) : null}
 
       {props.selectedRoomId ? (
-        <nav className="flex flex-wrap items-center gap-0.5 text-sm text-muted-foreground" aria-label="Folder location">
-          <button
-            type="button"
-            className={cn(
-              "rounded-md px-1.5 py-0.5 hover:bg-muted hover:text-foreground",
-              !currentFolderId && "font-semibold text-foreground",
-            )}
-            onClick={() => setCurrentFolderId(null)}
-          >
-            All files
-          </button>
-          {breadcrumbSegments.map((seg, i) => {
-            const isLast = i === breadcrumbSegments.length - 1;
-            return (
-              <React.Fragment key={seg.id}>
-                <ChevronRight className="mx-0.5 inline h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden />
-                {isLast ? (
-                  <span className="rounded-md px-1.5 py-0.5 font-semibold text-foreground">{seg.name}</span>
-                ) : (
-                  <button
-                    type="button"
-                    className="rounded-md px-1.5 py-0.5 hover:bg-muted hover:text-foreground"
-                    onClick={() => setCurrentFolderId(seg.id)}
-                  >
-                    {seg.name}
-                  </button>
-                )}
-              </React.Fragment>
-            );
-          })}
-        </nav>
+        docFilter === "all" ? (
+          <nav className="flex flex-wrap items-center gap-0.5 text-sm text-muted-foreground" aria-label="Folder location">
+            <button
+              type="button"
+              className={cn(
+                "rounded-md px-1.5 py-0.5 hover:bg-muted hover:text-foreground",
+                !currentFolderId && "font-semibold text-foreground",
+              )}
+              onClick={() => setCurrentFolderId(null)}
+            >
+              All files
+            </button>
+            {breadcrumbSegments.map((seg, i) => {
+              const isLast = i === breadcrumbSegments.length - 1;
+              return (
+                <React.Fragment key={seg.id}>
+                  <ChevronRight className="mx-0.5 inline h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden />
+                  {isLast ? (
+                    <span className="rounded-md px-1.5 py-0.5 font-semibold text-foreground">{seg.name}</span>
+                  ) : (
+                    <button
+                      type="button"
+                      className="rounded-md px-1.5 py-0.5 hover:bg-muted hover:text-foreground"
+                      onClick={() => setCurrentFolderId(seg.id)}
+                    >
+                      {seg.name}
+                    </button>
+                  )}
+                </React.Fragment>
+              );
+            })}
+          </nav>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            <span className="font-medium text-foreground">Category view</span>
+            {" — "}
+            Showing every file in this room that matches this filter (all folders).{" "}
+            <button
+              type="button"
+              className="font-medium text-primary underline-offset-4 hover:underline"
+              onClick={() => setDocFilter("all")}
+            >
+              Back to folder tree
+            </button>
+          </p>
+        )
       ) : null}
 
       <div className="flex flex-wrap gap-2">
@@ -930,16 +977,18 @@ export function DocumentManager(props: Props) {
                   No documents match this filter.
                 </TableCell>
               </TableRow>
-            ) : atFolderLevel.length === 0 ? (
+            ) : listSource.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={9} className="py-12 text-center text-sm text-muted-foreground">
-                  This folder is empty.
+                  {docFilter === "all" ? "This folder is empty." : "No files match this filter in this room."}
                 </TableCell>
               </TableRow>
             ) : searchedDocs.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={9} className="py-12 text-center text-sm text-muted-foreground">
-                  Nothing matches this search in this folder.
+                  {docFilter === "all"
+                    ? "Nothing matches this search in this folder."
+                    : "Nothing matches this search across these files."}
                 </TableCell>
               </TableRow>
             ) : (
@@ -956,14 +1005,21 @@ export function DocumentManager(props: Props) {
                         <span className="min-w-0">{d.name}</span>
                       </button>
                     ) : (
-                      <a
-                        href={`/api/data-room/documents/${encodeURIComponent(d.id)}/file`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="line-clamp-2 text-primary hover:underline"
-                      >
-                        {d.name}
-                      </a>
+                      <div className="min-w-0">
+                        <a
+                          href={`/api/data-room/documents/${encodeURIComponent(d.id)}/file`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="line-clamp-2 text-primary hover:underline"
+                        >
+                          {d.name}
+                        </a>
+                        {docFilter !== "all" ? (
+                          <p className="mt-0.5 truncate text-[11px] font-normal text-muted-foreground">
+                            {folderPathForDocument(d, folderByIdMap)}
+                          </p>
+                        ) : null}
+                      </div>
                     )}
                   </TableCell>
                   <TableCell>{kindLabel(d.kind)}</TableCell>

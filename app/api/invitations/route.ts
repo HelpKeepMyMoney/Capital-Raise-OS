@@ -76,29 +76,33 @@ export async function POST(req: NextRequest) {
   const id = randomUUID();
   const inviteUrl = `${appBaseUrl(req)}/invite/${encodeURIComponent(rawToken)}`;
 
-  await db
-    .collection(col.investorInvitations)
-    .doc(id)
-    .set({
-      id,
-      organizationId: ctx.orgId,
-      tokenHash,
-      scope,
-      dealIds,
-      dataRoomIds,
-      email,
-      message: typeof body.message === "string" ? body.message.slice(0, 2000) : undefined,
-      expiresAt: now + expiresInDays * 86400000,
-      createdBy: ctx.user.uid,
-      createdAt: now,
-    });
+  const invitationDoc: Record<string, unknown> = {
+    id,
+    organizationId: ctx.orgId,
+    tokenHash,
+    scope,
+    dealIds,
+    dataRoomIds,
+    expiresAt: now + expiresInDays * 86400000,
+    createdBy: ctx.user.uid,
+    createdAt: now,
+  };
+  if (email) invitationDoc.email = email;
+  if (typeof body.message === "string" && body.message.length > 0) {
+    invitationDoc.message = body.message.slice(0, 2000);
+  }
+
+  await db.collection(col.investorInvitations).doc(id).set(invitationDoc);
+
+  const auditPayload: Record<string, unknown> = { scope, dealIds };
+  if (email) auditPayload.email = email;
 
   await writeAuditLog({
     organizationId: ctx.orgId,
     actorId: ctx.user.uid,
     action: "invite.create",
     resource: `${col.investorInvitations}/${id}`,
-    payload: { scope, dealIds, email },
+    payload: auditPayload,
   });
 
   const sendEmail = body.sendEmail === true;

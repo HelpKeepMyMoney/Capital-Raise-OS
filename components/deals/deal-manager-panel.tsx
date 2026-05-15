@@ -120,7 +120,10 @@ export function DealManagerPanel(props: {
   }, [router, sp]);
 
   return (
-    <section className="rounded-2xl border border-border/80 border-dashed border-blue-500/30 bg-blue-500/[0.03] p-6 shadow-sm">
+    <section
+      id="sponsor-deal-manager"
+      className="rounded-2xl border border-border/80 border-dashed border-blue-500/30 bg-blue-500/[0.03] p-6 shadow-sm"
+    >
       <div className="mb-4 flex flex-col gap-1">
         <p className="text-xs font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300">
           Sponsor only

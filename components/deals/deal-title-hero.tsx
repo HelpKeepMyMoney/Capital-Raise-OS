@@ -5,7 +5,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { Calendar, Download, Wallet, Phone, TrendingUp } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { fmtUsd } from "@/lib/deals/format";
 import type { Deal } from "@/lib/firestore/types";
@@ -22,6 +22,8 @@ export function DealTitleHero(props: {
   investorCount: number;
   avgCheck: number;
   guest: boolean;
+  /** Sponsor preview: render investor-style CTAs without live investor-only actions. */
+  investorPreview?: boolean;
   hasDataRoom: boolean;
   showDataRoomCta: boolean;
   daysRemaining: number | null;
@@ -35,6 +37,8 @@ export function DealTitleHero(props: {
   questionnaireEnabled?: boolean;
 }) {
   const d = props.deal;
+  const previewAsInvestor = props.investorPreview === true && !props.guest;
+  const showInvestorCtAs = props.guest || previewAsInvestor;
   const [logoFailed, setLogoFailed] = React.useState(false);
   React.useEffect(() => {
     setLogoFailed(false);
@@ -67,7 +71,7 @@ export function DealTitleHero(props: {
             ) : null}
             <div>
               <p className="text-[0.65rem] font-semibold uppercase tracking-wider text-muted-foreground">
-                Offering
+                {previewAsInvestor ? "Investor view" : "Offering"}
               </p>
               <h1 className="mt-1 font-heading text-2xl font-bold tracking-tight sm:text-3xl md:text-[1.75rem] leading-tight">
                 {d.name}
@@ -163,34 +167,75 @@ export function DealTitleHero(props: {
 
           {/* Right: CTAs */}
           <div className="flex w-full shrink-0 flex-col gap-2 sm:flex-row sm:flex-wrap xl:w-[11.25rem] xl:flex-col xl:flex-nowrap">
-            {props.guest ? (
+            {showInvestorCtAs ? (
               <>
-                <Link
-                  href="#commit"
-                  className={cn(
-                    buttonVariants({ size: "default" }),
-                    "justify-center gap-2 rounded-xl shadow-sm",
-                  )}
-                  onClick={() => void trackDealTelemetry(d.id, "cta_commit_click")}
-                >
-                  <Wallet className="size-4" />
-                  Commit capital
-                </Link>
-                <RequestSubscriptionPacketButton
-                  dealId={d.id}
-                  variant="outline"
-                  label="Request subscription packet"
-                  subscriptionCompleted={props.subscriptionCompleted}
-                  subscriptionSigningUrl={props.subscriptionSigningUrl}
-                  subscriptionSponsorSigningNext={props.subscriptionSponsorSigningNext}
-                />
-                {props.questionnaireEnabled ? (
-                  <RequestQuestionnairePacketButton
+                {previewAsInvestor ? (
+                  <Button
+                    type="button"
+                    disabled
+                    className={cn(
+                      buttonVariants({ size: "default" }),
+                      "justify-center gap-2 rounded-xl opacity-80 shadow-none",
+                    )}
+                    title="Invited investors reserve a commitment here."
+                  >
+                    <Wallet className="size-4" />
+                    Commit capital
+                  </Button>
+                ) : (
+                  <Link
+                    href="#commit"
+                    className={cn(
+                      buttonVariants({ size: "default" }),
+                      "justify-center gap-2 rounded-xl shadow-sm",
+                    )}
+                    onClick={() => void trackDealTelemetry(d.id, "cta_commit_click")}
+                  >
+                    <Wallet className="size-4" />
+                    Commit capital
+                  </Link>
+                )}
+                {previewAsInvestor ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="default"
+                    disabled
+                    className="justify-center gap-2 rounded-xl opacity-80"
+                    title="Available after investors are invited to this deal."
+                  >
+                    Request subscription packet
+                  </Button>
+                ) : (
+                  <RequestSubscriptionPacketButton
                     dealId={d.id}
                     variant="outline"
-                    label="Request investor questionnaire"
-                    questionnaireCompleted={props.questionnaireCompleted}
+                    label="Request subscription packet"
+                    subscriptionCompleted={props.subscriptionCompleted}
+                    subscriptionSigningUrl={props.subscriptionSigningUrl}
+                    subscriptionSponsorSigningNext={props.subscriptionSponsorSigningNext}
                   />
+                )}
+                {props.questionnaireEnabled ? (
+                  previewAsInvestor ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="default"
+                      disabled
+                      className="justify-center gap-2 rounded-xl opacity-80"
+                      title="Available to invited investors when enabled for this deal."
+                    >
+                      Request investor questionnaire
+                    </Button>
+                  ) : (
+                    <RequestQuestionnairePacketButton
+                      dealId={d.id}
+                      variant="outline"
+                      label="Request investor questionnaire"
+                      questionnaireCompleted={props.questionnaireCompleted}
+                    />
+                  )
                 ) : null}
                 {showBook && d.calendarBookingUrl ? (
                   <a
@@ -220,9 +265,22 @@ export function DealTitleHero(props: {
                     Access data room
                   </Link>
                 ) : null}
-                <div className="pt-1">
-                  <ExpressInterestButton dealId={d.id} dealName={d.name} variant="ghost" />
-                </div>
+                {previewAsInvestor ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="default"
+                    disabled
+                    className="justify-center gap-2 rounded-xl opacity-70"
+                    title="Invited investors can signal interest from their portal login."
+                  >
+                    Express interest
+                  </Button>
+                ) : (
+                  <div className="pt-1">
+                    <ExpressInterestButton dealId={d.id} dealName={d.name} variant="ghost" />
+                  </div>
+                )}
               </>
             ) : (
               <>
