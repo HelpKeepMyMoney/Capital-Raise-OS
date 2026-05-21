@@ -648,7 +648,11 @@ export function InvestorDetailClient(props: {
                   onValueChange={(v) => setInteractionType(v as InvestorInteractionType)}
                 >
                   <SelectTrigger className="h-9 w-full">
-                    <SelectValue />
+                    <SelectValue
+                      label={
+                        interactionType.charAt(0).toUpperCase() + interactionType.slice(1)
+                      }
+                    />
                   </SelectTrigger>
                   <SelectContent>
                     {INTERACTION_TYPES.map((t) => (
@@ -688,7 +692,7 @@ export function InvestorDetailClient(props: {
             onValueChange={(v) => void onStageChange(v as PipelineStage)}
           >
             <SelectTrigger className="h-9 w-full max-w-xs">
-              <SelectValue />
+              <SelectValue label={pipelineStageLabel(inv.pipelineStage)} />
             </SelectTrigger>
             <SelectContent>
               {PIPELINE_STAGES.map((s) => (
@@ -843,7 +847,9 @@ export function InvestorDetailClient(props: {
                   onValueChange={(v) => setEditTimelineType(v as InvestorInteractionType)}
                 >
                   <SelectTrigger className="h-9 w-full">
-                    <SelectValue />
+                    <SelectValue
+                      label={editTimelineType.charAt(0).toUpperCase() + editTimelineType.slice(1)}
+                    />
                   </SelectTrigger>
                   <SelectContent>
                     {INTERACTION_TYPES.map((t) => (

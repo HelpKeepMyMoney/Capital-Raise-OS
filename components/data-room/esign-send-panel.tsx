@@ -15,6 +15,7 @@ import {
 import { ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { idNameSelectLabel } from "@/lib/ui/select-trigger-label";
 
 type EligibleRow = { id: string; email: string; displayName: string };
 
@@ -146,6 +147,13 @@ export function EsignSendPanel(props: Props) {
 
   const selected = eligible.find((r) => r.id === investorId);
 
+  const investorTriggerLabel = React.useMemo(() => {
+    if (!investorId) return undefined;
+    const row = eligible.find((r) => r.id === investorId);
+    if (row) return `${row.displayName} — ${row.email}`;
+    return idNameSelectLabel(investorId, eligible.map((r) => ({ id: r.id, name: `${r.displayName} — ${r.email}` })));
+  }, [investorId, eligible]);
+
   return (
     <Card className="max-w-xl rounded-2xl border-border shadow-sm">
       <CardHeader>
@@ -181,6 +189,7 @@ export function EsignSendPanel(props: Props) {
             <SelectTrigger className="h-10 rounded-xl">
               <SelectValue
                 placeholder={loadingEligible ? "Loading…" : "Choose investor email…"}
+                label={investorTriggerLabel}
               />
             </SelectTrigger>
             <SelectContent>

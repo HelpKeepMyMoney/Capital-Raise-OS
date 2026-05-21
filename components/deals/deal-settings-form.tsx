@@ -21,6 +21,7 @@ import {
 } from "@/lib/deals/why-invest-narrative";
 import type { Deal, DealStatus, DealType } from "@/lib/firestore/types";
 import { Plus, Trash2 } from "lucide-react";
+import { idNameSelectLabel } from "@/lib/ui/select-trigger-label";
 
 type TractionFormRow = { key: string; label: string; value: string; hint: string };
 
@@ -172,6 +173,23 @@ export function DealSettingsForm(props: {
 
   const linkableRooms =
     orgRooms?.filter((r) => r.dealId !== d.id) ?? [];
+
+  const roomLinkOptions = React.useMemo(
+    () =>
+      linkableRooms.map((r) => ({
+        id: r.id,
+        name: `${r.name}${r.dealId && r.dealId !== d.id ? " (linked to another deal)" : ""}`,
+      })),
+    [linkableRooms, d.id],
+  );
+
+  const roomLinkTriggerLabel = React.useMemo(
+    () =>
+      roomLinkPick === ROOM_LINK_NONE
+        ? undefined
+        : idNameSelectLabel(roomLinkPick, roomLinkOptions),
+    [roomLinkPick, roomLinkOptions],
+  );
 
   const [tractionRows, setTractionRows] = React.useState<TractionFormRow[]>(() =>
     (d.tractionMetrics?.length
@@ -494,7 +512,16 @@ export function DealSettingsForm(props: {
               disabled={roomLinkPending || linkableRooms.length === 0}
             >
               <SelectTrigger className="rounded-xl w-full sm:min-w-[12rem]">
-                <SelectValue placeholder={orgRooms == null ? "Loading rooms…" : linkableRooms.length === 0 ? "No more rooms to link" : "Choose a room…"} />
+                <SelectValue
+                  placeholder={
+                    orgRooms == null
+                      ? "Loading rooms…"
+                      : linkableRooms.length === 0
+                        ? "No more rooms to link"
+                        : "Choose a room…"
+                  }
+                  label={roomLinkTriggerLabel}
+                />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={ROOM_LINK_NONE} className="text-muted-foreground">

@@ -15,7 +15,8 @@ export default async function DiscoveryPage() {
       <div>
         <h1 className="text-3xl font-semibold tracking-tight">Investor discovery</h1>
         <p className="mt-1 text-foreground/85">
-          AI-ranked search across your CRM with pluggable enrichment providers.
+          AI-ranked search across your CRM with pluggable enrichment providers. Enroll matches
+          into Outreach campaigns from the Outreach workspace.
         </p>
       </div>
       <DiscoveryClient />

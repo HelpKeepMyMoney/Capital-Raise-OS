@@ -121,6 +121,14 @@ export function InvestorAccessTable(props: Props) {
     };
   }, [assignTarget]);
 
+  const assignOwnerTriggerLabel = React.useMemo(() => {
+    if (!assignOwnerUid) return undefined;
+    const m = orgMembers.find((x) => x.userId === assignOwnerUid);
+    if (!m) return assignOwnerUid;
+    const base = memberPickLabel(m);
+    return m.email ? `${base} (${m.email})` : base;
+  }, [assignOwnerUid, orgMembers]);
+
   function busy(inv: InviteRow, op: string) {
     return busyKey === `${inv.id}:${op}`;
   }
@@ -658,7 +666,7 @@ export function InvestorAccessTable(props: Props) {
                   onValueChange={(v) => setAssignOwnerUid(v ?? "")}
                 >
                   <SelectTrigger className="rounded-xl">
-                    <SelectValue placeholder="Choose teammate" />
+                    <SelectValue placeholder="Choose teammate" label={assignOwnerTriggerLabel} />
                   </SelectTrigger>
                   <SelectContent>
                     {orgMembers.map((m) => (

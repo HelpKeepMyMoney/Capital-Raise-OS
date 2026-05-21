@@ -5,6 +5,11 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import type { SerializedRoomDocument } from "@/components/data-room/types";
 import { DATA_ROOM_KIND_OPTIONS, kindLabel } from "@/lib/data-room/kind-labels";
+import {
+  folderParentSelectLabel,
+  idNameSelectLabel,
+  valueLabelSelectLabel,
+} from "@/lib/ui/select-trigger-label";
 import type { RoomDocument as RoomDocType } from "@/lib/firestore/types";
 import { Button } from "@/components/ui/button";
 import {
@@ -611,6 +616,39 @@ export function DocumentManager(props: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allFolderOptions, editDocId, editIsFolder, roomFolders]);
 
+  const uploadFolderTriggerLabel = React.useMemo(
+    () => folderParentSelectLabel(uploadFolderId, allFolderOptions),
+    [uploadFolderId, allFolderOptions],
+  );
+
+  const uploadKindTriggerLabel = React.useMemo(
+    () => valueLabelSelectLabel(kind, DATA_ROOM_KIND_OPTIONS),
+    [kind],
+  );
+
+  const editRoomTriggerLabel = React.useMemo(
+    () => idNameSelectLabel(editRoomId, props.rooms),
+    [editRoomId, props.rooms],
+  );
+
+  const editFolderTriggerLabel = React.useMemo(
+    () =>
+      folderParentSelectLabel(editParentFolderId, allFolderOptions, {
+        fallbackName: editParentFolderId ? folderByIdMap.get(editParentFolderId)?.name : undefined,
+      }),
+    [editParentFolderId, allFolderOptions, folderByIdMap],
+  );
+
+  const editKindTriggerLabel = React.useMemo(
+    () => valueLabelSelectLabel(editKindState, DATA_ROOM_KIND_OPTIONS),
+    [editKindState],
+  );
+
+  const newFolderParentTriggerLabel = React.useMemo(
+    () => folderParentSelectLabel(newFolderParentId, allFolderOptions),
+    [newFolderParentId, allFolderOptions],
+  );
+
   const sortedDocs = React.useMemo(() => {
     const list = [...searchedDocs];
     const dir = sortDir === "asc" ? 1 : -1;
@@ -752,7 +790,7 @@ export function DocumentManager(props: Props) {
                   <SelectTrigger
                     className={cn(DATA_ROOM_FOLDER_SELECT_TRIGGER_CLASS, "rounded-xl border-border")}
                   >
-                    <SelectValue />
+                    <SelectValue label={uploadFolderTriggerLabel} />
                   </SelectTrigger>
                   <SelectContent alignItemWithTrigger={false} className={DATA_ROOM_FOLDER_SELECT_CONTENT_CLASS}>
                     <SelectItem value="__root__">Room root</SelectItem>
@@ -789,7 +827,7 @@ export function DocumentManager(props: Props) {
                   }}
                 >
                   <SelectTrigger className="rounded-xl border-border">
-                    <SelectValue />
+                    <SelectValue label={uploadKindTriggerLabel} />
                   </SelectTrigger>
                   <SelectContent>
                     {DATA_ROOM_KIND_OPTIONS.map((opt) => (
@@ -1156,7 +1194,7 @@ export function DocumentManager(props: Props) {
                 onValueChange={(v) => setEditRoomId(typeof v === "string" ? v : "")}
               >
                 <SelectTrigger className="rounded-xl">
-                  <SelectValue placeholder="Room" />
+                  <SelectValue placeholder="Room" label={editRoomTriggerLabel} />
                 </SelectTrigger>
                 <SelectContent>
                   {props.rooms.map((r) => (
@@ -1179,7 +1217,7 @@ export function DocumentManager(props: Props) {
                 onValueChange={(v) => setEditParentFolderId(v === "__root__" ? null : v)}
               >
                 <SelectTrigger className={cn(DATA_ROOM_FOLDER_SELECT_TRIGGER_CLASS, "rounded-xl")}>
-                  <SelectValue placeholder="Location" />
+                  <SelectValue placeholder="Location" label={editFolderTriggerLabel} />
                 </SelectTrigger>
                 <SelectContent alignItemWithTrigger={false} className={DATA_ROOM_FOLDER_SELECT_CONTENT_CLASS}>
                   <SelectItem value="__root__">Room root</SelectItem>
@@ -1201,7 +1239,7 @@ export function DocumentManager(props: Props) {
                   }}
                 >
                   <SelectTrigger className="rounded-xl">
-                    <SelectValue />
+                    <SelectValue label={editKindTriggerLabel} />
                   </SelectTrigger>
                   <SelectContent>
                     {DATA_ROOM_KIND_OPTIONS.map((k) => (
@@ -1254,7 +1292,7 @@ export function DocumentManager(props: Props) {
                 onValueChange={(v) => setNewFolderParentId(v === "__root__" ? null : v)}
               >
                 <SelectTrigger className={cn(DATA_ROOM_FOLDER_SELECT_TRIGGER_CLASS, "rounded-xl")}>
-                  <SelectValue placeholder="Location" />
+                  <SelectValue placeholder="Location" label={newFolderParentTriggerLabel} />
                 </SelectTrigger>
                 <SelectContent alignItemWithTrigger={false} className={DATA_ROOM_FOLDER_SELECT_CONTENT_CLASS}>
                   <SelectItem value="__root__">Room root</SelectItem>

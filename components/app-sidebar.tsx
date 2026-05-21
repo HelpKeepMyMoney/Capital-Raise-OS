@@ -53,8 +53,8 @@ export function isNavItemActive(pathname: string, href: string): boolean {
 
 const raiseNav: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/discovery", label: "Discovery", icon: Search, suffix: "(coming soon)" },
-  { href: "/outreach", label: "Outreach", icon: Send, suffix: "(coming soon)" },
+  { href: "/discovery", label: "Discovery", icon: Search, suffix: "Preview" },
+  { href: "/outreach", label: "Outreach", icon: Send },
 ];
 
 const capitalNav: NavItem[] = [

@@ -417,6 +417,28 @@ export async function dashboardEngagementDailySeries(
     if (e.replySentiment && e.replySentiment !== "unknown") cur.replies += 1;
   }
 
+  try {
+    const eventSnap = await db
+      .collection(col.outreachEvents)
+      .where("organizationId", "==", orgId)
+      .where("createdAt", ">=", cutoff)
+      .orderBy("createdAt", "desc")
+      .limit(1200)
+      .get();
+    for (const doc of eventSnap.docs) {
+      const e = doc.data() as { createdAt?: number; eventType?: string };
+      if (!e.createdAt) continue;
+      const day = new Date(e.createdAt).toISOString().slice(0, 10);
+      const cur = buckets.get(day);
+      if (!cur) continue;
+      if (e.eventType === "email_sent") cur.sent += 1;
+      if (e.eventType === "email_replied") cur.replies += 1;
+      if (e.eventType === "meeting_booked") cur.meetingsBooked += 1;
+    }
+  } catch {
+    /* index may be pending */
+  }
+
   const meetSnap = await db
     .collection(col.meetings)
     .where("organizationId", "==", orgId)

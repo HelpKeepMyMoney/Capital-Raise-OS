@@ -149,12 +149,69 @@ async function main() {
     createdAt: now,
   });
 
-  batch.set(db.collection("campaigns").doc(), {
+  const campaignId = db.collection("campaigns").doc().id;
+  const metrics = {
+    recipients: 48,
+    sent: 128,
+    opened: 62,
+    clicked: 21,
+    replied: 14,
+    meetingsBooked: 3,
+    dataRoomVisits: 9,
+    bounced: 2,
+  };
+  batch.set(db.collection("campaigns").doc(campaignId), {
+    id: campaignId,
     organizationId: orgId,
     name: "Seed follow-up — EU AI",
     status: "active",
-    stats: { sent: 128, opened: 62, clicked: 21, replied: 14, bounced: 2 },
+    campaignType: "capital_raise",
+    audienceFilters: { sectors: ["ai"], geography: ["Europe"] },
+    metrics,
+    stats: {
+      sent: metrics.sent,
+      opened: metrics.opened,
+      clicked: metrics.clicked,
+      replied: metrics.replied,
+      bounced: metrics.bounced,
+    },
     createdAt: now,
+    updatedAt: now,
+    createdByUid: uid,
+    startedAt: now,
+  });
+
+  const sequenceId = db.collection("outreach_sequences").doc().id;
+  batch.set(db.collection("outreach_sequences").doc(sequenceId), {
+    id: sequenceId,
+    organizationId: orgId,
+    name: "Institutional 3-step",
+    status: "active",
+    steps: [
+      {
+        id: "step-1",
+        type: "email",
+        delayDays: 0,
+        subjectTemplate: "{{deal_name}} — introduction",
+        bodyTemplate: "<p>Hi {{investor_name}},</p><p>Reaching out from {{organization_name}}.</p>",
+        aiPersonalized: true,
+        trigger: "immediate",
+        enabled: true,
+      },
+      {
+        id: "step-2",
+        type: "email",
+        delayDays: 4,
+        subjectTemplate: "Following up",
+        bodyTemplate: "<p>Brief follow-up on our prior note.</p>",
+        aiPersonalized: false,
+        trigger: "no_response",
+        enabled: true,
+      },
+    ],
+    createdAt: now,
+    updatedAt: now,
+    createdByUid: uid,
   });
 
   for (let i = 0; i < 12; i++) {

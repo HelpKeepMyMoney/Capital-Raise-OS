@@ -1,5 +1,7 @@
 import type { Investor } from "@/lib/firestore/types";
 import { investorDisplayName } from "@/lib/investors/display-name";
+import { parseDiscoveryQuery } from "@/lib/discovery/parse-query-constraints";
+import { scoreInvestorForDiscoveryQuery } from "@/lib/discovery/query-relevance";
 import type { DiscoveryFilters, RankedInvestorCandidate } from "@/lib/discovery/types";
 import { getDiscoveryProviders } from "@/lib/discovery/providers/index";
 
@@ -24,23 +26,14 @@ function matchesFilters(inv: Investor, f: DiscoveryFilters): boolean {
   return true;
 }
 
-function crmToCandidate(inv: Investor, query: string): RankedInvestorCandidate {
-  const q = query.toLowerCase();
+type ScoredCandidate = RankedInvestorCandidate & {
+  _matchCount: number;
+  _matchScore: number;
+};
+
+function crmToCandidate(inv: Investor, query: string): ScoredCandidate {
   const displayName = investorDisplayName(inv);
-  let score = 50;
-  const reasons: string[] = ["In your CRM"];
-  if (displayName.toLowerCase().includes(q) || inv.firm?.toLowerCase().includes(q)) {
-    score += 25;
-    reasons.push("Name/firm matches query");
-  }
-  if (inv.relationshipScore != null) {
-    score += Math.min(20, inv.relationshipScore / 5);
-    reasons.push("Strong relationship score");
-  }
-  if (inv.warmCold === "warm") {
-    score += 10;
-    reasons.push("Warm relationship");
-  }
+  const { score, reasons, matchCount, matchScore } = scoreInvestorForDiscoveryQuery(inv, query);
   return {
     id: inv.id,
     name: displayName,
@@ -50,9 +43,26 @@ function crmToCandidate(inv: Investor, query: string): RankedInvestorCandidate {
     investorType: inv.investorType,
     location: inv.location,
     sources: ["crm"],
-    aiRankScore: Math.min(100, Math.round(score)),
+    aiRankScore: score,
     aiRankReasons: reasons,
+    _matchCount: matchCount,
+    _matchScore: matchScore,
   };
+}
+
+function compareDiscoveryCandidates(a: ScoredCandidate, b: ScoredCandidate, hasQuery: boolean): number {
+  if (hasQuery) {
+    if (a._matchCount !== b._matchCount) return b._matchCount - a._matchCount;
+    if (a._matchScore !== b._matchScore) return b._matchScore - a._matchScore;
+  }
+  return b.aiRankScore - a.aiRankScore;
+}
+
+function stripScoringMeta(c: ScoredCandidate): RankedInvestorCandidate {
+  const { _matchCount: _mc, _matchScore: _ms, ...rest } = c;
+  void _mc;
+  void _ms;
+  return rest;
 }
 
 export async function mergeAndRankDiscovery(
@@ -60,7 +70,13 @@ export async function mergeAndRankDiscovery(
   filters: DiscoveryFilters,
   crm: Investor[],
 ): Promise<RankedInvestorCandidate[]> {
-  const filtered = crm.filter((i) => matchesFilters(i, filters));
+  const parsed = parseDiscoveryQuery(query);
+  const effectiveFilters: DiscoveryFilters = {
+    ...filters,
+    checkMin: filters.checkMin ?? parsed.check?.min,
+    checkMax: filters.checkMax ?? parsed.check?.max,
+  };
+  const filtered = crm.filter((i) => matchesFilters(i, effectiveFilters));
   const fromCrm = filtered.map((i) => crmToCandidate(i, query));
 
   const providers = getDiscoveryProviders();
@@ -70,20 +86,26 @@ export async function mergeAndRankDiscovery(
     enriched.push(...chunk);
   }
 
-  const byId = new Map<string, RankedInvestorCandidate>();
-  for (const c of [...enriched, ...fromCrm]) {
-    const prev = byId.get(c.id);
+  const hasQuery = query.trim().length > 0;
+  const byId = new Map<string, ScoredCandidate>();
+  for (const c of [...enriched.map((e) => ({ ...e, _matchCount: 0, _matchScore: 0 })), ...fromCrm]) {
+    const row = c as ScoredCandidate;
+    const prev = byId.get(row.id);
     if (!prev) {
-      byId.set(c.id, c);
+      byId.set(row.id, row);
       continue;
     }
-    byId.set(c.id, {
+    byId.set(row.id, {
       ...prev,
-      sources: Array.from(new Set([...prev.sources, ...c.sources])),
-      aiRankScore: Math.max(prev.aiRankScore, c.aiRankScore),
-      aiRankReasons: Array.from(new Set([...prev.aiRankReasons, ...c.aiRankReasons])),
+      sources: Array.from(new Set([...prev.sources, ...row.sources])),
+      aiRankScore: Math.max(prev.aiRankScore, row.aiRankScore),
+      aiRankReasons: Array.from(new Set([...prev.aiRankReasons, ...row.aiRankReasons])),
+      _matchCount: Math.max(prev._matchCount, row._matchCount),
+      _matchScore: Math.max(prev._matchScore, row._matchScore),
     });
   }
 
-  return Array.from(byId.values()).sort((a, b) => b.aiRankScore - a.aiRankScore);
+  return Array.from(byId.values())
+    .sort((a, b) => compareDiscoveryCandidates(a, b, hasQuery))
+    .map(stripScoringMeta);
 }

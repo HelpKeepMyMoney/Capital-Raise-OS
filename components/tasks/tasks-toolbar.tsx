@@ -12,6 +12,7 @@ import {
 import { Search } from "lucide-react";
 import type { TaskPriority } from "@/lib/firestore/types";
 import { cn } from "@/lib/utils";
+import { idNameSelectLabel } from "@/lib/ui/select-trigger-label";
 
 export type WorkspaceSegment =
   | "my"
@@ -41,6 +42,16 @@ const segmentBtn =
   "rounded-full px-3 py-1.5 text-xs font-medium transition-colors sm:text-sm border border-transparent";
 
 export function TasksToolbar(props: TasksToolbarProps) {
+  const ownerFilterLabel =
+    props.ownerFilter === "all"
+      ? "All owners"
+      : props.ownerFilter === "unassigned"
+        ? "Unassigned"
+        : idNameSelectLabel(
+            props.ownerFilter,
+            props.memberOptions.map((m) => ({ id: m.userId, name: m.label })),
+          );
+
   const segments: { id: WorkspaceSegment; label: string }[] = [
     { id: "my", label: "My Tasks" },
     { id: "team", label: "Team Tasks" },
@@ -136,7 +147,7 @@ export function TasksToolbar(props: TasksToolbarProps) {
           onValueChange={(v) => props.onOwnerFilterChange(v ?? "all")}
         >
           <SelectTrigger className="h-9 w-[160px] rounded-xl border-border/80">
-            <SelectValue placeholder="Owner" />
+            <SelectValue placeholder="Owner" label={ownerFilterLabel} />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All owners</SelectItem>

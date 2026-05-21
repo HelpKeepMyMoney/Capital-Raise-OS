@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EsignSendPanel } from "@/components/data-room/esign-send-panel";
+import { idNameSelectLabel } from "@/lib/ui/select-trigger-label";
 
 type Props = {
   room: SerializedDataRoom;
@@ -73,6 +74,15 @@ export function RoomSettings(props: Props) {
     if (!id) return "None";
     return templates.find((t) => t.id === id)?.name ?? id;
   }, [form.signableTemplateId, templates]);
+
+  const associatedDealTriggerLabel = React.useMemo(
+    () =>
+      idNameSelectLabel(form.dealId || "__none", props.deals, {
+        sentinel: "__none",
+        sentinelLabel: "None",
+      }),
+    [form.dealId, props.deals],
+  );
 
   React.useEffect(() => {
     setForm({
@@ -161,7 +171,7 @@ export function RoomSettings(props: Props) {
             }
           >
             <SelectTrigger className="rounded-xl">
-              <SelectValue placeholder="Select deal" />
+              <SelectValue placeholder="Select deal" label={associatedDealTriggerLabel} />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="__none">None</SelectItem>

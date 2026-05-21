@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { TaskType } from "@/lib/firestore/types";
+import { idNameSelectLabel, valueLabelSelectLabel } from "@/lib/ui/select-trigger-label";
 
 type MemberOpt = { userId: string; label: string };
 type RelOpt = { id: string; name: string };
@@ -62,6 +63,83 @@ export function NewTaskModal(props: {
   const [repeat, setRepeat] = React.useState("");
   const [reminder, setReminder] = React.useState("");
   const [creating, setCreating] = React.useState(false);
+
+  const memberOptions = React.useMemo(
+    () => props.members.map((m) => ({ id: m.userId, name: m.label })),
+    [props.members],
+  );
+
+  const assigneeTriggerLabel = React.useMemo(
+    () =>
+      idNameSelectLabel(assignee, memberOptions, {
+        sentinel: "__none",
+        sentinelLabel: "Unassigned",
+      }),
+    [assignee, memberOptions],
+  );
+
+  const investorTriggerLabel = React.useMemo(
+    () =>
+      idNameSelectLabel(investor, props.investors, {
+        sentinel: "__none",
+        sentinelLabel: "None",
+      }),
+    [investor, props.investors],
+  );
+
+  const dealTriggerLabel = React.useMemo(
+    () =>
+      idNameSelectLabel(deal, props.deals, {
+        sentinel: "__none",
+        sentinelLabel: "None",
+      }),
+    [deal, props.deals],
+  );
+
+  const roomTriggerLabel = React.useMemo(
+    () =>
+      idNameSelectLabel(room, props.dataRooms, {
+        sentinel: "__none",
+        sentinelLabel: "None",
+      }),
+    [room, props.dataRooms],
+  );
+
+  const taskTypeTriggerLabel = React.useMemo(() => {
+    const labels: Record<TaskType, string> = {
+      follow_up: "Follow up",
+      call_investor: "Call investor",
+      send_docs: "Send docs",
+      review_commitment: "Review commitment",
+      prepare_closing: "Prepare closing",
+      update_room: "Update room",
+      other: "Other",
+    };
+    return labels[taskType];
+  }, [taskType]);
+
+  const priorityTriggerLabel = React.useMemo(
+    () =>
+      valueLabelSelectLabel(priority, [
+        { value: "urgent", label: "Critical" },
+        { value: "high", label: "High" },
+        { value: "medium", label: "Medium" },
+        { value: "low", label: "Low" },
+      ]),
+    [priority],
+  );
+
+  const workflowTriggerLabel = React.useMemo(
+    () =>
+      valueLabelSelectLabel(workflow, [
+        { value: "not_started", label: "Not started" },
+        { value: "in_progress", label: "In progress" },
+        { value: "waiting", label: "Waiting" },
+        { value: "blocked", label: "Blocked" },
+        { value: "done", label: "Done" },
+      ]),
+    [workflow],
+  );
 
   function reset() {
     setTitle("");
@@ -207,7 +285,7 @@ export function NewTaskModal(props: {
               <Label>Priority</Label>
               <Select value={priority} onValueChange={(v) => setPriority(v ?? "medium")}>
                 <SelectTrigger className="rounded-xl">
-                  <SelectValue />
+                  <SelectValue label={priorityTriggerLabel} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="urgent">Critical</SelectItem>
@@ -221,7 +299,7 @@ export function NewTaskModal(props: {
               <Label>Workflow status</Label>
               <Select value={workflow} onValueChange={(v) => setWorkflow(v ?? "not_started")}>
                 <SelectTrigger className="rounded-xl">
-                  <SelectValue />
+                  <SelectValue label={workflowTriggerLabel} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="not_started">Not started</SelectItem>
@@ -253,7 +331,7 @@ export function NewTaskModal(props: {
               <Label>Owner</Label>
               <Select value={assignee} onValueChange={(v) => setAssignee(v ?? "__none")}>
                 <SelectTrigger className="rounded-xl">
-                  <SelectValue placeholder="Unassigned" />
+                  <SelectValue placeholder="Unassigned" label={assigneeTriggerLabel} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none">Unassigned</SelectItem>
@@ -269,7 +347,7 @@ export function NewTaskModal(props: {
               <Label>Task type</Label>
               <Select value={taskType} onValueChange={(v) => setTaskType(v as TaskType)}>
                 <SelectTrigger className="rounded-xl">
-                  <SelectValue />
+                  <SelectValue label={taskTypeTriggerLabel} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="follow_up">Follow up</SelectItem>
@@ -288,7 +366,7 @@ export function NewTaskModal(props: {
               <Label>Related investor</Label>
               <Select value={investor} onValueChange={(v) => setInvestor(v ?? "__none")}>
                 <SelectTrigger className="rounded-xl">
-                  <SelectValue placeholder="None" />
+                  <SelectValue placeholder="None" label={investorTriggerLabel} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none">None</SelectItem>
@@ -304,7 +382,7 @@ export function NewTaskModal(props: {
               <Label>Related deal</Label>
               <Select value={deal} onValueChange={(v) => setDeal(v ?? "__none")}>
                 <SelectTrigger className="rounded-xl">
-                  <SelectValue placeholder="None" />
+                  <SelectValue placeholder="None" label={dealTriggerLabel} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none">None</SelectItem>
@@ -321,7 +399,7 @@ export function NewTaskModal(props: {
             <Label>Related data room</Label>
             <Select value={room} onValueChange={(v) => setRoom(v ?? "__none")}>
               <SelectTrigger className="rounded-xl">
-                <SelectValue placeholder="None" />
+                <SelectValue placeholder="None" label={roomTriggerLabel} />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="__none">None</SelectItem>

@@ -1,80 +1,79 @@
 import { NextRequest, NextResponse } from "next/server";
+import { canEditOrgData } from "@/lib/auth/rbac";
 import { requireOrgSession } from "@/lib/auth/session";
-import { sendTransactionalEmail } from "@/lib/email/resend";
+import { writeAuditLog } from "@/lib/audit";
 import { getAdminFirestore } from "@/lib/firebase/admin";
 import { col } from "@/lib/firestore/paths";
+import { getMembership, getOrganization } from "@/lib/firestore/queries";
 import { checkRateLimit, rateLimitKey } from "@/lib/rate-limit";
-import { writeAuditLog } from "@/lib/audit";
-import { randomUUID } from "crypto";
+import { SendEmailSchema } from "@/lib/outreach/schemas";
+import { sendOutreachEmail } from "@/lib/outreach/send-email";
+import { assertOutreachSendAllowed } from "@/lib/outreach/entitlements";
+import type { OutreachDomainSettings } from "@/lib/firestore/types";
 
 export async function POST(req: NextRequest) {
   const ctx = await requireOrgSession();
   if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  const m = await getMembership(ctx.orgId, ctx.user.uid);
+  if (!m || !canEditOrgData(m.role)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "local";
   const rl = checkRateLimit(rateLimitKey(ip, "outreach-send"), 60, 60_000);
   if (!rl.ok) return NextResponse.json({ error: "Too many requests" }, { status: 429 });
 
-  const body = (await req.json()) as {
-    to: string;
-    subject: string;
-    html: string;
-    campaignId?: string;
-    investorId?: string;
-    replyTo?: string;
-  };
-  if (!body.to || !body.subject || !body.html) {
-    return NextResponse.json({ error: "to, subject, html required" }, { status: 400 });
+  let json: unknown;
+  try {
+    json = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const from =
-    process.env.RESEND_FROM ??
-    process.env.OUTREACH_FROM_EMAIL ??
-    "CPIN <onboarding@resend.dev>";
+  const parsed = SendEmailSchema.safeParse(json);
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  }
 
-  const openToken = randomUUID();
+  const db = getAdminFirestore();
+  const allowed = await assertOutreachSendAllowed(db, ctx.orgId);
+  if (!allowed.ok) {
+    return NextResponse.json({ error: allowed.message }, { status: 402 });
+  }
+
+  const org = await getOrganization(ctx.orgId);
+  if (!org) return NextResponse.json({ error: "Organization not found" }, { status: 404 });
+
+  const domainSnap = await db.collection(col.outreachDomainSettings).doc(ctx.orgId).get();
   const base =
     process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ??
     (req.headers.get("origin") ?? "http://localhost:3000");
-  const pixel = `<img src="${base}/api/outreach/track/open?t=${encodeURIComponent(openToken)}" width="1" height="1" alt="" />`;
-  const htmlFinal = `${body.html}${pixel}`;
 
-  const db = getAdminFirestore();
-  const id = randomUUID();
-  await db.collection(col.emails).doc(id).set({
-    id,
+  const { touchId, legacyEmailId, messageId } = await sendOutreachEmail({
+    db,
     organizationId: ctx.orgId,
-    campaignId: body.campaignId ?? null,
-    investorId: body.investorId ?? null,
-    subject: body.subject,
-    status: "queued",
-    openCount: 0,
-    clickCount: 0,
-    replySentiment: "unknown",
-    createdAt: Date.now(),
-    openToken,
-  });
-
-  const data = await sendTransactionalEmail({
-    from,
-    to: body.to,
-    subject: body.subject,
-    html: htmlFinal,
-    replyTo: body.replyTo,
-  });
-
-  await db.collection(col.emails).doc(id).update({
-    resendMessageId: data?.id,
-    status: "sent",
-    sentAt: Date.now(),
+    organization: org,
+    domainSettings: domainSnap.exists
+      ? ({ organizationId: ctx.orgId, ...domainSnap.data() } as OutreachDomainSettings)
+      : null,
+    to: parsed.data.to,
+    subject: parsed.data.subject,
+    html: parsed.data.html,
+    text: parsed.data.text,
+    campaignId: parsed.data.campaignId,
+    investorId: parsed.data.investorId,
+    recipientId: parsed.data.recipientId,
+    replyTo: parsed.data.replyTo,
+    baseUrl: base,
   });
 
   await writeAuditLog({
     organizationId: ctx.orgId,
     actorId: ctx.user.uid,
     action: "outreach.send",
-    resource: `emails/${id}`,
+    resource: `${col.outreachTouches}/${touchId}`,
   });
 
-  return NextResponse.json({ ok: true, id, messageId: data?.id });
+  return NextResponse.json({ ok: true, id: legacyEmailId, touchId, messageId });
 }

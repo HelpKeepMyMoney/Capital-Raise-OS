@@ -77,6 +77,63 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
       metadata: { event, clientId },
       createdAt: now,
     });
+    if (event === "cta_data_room_click" || event === "cta_book_call_click") {
+      const invSnap = await db
+        .collection(col.investors)
+        .where("organizationId", "==", session.orgId)
+        .where("linkedUserId", "==", session.user.uid)
+        .limit(1)
+        .get();
+      const investorId = invSnap.docs[0]?.id;
+      if (investorId) {
+        const { bridgeDataRoomViewToOutreach } = await import("@/lib/outreach/data-room-bridge");
+        const { recordOutreachEvent } = await import("@/lib/outreach/events");
+        const { handleOutreachEventSideEffects } = await import("@/lib/outreach/engine");
+
+        if (event === "cta_data_room_click") {
+          await bridgeDataRoomViewToOutreach(db, {
+            organizationId: session.orgId,
+            investorId,
+            dealId,
+            metadata: { source: "deal_telemetry" },
+          });
+        } else {
+          const campaignsSnap = await db
+            .collection(col.campaigns)
+            .where("organizationId", "==", session.orgId)
+            .where("status", "==", "active")
+            .limit(5)
+            .get();
+          for (const cDoc of campaignsSnap.docs) {
+            const recSnap = await db
+              .collection(col.outreachRecipients)
+              .where("campaignId", "==", cDoc.id)
+              .where("investorId", "==", investorId)
+              .limit(1)
+              .get();
+            if (recSnap.empty) continue;
+            const recipient = recSnap.docs[0]!;
+            await recordOutreachEvent(db, {
+              organizationId: session.orgId,
+              campaignId: cDoc.id,
+              recipientId: recipient.id,
+              investorId,
+              eventType: "meeting_booked",
+              metadata: { source: "deal_telemetry" },
+            });
+            await handleOutreachEventSideEffects(db, {
+              organizationId: session.orgId,
+              campaignId: cDoc.id,
+              recipientId: recipient.id,
+              investorId,
+              eventType: "meeting_booked",
+              relatedDealId: dealId,
+            });
+            break;
+          }
+        }
+      }
+    }
   } catch (err) {
     console.error("[deal telemetry] persistence skipped:", err);
   }

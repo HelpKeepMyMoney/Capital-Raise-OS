@@ -714,6 +714,16 @@ type MembershipAssignmentPickerProps = {
 
 const MEMBERSHIP_ORG_SKIP_VALUE = "__skip__";
 
+function membershipOrgTriggerLabel(
+  orgId: string,
+  organizations: { id: string; name: string }[],
+  autoSelectFirstOrg: boolean,
+): string | undefined {
+  if (!orgId) return undefined;
+  if (!autoSelectFirstOrg && orgId === MEMBERSHIP_ORG_SKIP_VALUE) return "Skip — assign later";
+  return organizations.find((o) => o.id === orgId)?.name ?? orgId;
+}
+
 const MembershipAssignmentPicker = React.forwardRef<MembershipAssignmentHandle, MembershipAssignmentPickerProps>(
   function MembershipAssignmentPicker(props, ref) {
     const { organizations, userId, onAssignSuccess, notifyAssignment } = props;
@@ -731,6 +741,8 @@ const MembershipAssignmentPicker = React.forwardRef<MembershipAssignmentHandle, 
       dataRooms: { id: string; name: string; dealId: string | null; archived: boolean }[];
     } | null>(null);
     const [busy, setBusy] = React.useState(false);
+
+    const orgTriggerLabel = membershipOrgTriggerLabel(orgId, organizations, autoSelectFirstOrg);
 
     React.useEffect(() => {
       if (!autoSelectFirstOrg) return;
@@ -857,7 +869,7 @@ const MembershipAssignmentPicker = React.forwardRef<MembershipAssignmentHandle, 
               }
             >
               <SelectTrigger>
-                <SelectValue placeholder="Organization" />
+                <SelectValue placeholder="Organization" label={orgTriggerLabel} />
               </SelectTrigger>
               <SelectContent>
                 {!autoSelectFirstOrg ? (

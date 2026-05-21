@@ -27,6 +27,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Copy } from "lucide-react";
+import { idNameSelectLabel } from "@/lib/ui/select-trigger-label";
 
 type Props = {
   rooms: SerializedDataRoom[];
@@ -138,6 +139,15 @@ export function DataRoomShell(props: Props) {
   const [ndaRequired, setNdaRequired] = React.useState(false);
   const [createDealId, setCreateDealId] = React.useState<string>("");
   const [creating, setCreating] = React.useState(false);
+
+  const createDealTriggerLabel = React.useMemo(
+    () =>
+      idNameSelectLabel(createDealId || "__none", props.deals, {
+        sentinel: "__none",
+        sentinelLabel: "None",
+      }),
+    [createDealId, props.deals],
+  );
 
   async function createRoom() {
     const name = roomName.trim();
@@ -404,7 +414,7 @@ export function DataRoomShell(props: Props) {
                 }
               >
                 <SelectTrigger className="rounded-xl">
-                  <SelectValue placeholder="Select deal" />
+                  <SelectValue placeholder="Select deal" label={createDealTriggerLabel} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none">None</SelectItem>

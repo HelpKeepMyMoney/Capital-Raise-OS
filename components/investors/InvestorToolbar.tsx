@@ -36,6 +36,7 @@ import {
 } from "@/lib/investors/investor-toolbar-types";
 import { INVESTOR_TYPE_OPTIONS, PIPELINE_STAGES, pipelineStageLabel } from "@/lib/investors/form-options";
 import type { OrganizationMemberPublic } from "@/lib/firestore/queries";
+import { idNameSelectLabel } from "@/lib/ui/select-trigger-label";
 
 export type { InvestorToolbarState, LastActivityFilter };
 
@@ -58,6 +59,20 @@ export function InvestorToolbar(props: {
 }) {
   const [presetName, setPresetName] = React.useState("");
   const s = props.state;
+
+  const ownerFilterLabel = React.useMemo(() => {
+    const id = s.filterOwnerUserId ?? "all";
+    if (id === "all") return "Owner · All";
+    if (id === "__unassigned__") return "Owner · Unassigned";
+    const m = props.members.find((x) => x.userId === id);
+    return m?.displayName ?? m?.email ?? "Owner";
+  }, [s.filterOwnerUserId, props.members]);
+
+  const interestedDealFilterLabel = React.useMemo(() => {
+    const id = s.filterDealId ?? "all";
+    if (id === "all") return "Any deal";
+    return idNameSelectLabel(id, props.deals) ?? "Any deal";
+  }, [s.filterDealId, props.deals]);
 
   return (
     <div
@@ -196,7 +211,7 @@ export function InvestorToolbar(props: {
             }
           >
             <SelectTrigger className="h-10 w-[160px] rounded-xl border-border/80 bg-background shadow-sm">
-              <SelectValue placeholder="Owner" />
+              <SelectValue placeholder="Owner" label={ownerFilterLabel} />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Owner · All</SelectItem>
@@ -267,7 +282,7 @@ export function InvestorToolbar(props: {
                     }
                   >
                     <SelectTrigger className="h-9">
-                      <SelectValue />
+                      <SelectValue label={interestedDealFilterLabel} />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Any deal</SelectItem>

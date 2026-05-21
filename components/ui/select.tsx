@@ -18,13 +18,24 @@ function SelectGroup({ className, ...props }: SelectPrimitive.Group.Props) {
   )
 }
 
-function SelectValue({ className, ...props }: SelectPrimitive.Value.Props) {
+function SelectValue({
+  className,
+  label,
+  children,
+  ...props
+}: SelectPrimitive.Value.Props & {
+  /** Human-readable trigger text (avoids showing raw ids from Base UI value fallback). */
+  label?: React.ReactNode
+}) {
+  const display = label !== undefined ? label : children
   return (
     <SelectPrimitive.Value
       data-slot="select-value"
       className={cn("flex flex-1 text-left", className)}
       {...props}
-    />
+    >
+      {display}
+    </SelectPrimitive.Value>
   )
 }
 

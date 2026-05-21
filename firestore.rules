@@ -125,6 +125,36 @@ service cloud.firestore {
       allow write: if canWriteOrg(resource.data.organizationId);
     }
 
+    match /outreach_sequences/{sequenceId} {
+      allow read: if isOrgMember(resource.data.organizationId);
+      allow write: if canWriteOrg(resource.data.organizationId);
+    }
+
+    match /outreach_recipients/{recipientId} {
+      allow read: if isOrgMember(resource.data.organizationId);
+      allow write: if canWriteOrg(resource.data.organizationId);
+    }
+
+    match /outreach_touches/{touchId} {
+      allow read: if isOrgMember(resource.data.organizationId);
+      allow write: if canWriteOrg(resource.data.organizationId);
+    }
+
+    match /outreach_events/{eventId} {
+      allow read: if isOrgMember(resource.data.organizationId);
+      allow write: if canWriteOrg(resource.data.organizationId);
+    }
+
+    match /outreach_analytics_snapshots/{snapshotId} {
+      allow read: if isOrgMember(resource.data.organizationId);
+      allow write: if canWriteOrg(resource.data.organizationId);
+    }
+
+    match /outreach_domain_settings/{orgId} {
+      allow read: if isOrgMember(orgId);
+      allow write: if canWriteOrg(orgId);
+    }
+
     match /deals/{dealId} {
       allow read: if isOrgMember(resource.data.organizationId) && (
         !isGuest(resource.data.organizationId) ||

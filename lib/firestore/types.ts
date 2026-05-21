@@ -241,6 +241,9 @@ export type Investor = {
   nextFollowUpAt?: number;
   /** Open task synced from Next follow-up (Tasks page). */
   followUpTaskId?: string;
+  /** Long-form CRM notes on the investor profile. */
+  notes?: string;
+  /** Short summary; older rows may only have this field populated. */
   notesSummary?: string;
   documentsSharedCount?: number;
   pipelineStage: PipelineStage;
@@ -340,11 +343,50 @@ export type Meeting = {
   createdAt: number;
 };
 
-export type Campaign = {
+export type OutreachCampaignStatus = "draft" | "active" | "paused" | "completed";
+
+export type OutreachCampaignType =
+  | "capital_raise"
+  | "lp_relations"
+  | "strategic_partnership"
+  | "general";
+
+export type OutreachAudienceFilters = {
+  /** When set, only these CRM investor IDs are enrolled (still requires email + active). */
+  investorIds?: string[];
+  investorTypes?: string[];
+  sectors?: string[];
+  geography?: string[];
+  minimumRelationshipScore?: number;
+  tags?: string[];
+  dealIds?: string[];
+  pipelineStages?: string[];
+};
+
+export type OutreachCampaignMetrics = {
+  recipients: number;
+  sent: number;
+  opened: number;
+  replied: number;
+  clicked: number;
+  meetingsBooked: number;
+  dataRoomVisits: number;
+  bounced?: number;
+};
+
+/** Fundraising outreach initiative — stored in `campaigns`. */
+export type OutreachCampaign = {
   id: string;
   organizationId: string;
   name: string;
-  status: "draft" | "active" | "paused" | "completed";
+  description?: string;
+  status: OutreachCampaignStatus;
+  campaignType: OutreachCampaignType;
+  relatedDealId?: string;
+  sequenceId?: string;
+  audienceFilters: OutreachAudienceFilters;
+  metrics: OutreachCampaignMetrics;
+  /** Legacy alias — readers merge with `metrics`. */
   stats?: {
     sent: number;
     opened: number;
@@ -352,23 +394,140 @@ export type Campaign = {
     replied: number;
     bounced: number;
   };
+  startedAt?: number;
+  completedAt?: number;
+  createdAt: number;
+  updatedAt: number;
+  createdByUid: string;
+};
+
+/** @deprecated Use OutreachCampaign — alias for backward compatibility. */
+export type Campaign = OutreachCampaign;
+
+export type OutreachStepType = "email" | "task";
+
+export type OutreachStepTrigger =
+  | "immediate"
+  | "opened"
+  | "clicked"
+  | "no_response";
+
+export type OutreachStep = {
+  id: string;
+  type: OutreachStepType;
+  delayDays: number;
+  subjectTemplate?: string;
+  bodyTemplate?: string;
+  aiPersonalized: boolean;
+  trigger: OutreachStepTrigger;
+  enabled: boolean;
+};
+
+export type OutreachSequenceStatus = "draft" | "active" | "paused";
+
+export type OutreachSequence = {
+  id: string;
+  organizationId: string;
+  name: string;
+  status: OutreachSequenceStatus;
+  steps: OutreachStep[];
+  createdAt: number;
+  updatedAt: number;
+  createdByUid?: string;
+};
+
+export type OutreachRecipientStatus =
+  | "queued"
+  | "active"
+  | "completed"
+  | "paused"
+  | "bounced"
+  | "unsubscribed";
+
+export type OutreachRecipient = {
+  id: string;
+  organizationId: string;
+  campaignId: string;
+  investorId: string;
+  status: OutreachRecipientStatus;
+  currentStepIndex: number;
+  lastTouchAt?: number;
+  nextTouchAt?: number;
+  engagementScore: number;
+  opened: boolean;
+  clicked: boolean;
+  replied: boolean;
+  createdAt: number;
+  updatedAt: number;
+};
+
+export type OutreachTouchStatus = "queued" | "sent" | "delivered" | "bounced" | "failed";
+
+export type OutreachTouch = {
+  id: string;
+  organizationId: string;
+  campaignId: string;
+  recipientId: string;
+  investorId: string;
+  sequenceStepId?: string;
+  stepIndex: number;
+  subject: string;
+  bodyHtml: string;
+  status: OutreachTouchStatus;
+  resendMessageId?: string;
+  trackingToken: string;
+  openCount: number;
+  clickCount: number;
+  sentAt?: number;
+  createdAt: number;
+  /** Legacy emails collection doc id when dual-written. */
+  legacyEmailId?: string;
+};
+
+export type OutreachEventType =
+  | "email_sent"
+  | "email_opened"
+  | "email_clicked"
+  | "email_replied"
+  | "meeting_booked"
+  | "data_room_viewed";
+
+export type OutreachEvent = {
+  id: string;
+  organizationId: string;
+  campaignId: string;
+  recipientId: string;
+  investorId: string;
+  touchId?: string;
+  eventType: OutreachEventType;
+  metadata?: Record<string, unknown>;
   createdAt: number;
 };
 
-export type EmailTemplate = {
+export type OutreachTemplate = {
   id: string;
   organizationId: string;
   name: string;
   subject: string;
   bodyHtml: string;
+  bodyText?: string;
+  category?: "intro" | "follow_up" | "data_room" | "meeting" | "general";
+  variables?: string[];
   createdAt: number;
+  updatedAt?: number;
+  createdByUid?: string;
 };
+
+/** @deprecated Use OutreachTemplate */
+export type EmailTemplate = OutreachTemplate;
 
 export type OutreachEmail = {
   id: string;
   organizationId: string;
   campaignId?: string;
   investorId?: string;
+  recipientId?: string;
+  touchId?: string;
   resendMessageId?: string;
   subject: string;
   status: "queued" | "sent" | "delivered" | "bounced" | "failed";
@@ -377,6 +536,27 @@ export type OutreachEmail = {
   replySentiment?: "positive" | "neutral" | "negative" | "unknown";
   sentAt?: number;
   createdAt: number;
+  openToken?: string;
+};
+
+export type OutreachAnalyticsSnapshot = {
+  id: string;
+  organizationId: string;
+  campaignId?: string;
+  dateKey: string;
+  metrics: OutreachCampaignMetrics;
+  createdAt: number;
+};
+
+export type OutreachDomainSettings = {
+  organizationId: string;
+  fromName?: string;
+  fromEmail?: string;
+  replyToEmail?: string;
+  domain?: string;
+  spfVerified?: boolean;
+  dkimVerified?: boolean;
+  updatedAt: number;
 };
 
 export type DealWhyInvestBlock = { title: string; body: string };

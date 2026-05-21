@@ -3,6 +3,7 @@ import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { onSchedule } from "firebase-functions/v2/scheduler";
+import { runOutreachQueue } from "./outreach-queue";
 
 if (!getApps().length) {
   initializeApp();
@@ -28,6 +29,11 @@ export const onOrganizationMemberWrite = onDocumentWritten(
     await auth.setCustomUserClaims(uid, { ...user.customClaims, orgs });
   },
 );
+
+export const processOutreachQueue = onSchedule("every 15 minutes", async () => {
+  const processed = await runOutreachQueue();
+  console.log("[processOutreachQueue] processed recipients:", processed);
+});
 
 export const weeklyFundraisingDigest = onSchedule("every monday 09:00", async () => {
   const orgs = await db.collection("organizations").limit(25).get();

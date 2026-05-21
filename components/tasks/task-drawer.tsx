@@ -23,6 +23,7 @@ import { Separator } from "@/components/ui/separator";
 import type { Task, TaskType } from "@/lib/firestore/types";
 import { PRIORITY_LABEL, WORKFLOW_LABEL } from "@/lib/tasks/ui-labels";
 import { cn } from "@/lib/utils";
+import { idNameSelectLabel, valueLabelSelectLabel } from "@/lib/ui/select-trigger-label";
 
 type MemberOpt = { userId: string; label: string };
 type RelOpt = { id: string; name: string };
@@ -118,6 +119,97 @@ export function TaskDrawer(props: {
 
   const t = props.task;
 
+  const memberOptions = React.useMemo(
+    () => props.members.map((m) => ({ id: m.userId, name: m.label })),
+    [props.members],
+  );
+
+  const assigneeTriggerLabel = React.useMemo(
+    () =>
+      t
+        ? idNameSelectLabel(t.assigneeId ?? "__none", memberOptions, {
+            sentinel: "__none",
+            sentinelLabel: "Unassigned",
+          })
+        : undefined,
+    [t, memberOptions],
+  );
+
+  const investorTriggerLabel = React.useMemo(
+    () =>
+      t
+        ? idNameSelectLabel(t.linkedInvestorId ?? "__none", props.investors, {
+            sentinel: "__none",
+            sentinelLabel: "None",
+          })
+        : undefined,
+    [t, props.investors],
+  );
+
+  const dealTriggerLabel = React.useMemo(
+    () =>
+      t
+        ? idNameSelectLabel(t.linkedDealId ?? "__none", props.deals, {
+            sentinel: "__none",
+            sentinelLabel: "None",
+          })
+        : undefined,
+    [t, props.deals],
+  );
+
+  const dataRoomTriggerLabel = React.useMemo(
+    () =>
+      t
+        ? idNameSelectLabel(t.linkedDataRoomId ?? "__none", props.dataRooms, {
+            sentinel: "__none",
+            sentinelLabel: "None",
+          })
+        : undefined,
+    [t, props.dataRooms],
+  );
+
+  const priorityTriggerLabel = React.useMemo(
+    () =>
+      t?.taskPriority
+        ? valueLabelSelectLabel(
+            t.taskPriority,
+            (Object.keys(PRIORITY_LABEL) as Array<keyof typeof PRIORITY_LABEL>).map((k) => ({
+              value: k,
+              label: PRIORITY_LABEL[k],
+            })),
+          )
+        : undefined,
+    [t?.taskPriority],
+  );
+
+  const workflowTriggerLabel = React.useMemo(
+    () =>
+      t?.workflowStatus
+        ? valueLabelSelectLabel(
+            t.workflowStatus,
+            (Object.keys(WORKFLOW_LABEL) as Array<keyof typeof WORKFLOW_LABEL>).map((k) => ({
+              value: k,
+              label: WORKFLOW_LABEL[k],
+            })),
+          )
+        : undefined,
+    [t?.workflowStatus],
+  );
+
+  const taskTypeTriggerLabel = React.useMemo(() => {
+    if (!t?.taskType) return "None";
+    const labels: Record<string, string> = {
+      follow_up: "Follow up",
+      call_investor: "Call investor",
+      send_docs: "Send docs",
+      review_commitment: "Review commitment",
+      prepare_closing: "Prepare closing",
+      update_room: "Update room",
+      other: "Other",
+    };
+    return labels[t.taskType] ?? t.taskType;
+  }, [t?.taskType]);
+
   return (
     <Sheet open={props.open} onOpenChange={props.onOpenChange}>
       <SheetContent className="flex w-full flex-col gap-0 overflow-hidden border-l border-border bg-card p-0 sm:max-w-lg">
@@ -150,7 +242,7 @@ export function TaskDrawer(props: {
                       }
                     >
                       <SelectTrigger className="rounded-xl">
-                        <SelectValue placeholder="Set priority" />
+                        <SelectValue placeholder="Set priority" label={priorityTriggerLabel} />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="__clear">None</SelectItem>
@@ -174,7 +266,7 @@ export function TaskDrawer(props: {
                       }
                     >
                       <SelectTrigger className="rounded-xl">
-                        <SelectValue />
+                        <SelectValue label={workflowTriggerLabel} />
                       </SelectTrigger>
                       <SelectContent>
                         {(Object.keys(WORKFLOW_LABEL) as Array<keyof typeof WORKFLOW_LABEL>).map((k) => (
@@ -251,7 +343,7 @@ export function TaskDrawer(props: {
                       }
                     >
                       <SelectTrigger className="rounded-xl">
-                        <SelectValue placeholder="Unassigned" />
+                        <SelectValue placeholder="Unassigned" label={assigneeTriggerLabel} />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="__none">Unassigned</SelectItem>
@@ -275,7 +367,7 @@ export function TaskDrawer(props: {
                       }
                     >
                       <SelectTrigger className="rounded-xl">
-                        <SelectValue placeholder="Type" />
+                        <SelectValue placeholder="Type" label={taskTypeTriggerLabel} />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="__none">None</SelectItem>
@@ -304,7 +396,7 @@ export function TaskDrawer(props: {
                       }
                     >
                       <SelectTrigger className="rounded-xl">
-                        <SelectValue placeholder="None" />
+                        <SelectValue placeholder="None" label={investorTriggerLabel} />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="__none">None</SelectItem>
@@ -328,7 +420,7 @@ export function TaskDrawer(props: {
                       }
                     >
                       <SelectTrigger className="rounded-xl">
-                        <SelectValue placeholder="None" />
+                        <SelectValue placeholder="None" label={dealTriggerLabel} />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="__none">None</SelectItem>
@@ -354,7 +446,7 @@ export function TaskDrawer(props: {
                     }
                   >
                     <SelectTrigger className="rounded-xl">
-                      <SelectValue placeholder="None" />
+                      <SelectValue placeholder="None" label={dataRoomTriggerLabel} />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="__none">None</SelectItem>

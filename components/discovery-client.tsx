@@ -8,26 +8,51 @@ import { Badge } from "@/components/ui/badge";
 import type { RankedInvestorCandidate } from "@/lib/discovery/types";
 
 export function DiscoveryClient() {
-  const [query, setQuery] = React.useState("Seed AI investors in Europe active in last 90 days");
+  const [query, setQuery] = React.useState("");
+  const [queryUsed, setQueryUsed] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
   const [results, setResults] = React.useState<RankedInvestorCandidate[]>([]);
+  const inputRef = React.useRef<HTMLInputElement>(null);
 
-  async function run() {
+  async function runSearch(submittedQuery: string) {
+    const q = submittedQuery.trim();
+    if (!q) {
+      setError("Enter a search query before ranking.");
+      return;
+    }
+
     setLoading(true);
+    setError(null);
     try {
       const res = await fetch("/api/discovery/search", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          query,
-          filters: { recencyDays: 90, geography: "Europe", sector: "ai" },
-        }),
+        cache: "no-store",
+        body: JSON.stringify({ query: q }),
       });
-      const json = (await res.json()) as { results?: RankedInvestorCandidate[] };
+      const json = (await res.json()) as {
+        results?: RankedInvestorCandidate[];
+        queryUsed?: string;
+        error?: string;
+      };
+      if (!res.ok) {
+        setError(json.error ?? "Search failed");
+        return;
+      }
+      setQueryUsed(json.queryUsed ?? q);
       setResults(json.results ?? []);
+    } catch {
+      setError("Search failed. Check your connection and try again.");
     } finally {
       setLoading(false);
     }
+  }
+
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const fromDom = inputRef.current?.value ?? query;
+    void runSearch(fromDom);
   }
 
   return (
@@ -36,16 +61,36 @@ export function DiscoveryClient() {
         <CardHeader>
           <CardTitle className="text-base">AI discovery</CardTitle>
         </CardHeader>
-        <CardContent className="flex flex-col gap-3 md:flex-row md:items-end">
-          <div className="flex-1 space-y-2">
-            <label className="text-xs text-muted-foreground">Natural language query</label>
-            <Input value={query} onChange={(e) => setQuery(e.target.value)} className="h-11" />
-          </div>
-          <Button className="h-11" onClick={() => void run()} disabled={loading}>
-            {loading ? "Searching…" : "Rank investors"}
-          </Button>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="flex flex-col gap-3 md:flex-row md:items-end">
+            <div className="flex-1 space-y-2">
+              <label htmlFor="discovery-query" className="text-xs text-muted-foreground">
+                Natural language query
+              </label>
+              <Input
+                id="discovery-query"
+                name="query"
+                ref={inputRef}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="e.g. healthcare seed Boston, fintech Europe angels"
+                className="h-11"
+                autoComplete="off"
+              />
+            </div>
+            <Button type="submit" className="h-11" disabled={loading}>
+              {loading ? "Searching…" : "Rank investors"}
+            </Button>
+          </form>
+          {error ? <p className="mt-3 text-sm text-destructive">{error}</p> : null}
         </CardContent>
       </Card>
+
+      {queryUsed ? (
+        <p className="text-xs text-muted-foreground">
+          Ranked for: <span className="text-foreground">{queryUsed}</span>
+        </p>
+      ) : null}
 
       <div className="grid gap-3">
         {results.map((r) => (
@@ -75,7 +120,9 @@ export function DiscoveryClient() {
           </Card>
         ))}
         {!results.length && !loading ? (
-          <p className="text-sm text-foreground/80">Run a query to merge CRM + enrichment providers.</p>
+          <p className="text-sm text-foreground/80">
+            Enter a query and rank investors to search your CRM (OpenAI refines scores when configured).
+          </p>
         ) : null}
       </div>
     </div>
