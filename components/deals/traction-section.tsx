@@ -30,7 +30,7 @@ export function TractionSection(props: {
         <h2 className="font-heading text-2xl font-bold tracking-tight">Traction</h2>
         <p className="mt-1 text-sm text-muted-foreground">Key quantitative milestones.</p>
       </div>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4">
         {m.map((row, i) => (
           <motion.div
             key={`${row.label}-${i}`}

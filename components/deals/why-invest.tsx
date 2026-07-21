@@ -20,7 +20,7 @@ export function WhyInvest(props: { deal: Deal; className?: string }) {
           What makes this opportunity compelling for qualified investors.
         </p>
       </div>
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4">
         {blocks.slice(0, 3).map((b, i) => {
           const Icon = PILLAR_ICONS[i] ?? Lightbulb;
           return (
