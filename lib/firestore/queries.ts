@@ -692,6 +692,17 @@ export async function listActiveDataRoomsForDeal(orgId: string, dealId: string):
     .filter((r) => !r.archived);
 }
 
+export async function listDocumentsForDataRoom(orgId: string, dataRoomId: string): Promise<RoomDocument[]> {
+  const db = getAdminFirestore();
+  const snap = await db
+    .collection(col.documents)
+    .where("organizationId", "==", orgId)
+    .where("dataRoomId", "==", dataRoomId)
+    .limit(500)
+    .get();
+  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<RoomDocument, "id">) }));
+}
+
 /** Documents in data rooms tied to this deal. */
 export async function listDocumentsForDeal(orgId: string, dealId: string): Promise<RoomDocument[]> {
   const rooms = await listActiveDataRoomsForDeal(orgId, dealId);

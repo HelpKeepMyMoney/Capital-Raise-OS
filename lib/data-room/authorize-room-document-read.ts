@@ -10,6 +10,44 @@ export type RoomDocumentReadAuth =
   | { ok: true; storagePath: string; name: string; mimeType?: string; dataRoomId: string }
   | { ok: false; status: number; error: string };
 
+/** Staff/org API read — skips guest NDA and membership checks. */
+export async function authorizeRoomDocumentReadForOrg(
+  orgId: string,
+  documentId: string,
+): Promise<RoomDocumentReadAuth> {
+  const db = getAdminFirestore();
+  const doc = await db.collection(col.documents).doc(documentId).get();
+  if (!doc.exists) return { ok: false, status: 404, error: "Not found" };
+
+  const data = doc.data() as {
+    organizationId?: string;
+    storagePath?: string;
+    name?: string;
+    dataRoomId?: string;
+    mimeType?: string;
+    kind?: string;
+  };
+  if (data.organizationId !== orgId) {
+    return { ok: false, status: 403, error: "Forbidden" };
+  }
+  if (data.kind === "folder" || !data.storagePath) {
+    return { ok: false, status: 400, error: "Not a downloadable file" };
+  }
+
+  const dataRoomId = typeof data.dataRoomId === "string" ? data.dataRoomId : "";
+  if (!dataRoomId) {
+    return { ok: false, status: 400, error: "Invalid document" };
+  }
+
+  return {
+    ok: true,
+    storagePath: data.storagePath,
+    name: typeof data.name === "string" ? data.name : documentId,
+    mimeType: typeof data.mimeType === "string" ? data.mimeType : undefined,
+    dataRoomId,
+  };
+}
+
 export async function authorizeRoomDocumentRead(
   ctx: { user: DecodedIdToken; orgId: string },
   documentId: string,

@@ -4,6 +4,7 @@ import {
   canEditOrganizationProfileRole,
 } from "@/lib/auth/rbac";
 import { requireOrgSession } from "@/lib/auth/session";
+import { ApiKeysSection } from "@/components/settings/api-keys-section";
 import { DeleteOrganizationSection } from "@/components/settings/delete-organization-section";
 import { OrganizationContactForm } from "@/components/settings/organization-contact-form";
 import { OrganizationSettingsForm } from "@/components/settings/organization-settings-form";
@@ -51,6 +52,9 @@ export default async function SettingsPage() {
                 initialContact={org.contact}
                 canEdit={canEditOrg}
               />
+            ) : null}
+            {org ? (
+              <ApiKeysSection organizationId={org.id} canManage={canEditOrg} />
             ) : null}
             <Link
               href="/settings/billing"

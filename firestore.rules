@@ -217,5 +217,10 @@ service cloud.firestore {
     match /contact_form_throttle/{id} {
       allow read, write: if false;
     }
+
+    /** Org REST API keys — Admin SDK only */
+    match /org_api_keys/{id} {
+      allow read, write: if false;
+    }
   }
 }
