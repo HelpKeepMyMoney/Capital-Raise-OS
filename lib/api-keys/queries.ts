@@ -89,6 +89,8 @@ export type ResolvedOrgApiKey = {
   organizationId: string;
 };
 
+const LAST_USED_DEBOUNCE_MS = 5 * 60 * 1000;
+
 /** Resolve Bearer / X-API-Key to org context. Returns null when missing or invalid. */
 export async function resolveOrgApiKeyFromSecret(rawSecret: string): Promise<ResolvedOrgApiKey | null> {
   const trimmed = rawSecret.trim();
@@ -97,29 +99,15 @@ export async function resolveOrgApiKeyFromSecret(rawSecret: string): Promise<Res
   const candidateHash = hashOrgApiKey(trimmed);
   const db = getAdminFirestore();
 
-  // Keys are looked up by prefix to limit scan; prefix is first 16 chars of raw secret.
-  const prefix = orgApiKeyDisplayPrefix(trimmed);
-  const snap = await db
-    .collection(col.orgApiKeys)
-    .where("prefix", "==", prefix)
-    .limit(20)
-    .get();
-
-  for (const d of snap.docs) {
-    const row = d.data() as OrgApiKey;
-    if (row.revokedAt) continue;
-    if (!safeCompareKeyHash(row.keyHash, candidateHash)) continue;
-    await d.ref.update({ lastUsedAt: Date.now() }).catch(() => undefined);
-    return { keyId: d.id, organizationId: row.organizationId };
-  }
-
-  // Fallback: legacy rows without revokedAt field — scan by hash only (slow path).
   const hashSnap = await db.collection(col.orgApiKeys).where("keyHash", "==", candidateHash).limit(5).get();
   for (const d of hashSnap.docs) {
     const row = d.data() as OrgApiKey;
     if (row.revokedAt) continue;
     if (!safeCompareKeyHash(row.keyHash, candidateHash)) continue;
-    await d.ref.update({ lastUsedAt: Date.now() }).catch(() => undefined);
+    const now = Date.now();
+    if (!row.lastUsedAt || now - row.lastUsedAt >= LAST_USED_DEBOUNCE_MS) {
+      await d.ref.update({ lastUsedAt: now }).catch(() => undefined);
+    }
     return { keyId: d.id, organizationId: row.organizationId };
   }
 

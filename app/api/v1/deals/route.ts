@@ -1,13 +1,14 @@
 import { NextRequest } from "next/server";
 import { randomUUID } from "crypto";
 import { withApiKeyAuth } from "@/lib/api/v1/with-auth";
-import { rejectDealStatusWrite, rejectForbiddenApiActions } from "@/lib/api/v1/guards";
+import { parseDealStatusWrite, rejectForbiddenApiActions } from "@/lib/api/v1/guards";
 import { v1BadRequest, v1Forbidden, v1Json } from "@/lib/api/v1/responses";
+import { serializeDeal } from "@/lib/api/v1/serialize";
 import { writeAuditLog } from "@/lib/audit";
 import { getAdminFirestore } from "@/lib/firebase/admin";
 import { col } from "@/lib/firestore/paths";
-import type { Deal, DealType } from "@/lib/firestore/types";
-import { listActiveDataRoomsForDeal, listDeals } from "@/lib/firestore/queries";
+import type { Deal, DealStatus, DealType } from "@/lib/firestore/types";
+import { listDataRoomsForOrganization, listDeals } from "@/lib/firestore/queries";
 
 const DEAL_TYPES: DealType[] = [
   "startup_equity",
@@ -19,46 +20,25 @@ const DEAL_TYPES: DealType[] = [
   "private_bond",
 ];
 
-function serializeDeal(deal: Deal, linkedRoomIds: string[]) {
-  return {
-    id: deal.id,
-    name: deal.name,
-    type: deal.type,
-    status: deal.status,
-    industry: deal.industry ?? null,
-    stage: deal.stage ?? null,
-    targetRaise: deal.targetRaise ?? null,
-    minimumInvestment: deal.minimumInvestment ?? null,
-    valuation: deal.valuation ?? null,
-    closeDate: deal.closeDate ?? null,
-    terms: deal.terms ?? null,
-    useOfProceeds: deal.useOfProceeds ?? null,
-    tractionMetrics: deal.tractionMetrics ?? [],
-    useOfFundsSplit: deal.useOfFundsSplit ?? [],
-    whyInvest: deal.whyInvest ?? [],
-    marketOpportunity: deal.marketOpportunity ?? null,
-    problem: deal.problem ?? null,
-    solution: deal.solution ?? null,
-    competitiveEdge: deal.competitiveEdge ?? null,
-    growthStrategy: deal.growthStrategy ?? null,
-    exitPotential: deal.exitPotential ?? null,
-    returnsModel: deal.returnsModel ?? null,
-    sponsorProfile: deal.sponsorProfile ?? null,
-    linkedDataRoomIds: linkedRoomIds,
-    createdAt: deal.createdAt,
-  };
+function roomsByDealId(rooms: { id: string; dealId?: string; archived?: boolean }[]) {
+  const map = new Map<string, string[]>();
+  for (const r of rooms) {
+    if (r.archived || !r.dealId) continue;
+    const list = map.get(r.dealId) ?? [];
+    list.push(r.id);
+    map.set(r.dealId, list);
+  }
+  return map;
 }
 
 export async function GET(req: NextRequest) {
   return withApiKeyAuth(req, async (ctx) => {
-    const deals = await listDeals(ctx.orgId);
-    const withRooms = await Promise.all(
-      deals.map(async (d) => {
-        const rooms = await listActiveDataRoomsForDeal(ctx.orgId, d.id);
-        return serializeDeal(d, rooms.map((r) => r.id));
-      }),
-    );
-    return v1Json({ deals: withRooms });
+    const [deals, rooms] = await Promise.all([
+      listDeals(ctx.orgId),
+      listDataRoomsForOrganization(ctx.orgId, 120),
+    ]);
+    const linked = roomsByDealId(rooms);
+    return v1Json({ deals: deals.map((d) => serializeDeal(d, linked.get(d.id) ?? [])) });
   });
 }
 
@@ -74,8 +54,9 @@ export async function POST(req: NextRequest) {
     const forbidden = rejectForbiddenApiActions(body);
     if (!forbidden.ok) return v1Forbidden(forbidden.message);
 
-    const statusCheck = rejectDealStatusWrite(body.status);
-    if (!statusCheck.ok) return v1Forbidden(statusCheck.message);
+    const statusCheck = parseDealStatusWrite(body.status);
+    if (!statusCheck.ok) return v1BadRequest(statusCheck.message);
+    const status: DealStatus = statusCheck.status ?? "draft";
 
     const name = typeof body.name === "string" ? body.name.trim() : "";
     if (!name) return v1BadRequest("name is required");
@@ -92,7 +73,7 @@ export async function POST(req: NextRequest) {
       organizationId: ctx.orgId,
       name,
       type,
-      status: "draft",
+      status,
       createdAt: now,
     };
 
@@ -108,6 +89,7 @@ export async function POST(req: NextRequest) {
     if (typeof body.closeDate === "number" && body.closeDate > 0) payload.closeDate = body.closeDate;
     if (typeof body.industry === "string" && body.industry.trim()) payload.industry = body.industry.trim();
     if (typeof body.stage === "string" && body.stage.trim()) payload.stage = body.stage.trim();
+    if (typeof body.tagline === "string" && body.tagline.trim()) payload.tagline = body.tagline.trim();
 
     const db = getAdminFirestore();
     await db.collection(col.deals).doc(id).set(payload);
@@ -117,7 +99,7 @@ export async function POST(req: NextRequest) {
       actorId: ctx.actorId,
       action: "deal.create.api",
       resource: `${col.deals}/${id}`,
-      payload: { name, type, status: "draft" },
+      payload: { name, type, status },
     });
 
     const deal = { id, ...(payload as Omit<Deal, "id">) };

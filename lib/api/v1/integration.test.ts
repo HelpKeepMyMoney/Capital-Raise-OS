@@ -140,6 +140,25 @@ describe("REST API v1 integration (mocked Firestore)", () => {
       createdByUid: "user-1",
       createdAt: Date.now(),
     });
+    store.set("investors/inv-1", {
+      id: "inv-1",
+      organizationId: ORG_A,
+      name: "LP One",
+      firstName: "LP",
+      lastName: "One",
+      pipelineStage: "committed",
+      committedAmount: 100_000,
+      createdAt: 1,
+      updatedAt: 1,
+    });
+    store.set("deals/deal-1", {
+      id: "deal-1",
+      organizationId: ORG_A,
+      name: "Draft SAFE",
+      type: "safe",
+      status: "draft",
+      createdAt: 1,
+    });
 
     const { db } = makeFirestore(store);
     const admin = await import("@/lib/firebase/admin");
@@ -185,20 +204,22 @@ describe("REST API v1 integration (mocked Firestore)", () => {
     expect(body.data.deals).toHaveLength(0);
   });
 
-  it("rejects publish on deal create", async () => {
+  it("creates an active deal on authorized write", async () => {
     const { POST } = await import("@/app/api/v1/deals/route");
     const res = await POST(
       authReq("http://localhost/api/v1/deals", {
         method: "POST",
         secret: orgASecret,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: "X", type: "safe", status: "active" }),
+        body: JSON.stringify({ name: "Live SAFE", type: "safe", status: "active" }),
       }),
     );
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { data: { deal: { status: string } } };
+    expect(body.data.deal.status).toBe("active");
   });
 
-  it("creates draft deal on authorized write", async () => {
+  it("creates draft deal when status omitted", async () => {
     const { POST } = await import("@/app/api/v1/deals/route");
     const res = await POST(
       authReq("http://localhost/api/v1/deals", {
@@ -213,7 +234,7 @@ describe("REST API v1 integration (mocked Firestore)", () => {
     expect(body.data.deal.status).toBe("draft");
   });
 
-  it("rejects publish on deal patch", async () => {
+  it("publishes a deal via patch", async () => {
     const { PATCH } = await import("@/app/api/v1/deals/[id]/route");
     const res = await PATCH(
       authReq("http://localhost/api/v1/deals/deal-1", {
@@ -224,6 +245,74 @@ describe("REST API v1 integration (mocked Firestore)", () => {
       }),
       { params: Promise.resolve({ id: "deal-1" }) },
     );
+    expect(res.status).toBe(200);
+  }, 20_000);
+
+  it("creates and updates an investor", async () => {
+    const { POST } = await import("@/app/api/v1/investors/route");
+    const created = await POST(
+      authReq("http://localhost/api/v1/investors", {
+        method: "POST",
+        secret: orgASecret,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ firstName: "Ada", lastName: "Lovelace", pipelineStage: "lead" }),
+      }),
+    );
+    expect(created.status).toBe(201);
+    const createdBody = (await created.json()) as { data: { investor: { id: string; pipelineStage: string } } };
+    expect(createdBody.data.investor.pipelineStage).toBe("lead");
+
+    const { PATCH } = await import("@/app/api/v1/investors/[id]/route");
+    const patched = await PATCH(
+      authReq(`http://localhost/api/v1/investors/${createdBody.data.investor.id}`, {
+        method: "PATCH",
+        secret: orgASecret,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pipelineStage: "due_diligence", committedAmount: 50_000 }),
+      }),
+      { params: Promise.resolve({ id: createdBody.data.investor.id }) },
+    );
+    expect(patched.status).toBe(200);
+    const patchedBody = (await patched.json()) as { data: { investor: { pipelineStage: string } } };
+    expect(patchedBody.data.investor.pipelineStage).toBe("due_diligence");
+  });
+
+  it("creates a task", async () => {
+    const { POST } = await import("@/app/api/v1/tasks/route");
+    const res = await POST(
+      authReq("http://localhost/api/v1/tasks", {
+        method: "POST",
+        secret: orgASecret,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: "Call LP", taskType: "call_investor" }),
+      }),
+    );
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { data: { task: { title: string; status: string } } };
+    expect(body.data.task.title).toBe("Call LP");
+    expect(body.data.task.status).toBe("open");
+  });
+
+  it("rejects invite actions", async () => {
+    const { POST } = await import("@/app/api/v1/investors/route");
+    const res = await POST(
+      authReq("http://localhost/api/v1/investors", {
+        method: "POST",
+        secret: orgASecret,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ firstName: "X", inviteInvestor: true }),
+      }),
+    );
     expect(res.status).toBe(403);
+  });
+
+  it("rejects revoked keys", async () => {
+    store.set("org_api_keys/key-a", {
+      ...(store.get("org_api_keys/key-a") as Record<string, unknown>),
+      revokedAt: Date.now(),
+    });
+    const { GET } = await import("@/app/api/v1/org/route");
+    const res = await GET(authReq("http://localhost/api/v1/org", { secret: orgASecret }));
+    expect(res.status).toBe(401);
   });
 });

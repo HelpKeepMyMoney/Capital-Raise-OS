@@ -1,27 +1,13 @@
 import { NextRequest } from "next/server";
 import { randomUUID } from "crypto";
 import { withApiKeyAuth } from "@/lib/api/v1/with-auth";
-import { v1BadRequest, v1Forbidden, v1Json, v1NotFound } from "@/lib/api/v1/responses";
+import { v1BadRequest, v1Json, v1NotFound } from "@/lib/api/v1/responses";
+import { serializeRoom } from "@/lib/api/v1/serialize";
 import { writeAuditLog } from "@/lib/audit";
 import { getAdminFirestore } from "@/lib/firebase/admin";
 import { col } from "@/lib/firestore/paths";
 import { getDeal, listDataRoomsForOrganization } from "@/lib/firestore/queries";
 import type { DataRoom, DataRoomVisibility } from "@/lib/firestore/types";
-
-function serializeRoom(room: DataRoom) {
-  return {
-    id: room.id,
-    name: room.name,
-    description: room.description ?? null,
-    dealId: room.dealId ?? null,
-    ndaRequired: room.ndaRequired,
-    visibility: room.visibility ?? "open",
-    downloadAllowed: room.downloadAllowed ?? true,
-    archived: room.archived ?? false,
-    createdAt: room.createdAt,
-    updatedAt: room.updatedAt ?? null,
-  };
-}
 
 export async function GET(req: NextRequest) {
   return withApiKeyAuth(req, async (ctx) => {
@@ -37,6 +23,8 @@ export async function POST(req: NextRequest) {
       dealId?: string | null;
       description?: string | null;
       ndaRequired?: boolean;
+      visibility?: DataRoomVisibility;
+      downloadAllowed?: boolean;
     };
     try {
       body = (await req.json()) as typeof body;
@@ -60,6 +48,9 @@ export async function POST(req: NextRequest) {
     const description =
       typeof body.description === "string" ? body.description.trim().slice(0, 4000) : undefined;
     const ndaRequired = Boolean(body.ndaRequired);
+    const visibility: DataRoomVisibility =
+      body.visibility === "invite_only" ? "invite_only" : "open";
+    const downloadAllowed = body.downloadAllowed === undefined ? true : Boolean(body.downloadAllowed);
 
     const id = randomUUID();
     const now = Date.now();
@@ -68,8 +59,8 @@ export async function POST(req: NextRequest) {
       organizationId: ctx.orgId,
       name,
       ndaRequired,
-      visibility: "open" satisfies DataRoomVisibility,
-      downloadAllowed: true,
+      visibility,
+      downloadAllowed,
       createdAt: now,
       updatedAt: now,
     };

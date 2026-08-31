@@ -33,9 +33,12 @@ export async function authorizeDataRoomFileCreateForOrg(
 
   const roomSnap = await db.collection(col.dataRooms).doc(dataRoomId).get();
   if (!roomSnap.exists) return { ok: false, status: 404, error: "Room not found" };
-  const room = roomSnap.data() as { organizationId?: string };
+  const room = roomSnap.data() as { organizationId?: string; archived?: boolean };
   if (room.organizationId !== orgId) {
     return { ok: false, status: 403, error: "Forbidden" };
+  }
+  if (room.archived) {
+    return { ok: false, status: 400, error: "Room is archived" };
   }
 
   const parentFolderId =

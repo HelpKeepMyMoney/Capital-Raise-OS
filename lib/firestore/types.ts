@@ -804,7 +804,7 @@ export type OrgApiKey = {
   organizationId: string;
   /** User-facing label, e.g. "CFO automation". */
   name: string;
-  /** First 12 chars of raw key for list UI, e.g. `cpin_live_ab`. */
+  /** First 16 chars of raw key for list UI, e.g. `cpin_live_ab12cd`. */
   prefix: string;
   keyHash: string;
   createdByUid: string;

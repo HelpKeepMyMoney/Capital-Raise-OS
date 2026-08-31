@@ -4,6 +4,23 @@ AI-powered private capital platform: investor CRM, discovery, outreach, data roo
 
 ## Changelog
 
+### REST API v1 (org API keys — clients update CapitalOS without the website)
+
+External clients (CFO automations, scripts, other systems) can **read and write** org data through **`/api/v1`** instead of driving the UI.
+
+- **Auth:** Founder/admin mints an org-scoped key in **Settings → REST API keys** (`cpin_live_…`). Send **`Authorization: Bearer`** or **`X-API-Key`**. Secrets are **SHA-256 hashed** in Firestore (`org_api_keys`; Admin SDK only — client rules deny read/write). Keys act as the **organization**, not a Firebase user session. Raw secret is shown **once**.
+- **Writes (same surfaces staff edit in-app):**
+  - **`PATCH /api/v1/org`** — name, slug, contact
+  - **`POST`/`PATCH /api/v1/deals`** — create/update deals, including **`status: active`** (publish) and the deal-settings field set
+  - **`POST`/`PATCH /api/v1/investors`** — CRM create/update, pipeline stage, archive
+  - **`POST`/`PATCH /api/v1/data-rooms`** — create/update rooms, link a deal, archive
+  - **`POST`/`PATCH /api/v1/tasks`** — create/update tasks
+- **Documents:** Prefer **signed GCS upload** — **`POST .../documents/uploads`** then **`PUT`** the file to `uploadUrl`, then **`POST .../uploads/:documentId/complete`** (avoids Vercel body limits; max 50MB, same types as the UI). Multipart POST/PUT remains for small local files only.
+- **Reads:** org + pipeline summary, deals, data rooms, documents (+ 15-minute signed download URL), investors, tasks.
+- **Still UI-only:** investor invites, outreach, and email/Resend (third-party mail). Body keys such as `invite`, `sendEmail`, `campaignId` return **403**.
+- **Docs & tests:** **[docs/API.md](./docs/API.md)** (endpoints, curl). **`npm test`** (vitest) covers key mint/revoke, auth, org isolation, publish, investor/task writes, revoked keys.
+- **Deploy:** no new env vars. Deploy Firestore **indexes** and **rules** (`org_api_keys`, `documents` composite) with the app.
+
 ### Outreach infrastructure (Phase 1)
 
 - **Data model:** Extended `campaigns`, `email_templates`, and `emails`; added `outreach_sequences`, `outreach_recipients`, `outreach_touches`, `outreach_events`, `outreach_analytics_snapshots`, and `outreach_domain_settings` with types in `lib/firestore/types.ts`.
@@ -286,9 +303,9 @@ Premium sponsor workspace for diligence: header actions, six KPI cards (from Fir
 - `app/onboarding/` — create first organization (session without org)
 - `app/invite/[token]/` — redeem investor invitation links
 - `app/sign/` — public native e-sign flow (token query param; no session required)
-- `app/api/` — session auth, **`platform-admin`**, **`discovery/search`**, **`outreach/*`** (campaigns, sequences, cron, track, analytics), data room (**`documents/prepare`**, **`documents/finalize`**, **`rooms/[roomId]/nda-eligible-investors`** for mutual-NDA recipient picker), deals, tasks, organizations, invitations, AI chat, PayPal billing, webhooks, **`esign/*`** (templates, template file, envelopes, sign-session, sign-complete, subscription create, **questionnaire create + final-document**), **`organizations/[id]/esign-settings`**
+- `app/api/` — session auth, **`v1/`** customer REST API (org API keys; see **[docs/API.md](./docs/API.md)**), **`organizations/[id]/api-keys`**, **`platform-admin`**, **`discovery/search`**, **`outreach/*`** (campaigns, sequences, cron, track, analytics), data room (**`documents/prepare`**, **`documents/finalize`**, **`rooms/[roomId]/nda-eligible-investors`** for mutual-NDA recipient picker), deals, tasks, organizations, invitations, AI chat, PayPal billing, webhooks, **`esign/*`** (templates, template file, envelopes, sign-session, sign-complete, subscription create, **questionnaire create + final-document**), **`organizations/[id]/esign-settings`**
 - `components/data-room/` — Data Room UI modules; `components/deals/` — Deal Room UI; **`components/investors/`** — CRM board + **`InvestorImportDialog`**; **`components/outreach/`** — Outreach dashboard UI; **`components/marketing/`** — public landing sections; **`components/tasks/`** — Tasks Workflow Center UI; **`components/settings/`** — org settings, **e-sign template client & field editor**, delete org; **`components/esign/`** — public signing client; **`components/platform-admin/`** — `/admin` dashboard UI; `lib/data-room/` — metrics, kind labels, server queries, **investor NDA gate**, **`authorize-room-document-read`**; **`lib/investors/`** — **`csv-import`**, **`esign-crm-touch`** (e-sign → CRM activity), filters/export; **`lib/deals/`** — deal patch schema, **`pitch-deck-picker`**, narrative helpers, telemetry aggregation, formatting; **`lib/outreach/`** — campaign engine, audience, analytics, send/tracking; **`lib/discovery/`** — search merge/rank and provider registry; **`lib/ui/select-trigger-label.ts`** — id → label helpers for **`SelectValue`**; **`lib/youtube/`** — YouTube URL parsing for embeds; **`lib/marketing/`** — marketing constants & contact schema; **`lib/tasks/`** — task workflow helpers; **`lib/organizations/`** — org patch, deletion cascade, slug helpers; **`lib/platform-admin/`** — admin API guards & schemas; **`lib/esign/`** — native e-sign (envelope service, tokens, field validation, PDF helpers, template schema, **`subscription-sponsor-emails`**)
-- `lib/` — Firebase, Firestore types/queries, **`lib/billing/`** (PayPal-backed **`PublicPlanId`**, **`lib/billing/entitlements.ts`**, **`lib/billing/features.ts`**; comp **`client`** plan is admin-only — see Changelog), discovery merge, analytics helpers, auth (RBAC, guests, platform admin), **`lib/email/password-set-mail`** (welcome / forgot-password links), invitations, PayPal, billing
+- `lib/` — Firebase, Firestore types/queries, **`lib/api/v1/`** and **`lib/api-keys/`** (REST API v1 + hashed org keys), **`lib/billing/`** (PayPal-backed **`PublicPlanId`**, **`lib/billing/entitlements.ts`**, **`lib/billing/features.ts`**; comp **`client`** plan is admin-only — see Changelog), discovery merge, analytics helpers, auth (RBAC, guests, platform admin), **`lib/email/password-set-mail`** (welcome / forgot-password links), invitations, PayPal, billing
 - `functions/` — Firebase Cloud Functions (member → custom claims sync, scheduled digest, **`processOutreachQueue`**)
 - `scripts/seed-demo.ts` — demo org, investors, tasks, emails
 
@@ -297,11 +314,14 @@ Premium sponsor workspace for diligence: header actions, six KPI cards (from Fir
 - Firestore/Storage rules scope data by `organizationId` and `organization_members`.
 - Organizations and memberships are **written via Admin SDK** from Next.js API routes (rules deny direct client writes to those collections).
 - Session cookies are HTTP-only Firebase session cookies (`cpin_session`); active org is `cpin_org_id`.
+- **REST API keys** (`org_api_keys`) are hashed at rest, minted/revoked only by founder/admin via session routes, and never readable from the client SDK.
 - Investor guests are restricted from raise-team modules via server checks and redirects.
 
 ## Documentation
 
 See [DEPLOYMENT.md](./DEPLOYMENT.md) for Vercel, Firebase, PayPal webhooks, and GA4/GTM.
+
+See [docs/API.md](./docs/API.md) for the customer **REST API v1** (org API keys, endpoints, curl).
 
 ## Scripts
 
@@ -309,4 +329,5 @@ See [DEPLOYMENT.md](./DEPLOYMENT.md) for Vercel, Firebase, PayPal webhooks, and 
 | -------------- | -------------------------- |
 | `npm run dev`  | Next.js dev server         |
 | `npm run build`| Production build           |
+| `npm test`     | Vitest (API keys + `/api/v1`) |
 | `npm run seed` | Seed demo data (needs UID)|

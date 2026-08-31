@@ -56,6 +56,7 @@ export async function uploadDataRoomDocument(
   const replaceId = input.replaceDocumentId?.trim();
   let docId: string;
   let version = 1;
+  let previousStoragePath: string | undefined;
 
   if (replaceId) {
     if (!isSafeDocumentId(replaceId)) {
@@ -70,6 +71,7 @@ export async function uploadDataRoomDocument(
     if (ex.kind === "folder") return { ok: false, status: 400, error: "Cannot replace a folder" };
     docId = replaceId;
     version = (ex.version ?? 1) + 1;
+    previousStoragePath = ex.storagePath;
   } else {
     docId = randomUUID();
   }
@@ -108,6 +110,9 @@ export async function uploadDataRoomDocument(
       version,
       updatedAt: now,
     });
+    if (previousStoragePath && previousStoragePath !== storagePath) {
+      await bucket.file(previousStoragePath).delete().catch(() => undefined);
+    }
   } else {
     await db.collection(col.documents).doc(docId).set(row);
   }
@@ -127,21 +132,4 @@ export async function uploadDataRoomDocument(
   };
 }
 
-function serializeDocument(doc: RoomDocument) {
-  const extended = doc as RoomDocument & { updatedAt?: number };
-  return {
-    id: doc.id,
-    dataRoomId: doc.dataRoomId,
-    name: doc.name,
-    kind: doc.kind,
-    parentFolderId: doc.parentFolderId ?? null,
-    sizeBytes: doc.sizeBytes ?? null,
-    mimeType: doc.mimeType ?? null,
-    viewCount: doc.viewCount ?? 0,
-    version: doc.version ?? 1,
-    createdAt: doc.createdAt,
-    updatedAt: extended.updatedAt ?? null,
-  };
-}
-
-export { serializeDocument };
+export { serializeDocument } from "@/lib/api/v1/serialize";

@@ -1,25 +1,19 @@
 import type { DealStatus } from "@/lib/firestore/types";
+import { DealStatusSchema } from "@/lib/firestore/types";
 
-const FORBIDDEN_STATUS: DealStatus[] = ["active", "closing", "closed"];
-
-/** Reject publish / go-live via API (draft-only writes). */
-export function rejectDealStatusWrite(status: unknown): { ok: true } | { ok: false; message: string } {
+/** Validate deal status for API writes. Any in-app status is allowed. */
+export function parseDealStatusWrite(
+  status: unknown,
+): { ok: true; status?: DealStatus } | { ok: false; message: string } {
   if (status === undefined) return { ok: true };
-  if (typeof status !== "string") {
-    return { ok: false, message: "Publishing deals via API is not allowed. Omit status or use draft." };
-  }
-  const s = status as DealStatus;
-  if (FORBIDDEN_STATUS.includes(s)) {
+  const parsed = DealStatusSchema.safeParse(status);
+  if (!parsed.success) {
     return {
       ok: false,
-      message:
-        "Publishing deals via API is not allowed. Create and update deals as draft only; publish in the CapitalOS UI.",
+      message: "Invalid deal status. Use draft, active, closing, closed, or cancelled.",
     };
   }
-  if (s !== "draft" && s !== "cancelled") {
-    return { ok: false, message: "Only draft status is allowed when creating or updating deals via API." };
-  }
-  return { ok: true };
+  return { ok: true, status: parsed.data };
 }
 
 /** Block invite / email / outreach actions if present in body. */

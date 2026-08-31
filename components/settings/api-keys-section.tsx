@@ -125,9 +125,10 @@ export function ApiKeysSection(props: { organizationId: string; canManage: boole
             REST API keys
           </CardTitle>
           <CardDescription>
-            Create org-scoped keys for external agents (e.g. a CFO automation) to sync draft raise materials
-            via <code className="text-xs">/api/v1</code>. Keys authenticate as this organization, not as your
-            user session. See <code className="text-xs">docs/API.md</code> in the repo.
+            Create org-scoped keys so clients can read and update deals, investors, data rooms, and
+            tasks via <code className="text-xs">/api/v1</code> instead of the website. Keys
+            authenticate as this organization, not as your user session. Invites and email sends stay
+            in the CapitalOS UI.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
