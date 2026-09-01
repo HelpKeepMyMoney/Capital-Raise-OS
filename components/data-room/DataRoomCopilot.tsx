@@ -36,6 +36,7 @@ export function DataRoomCopilot(props: Props) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          pathname: "/data-room",
           messages: appendMessages.slice(-12).map((m, i, arr) => {
             let content = m.content;
             if (m.role === "user" && i === arr.length - 1) {

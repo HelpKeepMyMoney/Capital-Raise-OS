@@ -30,6 +30,7 @@ export function ApiKeysSection(props: { organizationId: string; canManage: boole
   const router = useRouter();
   const [keys, setKeys] = React.useState<ApiKeyRow[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const [loadError, setLoadError] = React.useState<string | null>(null);
   const [name, setName] = React.useState("");
   const [creating, setCreating] = React.useState(false);
   const [newSecret, setNewSecret] = React.useState<string | null>(null);
@@ -39,13 +40,16 @@ export function ApiKeysSection(props: { organizationId: string; canManage: boole
 
   async function loadKeys() {
     setLoading(true);
+    setLoadError(null);
     try {
       const res = await fetch(base);
       const data = (await res.json()) as { keys?: ApiKeyRow[]; error?: string };
       if (!res.ok) throw new Error(data.error ?? "Failed to load API keys");
       setKeys(data.keys ?? []);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to load API keys");
+      const message = err instanceof Error ? err.message : "Failed to load API keys";
+      setLoadError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -156,6 +160,13 @@ export function ApiKeysSection(props: { organizationId: string; canManage: boole
 
               {loading ? (
                 <p className="text-sm text-muted-foreground">Loading keys…</p>
+              ) : loadError ? (
+                <div className="space-y-2">
+                  <p className="text-sm text-destructive">{loadError}</p>
+                  <Button type="button" variant="outline" size="sm" onClick={() => void loadKeys()}>
+                    Retry
+                  </Button>
+                </div>
               ) : activeKeys.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No active API keys.</p>
               ) : (

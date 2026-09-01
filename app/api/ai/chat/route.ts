@@ -2,6 +2,7 @@ import { requireOrgSession } from "@/lib/auth/session";
 import { getOrganization } from "@/lib/firestore/queries";
 import { canUseAiCopilot, effectivePlan } from "@/lib/billing/features";
 import { getAnthropic } from "@/lib/ai/anthropic";
+import { buildCopilotSystemPrompt } from "@/lib/ai/copilot-system";
 import { checkRateLimit, rateLimitKey } from "@/lib/rate-limit";
 import { NextRequest } from "next/server";
 
@@ -27,20 +28,22 @@ export async function POST(req: NextRequest) {
     return new Response("Too many requests", { status: 429 });
   }
 
-  const { messages } = (await req.json()) as {
+  const body = (await req.json()) as {
     messages?: { role: "user" | "assistant"; content: string }[];
+    pathname?: string;
   };
+  const { messages } = body;
   if (!messages?.length) {
     return new Response("Bad request", { status: 400 });
   }
+
+  const pathname = typeof body.pathname === "string" ? body.pathname.slice(0, 200) : undefined;
 
   const client = getAnthropic();
   const stream = await client.messages.stream({
     model: process.env.ANTHROPIC_MODEL ?? "claude-3-5-haiku-20241022",
     max_tokens: 2048,
-    system: `You are CPIN Copilot, an AI assistant for private capital fundraising inside organization ${ctx.orgId}. 
-Help draft investor emails, summarize meetings, suggest next investors, and review funnel metrics. 
-Stay concise, compliant (no legal advice), and professional.`,
+    system: buildCopilotSystemPrompt({ orgId: ctx.orgId, pathname }),
     messages: messages.map((m) => ({ role: m.role, content: m.content })),
   });
 

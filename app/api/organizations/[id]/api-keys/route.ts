@@ -20,8 +20,14 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const keys = await listOrgApiKeys(orgId);
-  return NextResponse.json({ keys });
+  try {
+    const keys = await listOrgApiKeys(orgId);
+    return NextResponse.json({ keys });
+  } catch (err) {
+    console.error("[api-keys GET]", err);
+    const message = err instanceof Error ? err.message : "Failed to list API keys";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }
 
 export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
@@ -48,19 +54,25 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   const name = typeof body.name === "string" ? body.name.trim() : "";
   if (!name) return NextResponse.json({ error: "Name is required" }, { status: 400 });
 
-  const { key, secret } = await createOrgApiKey({
-    organizationId: orgId,
-    name,
-    createdByUid: session.user.uid,
-  });
+  try {
+    const { key, secret } = await createOrgApiKey({
+      organizationId: orgId,
+      name,
+      createdByUid: session.user.uid,
+    });
 
-  await writeAuditLog({
-    organizationId: orgId,
-    actorId: session.user.uid,
-    action: "api_key.create",
-    resource: `${col.orgApiKeys}/${key.id}`,
-    payload: { name, prefix: key.prefix },
-  });
+    await writeAuditLog({
+      organizationId: orgId,
+      actorId: session.user.uid,
+      action: "api_key.create",
+      resource: `${col.orgApiKeys}/${key.id}`,
+      payload: { name, prefix: key.prefix },
+    });
 
-  return NextResponse.json({ key, secret });
+    return NextResponse.json({ key, secret });
+  } catch (err) {
+    console.error("[api-keys POST]", err);
+    const message = err instanceof Error ? err.message : "Failed to create API key";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }

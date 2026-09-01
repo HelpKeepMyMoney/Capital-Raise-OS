@@ -23,15 +23,21 @@ export async function DELETE(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const ok = await revokeOrgApiKey(orgId, keyId);
-  if (!ok) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  try {
+    const ok = await revokeOrgApiKey(orgId, keyId);
+    if (!ok) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  await writeAuditLog({
-    organizationId: orgId,
-    actorId: session.user.uid,
-    action: "api_key.revoke",
-    resource: `${col.orgApiKeys}/${keyId}`,
-  });
+    await writeAuditLog({
+      organizationId: orgId,
+      actorId: session.user.uid,
+      action: "api_key.revoke",
+      resource: `${col.orgApiKeys}/${keyId}`,
+    });
 
-  return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    console.error("[api-keys DELETE]", err);
+    const message = err instanceof Error ? err.message : "Failed to revoke API key";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }

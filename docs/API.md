@@ -6,7 +6,7 @@ Invites, outreach, and email sends remain UI-only (they deliver mail to third pa
 
 ## Authentication
 
-1. In **Settings → REST API keys**, create a key (founder/admin only). The full secret is shown **once**.
+1. In **Settings**, click **REST API keys** (top right, next to E-Sign Templates), or open **`/settings/api`**. Founder/admin only. The full secret is shown **once**.
 2. Send it on every request:
 
 ```bash

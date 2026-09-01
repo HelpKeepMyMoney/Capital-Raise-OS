@@ -16,13 +16,13 @@ export type OrgApiKeyListRow = Pick<
 
 export async function listOrgApiKeys(orgId: string): Promise<OrgApiKeyListRow[]> {
   const db = getAdminFirestore();
+  // Equality-only query so listing works before the composite index is deployed.
   const snap = await db
     .collection(col.orgApiKeys)
     .where("organizationId", "==", orgId)
-    .orderBy("createdAt", "desc")
     .limit(50)
     .get();
-  return snap.docs.map((d) => {
+  const rows = snap.docs.map((d) => {
     const x = d.data() as Omit<OrgApiKey, "id">;
     return {
       id: d.id,
@@ -34,6 +34,8 @@ export async function listOrgApiKeys(orgId: string): Promise<OrgApiKeyListRow[]>
       lastUsedAt: x.lastUsedAt,
     };
   });
+  rows.sort((a, b) => b.createdAt - a.createdAt);
+  return rows;
 }
 
 export async function createOrgApiKey(input: {
