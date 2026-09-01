@@ -797,3 +797,18 @@ export type AuditLog = {
   payload?: Record<string, unknown>;
   createdAt: number;
 };
+
+/** Organization REST API key metadata (secret stored as SHA-256 hash only). */
+export type OrgApiKey = {
+  id: string;
+  organizationId: string;
+  /** User-facing label, e.g. "CFO automation". */
+  name: string;
+  /** First 16 chars of raw key for list UI, e.g. `cpin_live_ab12cd`. */
+  prefix: string;
+  keyHash: string;
+  createdByUid: string;
+  createdAt: number;
+  revokedAt?: number;
+  lastUsedAt?: number;
+};

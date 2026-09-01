@@ -293,6 +293,23 @@ export async function listDataRoomsForOrganization(orgId: string, limit = 80): P
   return mapDocs(snap, (data, id) => ({ id, ...(data as Omit<DataRoom, "id">) }));
 }
 
+export async function getTask(orgId: string, taskId: string): Promise<Task | null> {
+  const db = getAdminFirestore();
+  const d = await db.collection(col.tasks).doc(taskId).get();
+  if (!d.exists) return null;
+  const data = d.data() as Omit<Task, "id">;
+  if (data.organizationId !== orgId) return null;
+  return { id: d.id, ...data };
+}
+
+export async function listTasksForOrganization(orgId: string, limit = 200): Promise<Task[]> {
+  const db = getAdminFirestore();
+  const snap = await db.collection(col.tasks).where("organizationId", "==", orgId).limit(limit).get();
+  const list = mapDocs(snap, (data, id) => ({ id, ...(data as Omit<Task, "id">) }));
+  list.sort((a, b) => (b.updatedAt ?? b.createdAt) - (a.updatedAt ?? a.createdAt));
+  return list;
+}
+
 export async function getDeal(orgId: string, dealId: string): Promise<Deal | null> {
   const db = getAdminFirestore();
   const d = await db.collection(col.deals).doc(dealId).get();
@@ -690,6 +707,17 @@ export async function listActiveDataRoomsForDeal(orgId: string, dealId: string):
   return snap.docs
     .map((d) => ({ id: d.id, ...(d.data() as Omit<DataRoom, "id">) }))
     .filter((r) => !r.archived);
+}
+
+export async function listDocumentsForDataRoom(orgId: string, dataRoomId: string): Promise<RoomDocument[]> {
+  const db = getAdminFirestore();
+  const snap = await db
+    .collection(col.documents)
+    .where("organizationId", "==", orgId)
+    .where("dataRoomId", "==", dataRoomId)
+    .limit(500)
+    .get();
+  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<RoomDocument, "id">) }));
 }
 
 /** Documents in data rooms tied to this deal. */

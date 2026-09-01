@@ -75,6 +75,24 @@ const TASKS_QUICK_ACTIONS = [
   },
 ];
 
+const API_QUICK_ACTIONS = [
+  {
+    label: "How do I create an API key?",
+    prompt:
+      "Walk me through creating a CapitalOS REST API key in Settings, who can mint keys, how to copy the cpin_live_ secret once, and how to send it on requests (Authorization Bearer vs X-API-Key).",
+  },
+  {
+    label: "What can the API update?",
+    prompt:
+      "What can I read and write through CapitalOS /api/v1 (deals, investors, data rooms, documents, tasks, org)? What stays UI-only (invites, outreach, email)? Give example curl for publishing a deal with status active.",
+  },
+  {
+    label: "Upload a file via API",
+    prompt:
+      "Show the three-step signed upload flow for a data-room document via /api/v1 (request upload URL, PUT to GCS, complete). Include allowed types and the 50MB limit.",
+  },
+];
+
 const QUICK_ACTIONS = [
   {
     label: "What needs attention today?",
@@ -101,6 +119,11 @@ const QUICK_ACTIONS = [
     prompt:
       "List objective criteria for 'stale' investor leads in a raise (timing, stage, last touch) and give re-engagement plays for each pattern.",
   },
+  {
+    label: "REST API help",
+    prompt:
+      "Explain how to use the CapitalOS REST API so a client can update this org without the website: create a key at /settings/api, authenticate, and the main read/write endpoints. Include one curl example.",
+  },
 ];
 
 export function CopilotPanel(props: {
@@ -110,11 +133,19 @@ export function CopilotPanel(props: {
 }) {
   const pathname = usePathname();
   const quickActions = React.useMemo(() => {
+    const onApiSurface =
+      pathname === "/settings/api" ||
+      pathname === "/settings" ||
+      pathname === "/help" ||
+      pathname.startsWith("/settings/");
+    if (onApiSurface) {
+      return [...API_QUICK_ACTIONS, ...QUICK_ACTIONS.filter((a) => a.label !== "REST API help")];
+    }
     if (/^\/deals\/[^/]+$/.test(pathname)) {
       return [...DEAL_QUICK_ACTIONS, ...QUICK_ACTIONS];
     }
     if (pathname === "/tasks" || pathname.startsWith("/tasks/")) {
-      return TASKS_QUICK_ACTIONS;
+      return [...TASKS_QUICK_ACTIONS, QUICK_ACTIONS[QUICK_ACTIONS.length - 1]!];
     }
     return QUICK_ACTIONS;
   }, [pathname]);
@@ -131,6 +162,7 @@ export function CopilotPanel(props: {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          pathname,
           messages: appendMessages.slice(-12).map((m) => ({
             role: m.role,
             content:
@@ -231,7 +263,9 @@ export function CopilotPanel(props: {
           <div className="flex flex-col gap-3 text-sm">
             {messages.length === 0 && (
               <p className="text-muted-foreground">
-                Draft LP emails, pressure-test your funnel, or prep IC memos — grounded in CPIN workflows.
+                {pathname === "/settings/api" || pathname.startsWith("/settings")
+                  ? "Ask how to mint a REST API key, which /api/v1 endpoints to call, or for a curl example to update deals, investors, data rooms, or tasks."
+                  : "Draft LP emails, pressure-test your funnel, prep IC memos, or ask how to update CapitalOS through the REST API."}
               </p>
             )}
             {messages.map((m, i) => (

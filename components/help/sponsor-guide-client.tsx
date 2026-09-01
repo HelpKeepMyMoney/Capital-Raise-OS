@@ -91,8 +91,41 @@ export function SponsorGuideClient() {
                 Open <ProseLink href="/settings">Settings</ProseLink> and select the <strong>Organization</strong> tab
                 in the card at the top. Complete your workspace name and slug, organization contact details, and review
                 the billing entry point. The integrations note on Settings describes environment-driven services (email,
-                AI, payments) configured on the host.
+                AI, payments) configured on the host. Founders and org admins can also mint{" "}
+                <strong>REST API keys</strong> from this page (banner <strong>Create API key</strong>) or from{" "}
+                <strong>REST API keys</strong> next to <strong>E-Sign Templates</strong>.
               </p>
+            </Section>
+
+            <Section id="sg-api-keys" title="REST API keys">
+              <>
+                <p>
+                  Use org-scoped keys so other systems (CFO tools, scripts, partners) can{" "}
+                  <strong>read and update</strong> CapitalOS without using the website.
+                </p>
+                <p>
+                  Open <ProseLink href="/settings/api">REST API keys</ProseLink> from Settings — the header button sits
+                  next to <strong>E-Sign Templates</strong>, and the <strong>Organization</strong> tab has a{" "}
+                  <strong>Create API key</strong> shortcut. Only founders and org admins can create or revoke keys.
+                  Enter a label (for example &quot;CFO sync agent&quot;) and click <strong>Create API key</strong>. Copy
+                  the <code className="text-xs">cpin_live_…</code> secret <strong>once</strong>; it is not shown again.
+                </p>
+                <p>
+                  Send the key on every request as <code className="text-xs">Authorization: Bearer cpin_live_…</code>{" "}
+                  or <code className="text-xs">X-API-Key</code>. Keys authenticate as this{" "}
+                  <strong>organization</strong>, not as your user session. Treat the secret like a password: do not
+                  commit it, paste it into tickets, or email it in the clear. <strong>Revoke</strong> a key from the
+                  same page if it leaks or is no longer needed.
+                </p>
+                <p>
+                  Through <code className="text-xs">/api/v1</code> you can create and update deals (including going live
+                  with <code className="text-xs">status: &quot;active&quot;</code>), investors, data rooms, documents,
+                  tasks, and the organization profile — the same surfaces staff edit in the app.{" "}
+                  <strong>Invites, outreach, and email sends stay in the CapitalOS UI</strong>; those actions deliver
+                  mail to third parties and are blocked on the API. Technical endpoint list, upload steps, and curl
+                  examples live in the repo at <code className="text-xs">docs/API.md</code>.
+                </p>
+              </>
             </Section>
 
             <Section id="sg-your-profile" title="2. Your profile (Settings)">
@@ -424,15 +457,20 @@ export function SponsorGuideClient() {
             <Section id="sg-pl-system" title="System (sidebar)">
               <p>
                 <strong>Sponsor Guide</strong> (this page) and <strong>Settings</strong> — organization, profile, e-sign
-                entry, billing, and org lifecycle actions your role allows. <strong>Platform admin</strong> appears only
-                for platform administrators.
+                entry, billing, <ProseLink href="/settings/api">REST API keys</ProseLink>, and org lifecycle actions
+                your role allows. <strong>Platform admin</strong> appears only for platform administrators.
               </p>
             </Section>
 
             <Section id="sg-pl-copilot" title="AI Copilot">
               <p>
                 Open <strong>AI Copilot</strong> from the sidebar footer. When your plan does not include AI, the button
-                shows a <strong>Pro+</strong> badge; enabled orgs can chat with the copilot in context.
+                shows a <strong>Pro+</strong> badge; enabled orgs can chat with the copilot in context. Ask it to draft
+                LP emails, review the funnel, or walk through the <strong>REST API</strong> — how to create a key at{" "}
+                <ProseLink href="/settings/api">REST API keys</ProseLink>, which <code className="text-xs">/api/v1</code>{" "}
+                endpoints to call, and curl examples to update deals, investors, data rooms, or tasks. On Settings and
+                this guide, use the <strong>REST API help</strong> chips. Invites and email sends still happen in the
+                product UI, not via API.
               </p>
             </Section>
           </TabsContent>

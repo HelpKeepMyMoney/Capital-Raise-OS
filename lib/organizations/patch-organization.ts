@@ -26,3 +26,29 @@ export const OrganizationPatchBodySchema = z
   .strict();
 
 export type OrganizationPatchBody = z.infer<typeof OrganizationPatchBodySchema>;
+
+export const ApiOrganizationPatchSchema = z
+  .object({
+    name: z
+      .string()
+      .max(200)
+      .transform((s) => s.trim())
+      .pipe(z.string().min(1, "Name is required"))
+      .optional(),
+    slug: z
+      .string()
+      .max(64)
+      .transform((s) => s.trim().toLowerCase())
+      .pipe(
+        z
+          .string()
+          .min(3, "Slug must be at least 3 characters")
+          .regex(
+            /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
+            "Use lowercase letters, numbers, and single hyphens only",
+          ),
+      )
+      .optional(),
+    contact: OrgContactSchema.optional(),
+  })
+  .strict();

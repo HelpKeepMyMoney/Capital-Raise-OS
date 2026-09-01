@@ -12,6 +12,7 @@ export type TocEntry = {
 
 export const SPONSOR_GUIDE_TOC: TocEntry[] = [
   { tab: "workflow", id: "sg-organization", label: "Organization" },
+  { tab: "workflow", id: "sg-api-keys", label: "REST API keys" },
   { tab: "workflow", id: "sg-your-profile", label: "Your profile" },
   { tab: "workflow", id: "sg-esign", label: "E-sign templates" },
   { tab: "workflow", id: "sg-deal-room", label: "Deal room" },

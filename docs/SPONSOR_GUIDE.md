@@ -23,7 +23,19 @@ flowchart LR
 
 ### Organization
 
-Open **Settings** (`/settings`) and complete the **Organization** tab: workspace name and slug, organization contact, and billing entry as needed. Review the integrations note for environment-driven services.
+Open **Settings** (`/settings`) and complete the **Organization** tab: workspace name and slug, organization contact, and billing entry as needed. Review the integrations note for environment-driven services. Founders and org admins can also mint **REST API keys** from this page (banner **Create API key**) or from **REST API keys** next to **E-Sign Templates**.
+
+### REST API keys
+
+Use org-scoped keys so other systems (CFO tools, scripts, partners) can **read and update** CapitalOS without using the website.
+
+Open **REST API keys** (`/settings/api`) from **Settings** — the header button sits next to **E-Sign Templates**, and the **Organization** tab has a **Create API key** shortcut. Only founders and org admins can create or revoke keys. Enter a label (for example “CFO sync agent”) and click **Create API key**. Copy the `cpin_live_…` secret **once**; it is not shown again.
+
+Send the key on every request as `Authorization: Bearer cpin_live_…` or `X-API-Key`. Keys authenticate as this **organization**, not as your user session. Treat the secret like a password: do not commit it, paste it into tickets, or email it in the clear. **Revoke** a key from the same page if it leaks or is no longer needed.
+
+Through `/api/v1` you can create and update deals (including going live with `status: "active"`), investors, data rooms, documents, tasks, and the organization profile — the same surfaces staff edit in the app. **Invites, outreach, and email sends stay in the CapitalOS UI**; those actions deliver mail to third parties and are blocked on the API.
+
+Technical endpoint list, upload steps, and curl examples: [docs/API.md](./API.md).
 
 ### Your profile
 
@@ -209,8 +221,8 @@ room items according to their role and invite scope.
 
 ### System
 
-**Sponsor Guide** (`/help`) and **Settings**. **Platform admin** appears only for platform administrators.
+**Sponsor Guide** (`/help`) and **Settings** — organization, profile, e-sign, billing, and **REST API keys** (`/settings/api`). **Platform admin** appears only for platform administrators.
 
 ### AI Copilot
 
-Sidebar footer control; **Pro+** appears when AI is not enabled for the workspace.
+Sidebar footer control; **Pro+** appears when AI is not enabled for the workspace. Copilot can also help with the **REST API**: how to create a key at `/settings/api`, which `/api/v1` endpoints to call, and curl examples to update deals, investors, data rooms, or tasks. On Settings and this guide, use the **REST API help** chips. Invites and email sends still happen in the product UI.

@@ -29,6 +29,8 @@ export const col = {
   mndaSigningRequests: "mnda_signing_requests",
   signableTemplates: "signable_templates",
   esignEnvelopes: "esign_envelopes",
+  /** Org-scoped REST API keys (Admin SDK only; hashed secrets at rest). */
+  orgApiKeys: "org_api_keys",
 } as const;
 
 export function memberDocId(orgId: string, uid: string) {

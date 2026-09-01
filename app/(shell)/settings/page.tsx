@@ -36,6 +36,22 @@ export default async function SettingsPage() {
         organizationSection={
           <>
             {org ? (
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-muted/30 px-4 py-3">
+                <div>
+                  <p className="text-sm font-medium">REST API keys</p>
+                  <p className="text-sm text-muted-foreground">
+                    Let clients update CapitalOS via <code className="text-xs">/api/v1</code> instead of the website.
+                  </p>
+                </div>
+                <Link
+                  href="/settings/api"
+                  className={cn(buttonVariants({ size: "sm" }), "inline-flex shrink-0")}
+                >
+                  Create API key
+                </Link>
+              </div>
+            ) : null}
+            {org ? (
               <OrganizationSettingsForm
                 organizationId={org.id}
                 initialName={org.name}
@@ -54,7 +70,7 @@ export default async function SettingsPage() {
             ) : null}
             <Link
               href="/settings/billing"
-              className={cn(buttonVariants({ size: "sm" }), "inline-flex")}
+              className={cn(buttonVariants({ size: "sm", variant: "outline" }), "inline-flex")}
             >
               Billing & subscriptions
             </Link>

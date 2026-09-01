@@ -44,12 +44,20 @@ export function SettingsMainPanel(props: {
             Your Profile
           </button>
         </nav>
-        <Link
-          href="/settings/esign"
-          className={cn(buttonVariants({ size: "sm", variant: "outline" }), "shrink-0 rounded-xl")}
-        >
-          E-Sign Templates
-        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href="/settings/api"
+            className={cn(buttonVariants({ size: "sm", variant: "outline" }), "shrink-0 rounded-xl")}
+          >
+            REST API keys
+          </Link>
+          <Link
+            href="/settings/esign"
+            className={cn(buttonVariants({ size: "sm", variant: "outline" }), "shrink-0 rounded-xl")}
+          >
+            E-Sign Templates
+          </Link>
+        </div>
       </CardHeader>
       <CardContent className="space-y-4 pt-6">
         {section === "organization" ? props.organizationSection : props.profileSection}
