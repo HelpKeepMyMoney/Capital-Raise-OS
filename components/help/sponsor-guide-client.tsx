@@ -120,7 +120,9 @@ export function SponsorGuideClient() {
                 <p>
                   Through <code className="text-xs">/api/v1</code> you can create and update deals (including going live
                   with <code className="text-xs">status: &quot;active&quot;</code>), investors, data rooms, documents,
-                  tasks, and the organization profile — the same surfaces staff edit in the app.{" "}
+                  tasks, and the organization profile — the same surfaces staff edit in the app. Uploaded data-room
+                  documents can also be <strong>deleted</strong> with{" "}
+                  <code className="text-xs">DELETE /api/v1/data-rooms/:roomId/documents/:documentId</code>.{" "}
                   <strong>Invites, outreach, and email sends stay in the CapitalOS UI</strong>; those actions deliver
                   mail to third parties and are blocked on the API. Technical endpoint list, upload steps, and curl
                   examples live in the repo at <code className="text-xs">docs/API.md</code>.

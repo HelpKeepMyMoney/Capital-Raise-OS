@@ -4,6 +4,14 @@ AI-powered private capital platform: investor CRM, discovery, outreach, data roo
 
 ## Changelog
 
+### Data room document DELETE on REST API v1
+
+Clients can remove files they uploaded through the org API (previously upload/replace existed, but `DELETE` was missing and returned 405).
+
+- **`DELETE /api/v1/data-rooms/:roomId/documents/:documentId`** — deletes the Firestore row and Storage object; wrong org or room returns **404**. Folders reparent children the same way as the in-app data room.
+- Shared helper **`lib/data-room/delete-document.ts`** used by the session UI delete route and the v1 route.
+- **[docs/API.md](./docs/API.md)** curl example; Sponsor Guide (`/help`) and Copilot REST knowledge updated so clients are pointed at this path.
+
 ### REST API v1 (org API keys — clients update CapitalOS without the website)
 
 External clients (CFO automations, scripts, other systems) can **read and write** org data through **`/api/v1`** instead of driving the UI.
@@ -14,14 +22,15 @@ External clients (CFO automations, scripts, other systems) can **read and write*
   - **`POST`/`PATCH /api/v1/deals`** — create/update deals, including **`status: active`** (publish) and the deal-settings field set
   - **`POST`/`PATCH /api/v1/investors`** — CRM create/update, pipeline stage, archive
   - **`POST`/`PATCH /api/v1/data-rooms`** — create/update rooms, link a deal, archive
+  - **`DELETE /api/v1/data-rooms/:roomId/documents/:documentId`** — remove an uploaded document
   - **`POST`/`PATCH /api/v1/tasks`** — create/update tasks
-- **Documents:** Prefer **signed GCS upload** — **`POST .../documents/uploads`** then **`PUT`** the file to `uploadUrl`, then **`POST .../uploads/:documentId/complete`** (avoids Vercel body limits; max 50MB, same types as the UI). Multipart POST/PUT remains for small local files only.
+- **Documents:** Prefer **signed GCS upload** — **`POST .../documents/uploads`** then **`PUT`** the file to `uploadUrl`, then **`POST .../uploads/:documentId/complete`** (avoids Vercel body limits; max 50MB, same types as the UI). Multipart POST/PUT remains for small local files only. **`DELETE .../documents/:documentId`** removes the file from Storage and Firestore.
 - **Reads:** org + pipeline summary, deals, data rooms, documents (+ 15-minute signed download URL), investors, tasks.
 - **Still UI-only:** investor invites, outreach, and email/Resend (third-party mail). Body keys such as `invite`, `sendEmail`, `campaignId` return **403**.
 - **Settings UX:** Dedicated **`/settings/api`** page (no longer a redirect to `/settings`). Header **REST API keys** next to E-Sign Templates; Organization tab banner **Create API key**. List/create/revoke JSON errors surface in the UI with **Retry**. Key listing uses an equality-only Firestore query and sorts in memory so it works before the `org_api_keys` composite index is deployed.
 - **Sponsor Guide:** **[docs/SPONSOR_GUIDE.md](./docs/SPONSOR_GUIDE.md)** and in-app **`/help`** cover key minting, auth, what `/api/v1` can update, and UI-only actions. TOC includes **REST API keys**.
 - **AI Copilot:** System prompt includes REST API v1 product knowledge (`lib/ai/copilot-system.ts`). Sidebar Copilot offers **REST API help** chips (create a key, what the API can update, signed uploads) on Settings and `/help`. Chat requests pass the current pathname for screen context.
-- **Docs & tests:** **[docs/API.md](./docs/API.md)** (endpoints, curl). **`npm test`** (vitest) covers key mint/revoke, auth, org isolation, publish, investor/task writes, revoked keys, and Copilot prompt coverage of the API.
+- **Docs & tests:** **[docs/API.md](./docs/API.md)** (endpoints, curl). **`npm test`** (vitest) covers key mint/revoke, auth, org isolation, publish, investor/task writes, document delete, revoked keys, and Copilot prompt coverage of the API.
 - **Deploy:** no new env vars. Deploy Firestore **indexes** and **rules** (`org_api_keys`, `documents` composite) with the app. Listing keys does not require the composite index.
 
 ### Outreach infrastructure (Phase 1)

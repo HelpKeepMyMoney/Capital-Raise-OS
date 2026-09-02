@@ -73,6 +73,7 @@ List endpoints cap results (deals 100, investors 500, rooms 120, tasks 200).
 | POST | `/data-rooms/:roomId/documents/uploads/:documentId/complete` | Finalize after `PUT` to `uploadUrl` |
 | POST | `/data-rooms/:roomId/documents` | Multipart upload (small files / local only; Vercel body limit applies) |
 | PUT | `/data-rooms/:roomId/documents/:documentId` | Replace file via multipart (same limit) |
+| DELETE | `/data-rooms/:roomId/documents/:documentId` | Delete a document (removes Storage object + Firestore row) |
 | POST | `/tasks` | Create a task |
 | PATCH | `/tasks/:id` | Update task fields or mark done / cancelled |
 
@@ -113,6 +114,16 @@ curl -sS -X POST \
 ```
 
 Allowed types: PDF, DOCX, XLSX, PPTX, PNG, JPG, MP4 — max **50MB**. To replace an existing file, pass `replaceDocumentId` on step 1 and `"replace": true` on complete.
+
+### Delete a document
+
+```bash
+curl -sS -X DELETE \
+  -H "Authorization: Bearer cpin_live_YOUR_KEY" \
+  https://capitalos.thecpi.network/api/v1/data-rooms/ROOM_UUID/documents/DOCUMENT_ID
+```
+
+Response: `{ "data": { "deleted": true, "id": "DOCUMENT_ID" } }`. Folders are also allowed: children are moved to the parent folder (or room root).
 
 ## Explicitly blocked (403)
 

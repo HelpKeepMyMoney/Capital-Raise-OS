@@ -6,6 +6,7 @@ import { col } from "@/lib/firestore/paths";
 import { getMembership } from "@/lib/firestore/queries";
 import { writeAuditLog } from "@/lib/audit";
 import type { RoomDocument } from "@/lib/firestore/types";
+import { deleteDataRoomDocument } from "@/lib/data-room/delete-document";
 import { FILE_KINDS, folderParentWouldCreateCycle, isDataRoomFolderRow } from "@/lib/data-room/folder-helpers";
 
 const KINDS = FILE_KINDS;
@@ -204,47 +205,24 @@ export async function DELETE(
 
   const { documentId } = await context.params;
 
-  const db = getAdminFirestore();
-  const ref = db.collection(col.documents).doc(documentId);
-  const snap = await ref.get();
-  if (!snap.exists) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const result = await deleteDataRoomDocument({
+    db: getAdminFirestore(),
+    bucket: getAdminBucket(),
+    orgId: ctx.orgId,
+    documentId,
+  });
 
-  const data = snap.data() as DocRow & { name?: string };
-  if (data.organizationId !== ctx.orgId) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!result.ok) {
+    const status = result.code === "forbidden" ? 403 : 404;
+    return NextResponse.json({ error: status === 403 ? "Forbidden" : "Not found" }, { status });
   }
-
-  const isFolder = isDataRoomFolderRow(data);
-
-  if (isFolder) {
-    const inheritParent = data.parentFolderId ?? null;
-    const childrenSnap = await db.collection(col.documents).where("parentFolderId", "==", documentId).get();
-    const batchSize = 400;
-    let batch = db.batch();
-    let n = 0;
-    for (const ch of childrenSnap.docs) {
-      batch.update(ch.ref, { parentFolderId: inheritParent });
-      n += 1;
-      if (n >= batchSize) {
-        await batch.commit();
-        batch = db.batch();
-        n = 0;
-      }
-    }
-    if (n > 0) await batch.commit();
-  } else if (data.storagePath) {
-    const bucket = getAdminBucket();
-    await bucket.file(data.storagePath).delete({ ignoreNotFound: true });
-  }
-
-  await ref.delete();
 
   await writeAuditLog({
     organizationId: ctx.orgId,
     actorId: ctx.user.uid,
     action: "data_room.document_delete",
     resource: `${col.documents}/${documentId}`,
-    payload: { name: data.name, folder: isFolder },
+    payload: { name: result.name, folder: result.folder },
   });
 
   return NextResponse.json({ ok: true });

@@ -13,6 +13,7 @@ describe("buildCopilotSystemPrompt", () => {
     expect(prompt).toContain("status \"active\"");
     expect(prompt).toContain("invite");
     expect(prompt).toContain("documents/uploads");
+    expect(prompt).toContain("DELETE /data-rooms/:roomId/documents/:documentId");
     expect(prompt).toContain(COPILOT_REST_API_KNOWLEDGE.slice(0, 40));
   });
 

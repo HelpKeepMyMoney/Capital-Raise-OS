@@ -28,6 +28,9 @@ function makeFirestore(initial: DocStore = new Map()) {
         const key = `${name}/${id}`;
         store.set(key, { ...(store.get(key) ?? {}), ...u });
       },
+      delete: async () => {
+        store.delete(`${name}/${id}`);
+      },
     }),
     where: (field: string, _op: string, value: unknown) => {
       const filters: Array<{ field: string; value: unknown }> = [{ field, value }];
@@ -56,7 +59,22 @@ function makeFirestore(initial: DocStore = new Map()) {
     },
   });
 
-  return { store, db: { collection } };
+  const db = {
+    collection,
+    batch: () => {
+      const ops: Array<() => Promise<void>> = [];
+      return {
+        update: (ref: { update: (u: Record<string, unknown>) => Promise<void> }, u: Record<string, unknown>) => {
+          ops.push(() => ref.update(u));
+        },
+        commit: async () => {
+          for (const op of ops) await op();
+        },
+      };
+    },
+  };
+
+  return { store, db };
 }
 
 const ORG_A = "org-a";
@@ -163,6 +181,11 @@ describe("REST API v1 integration (mocked Firestore)", () => {
     const { db } = makeFirestore(store);
     const admin = await import("@/lib/firebase/admin");
     vi.mocked(admin.getAdminFirestore).mockReturnValue(db as never);
+    vi.mocked(admin.getAdminBucket).mockReturnValue({
+      file: () => ({
+        delete: async () => undefined,
+      }),
+    } as never);
   });
 
   function authReq(url: string, init?: RequestInit & { secret?: string | null }) {
@@ -304,6 +327,56 @@ describe("REST API v1 integration (mocked Firestore)", () => {
       }),
     );
     expect(res.status).toBe(403);
+  });
+
+  it("deletes a data-room document uploaded by the org", async () => {
+    store.set("data_rooms/room-1", { organizationId: ORG_A, name: "Diligence" });
+    store.set("documents/doc-1", {
+      id: "doc-1",
+      organizationId: ORG_A,
+      dataRoomId: "room-1",
+      name: "pitch.pdf",
+      storagePath: "orgs/org-a/data_rooms/room-1/doc-1_pitch.pdf",
+      kind: "deck",
+      createdAt: 1,
+    });
+
+    const { DELETE } = await import("@/app/api/v1/data-rooms/[roomId]/documents/[documentId]/route");
+    const res = await DELETE(
+      authReq("http://localhost/api/v1/data-rooms/room-1/documents/doc-1", {
+        method: "DELETE",
+        secret: orgASecret,
+      }),
+      { params: Promise.resolve({ roomId: "room-1", documentId: "doc-1" }) },
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { data: { deleted: boolean; id: string } };
+    expect(body.data.deleted).toBe(true);
+    expect(body.data.id).toBe("doc-1");
+    expect(store.has("documents/doc-1")).toBe(false);
+  });
+
+  it("does not delete another org's data-room document", async () => {
+    store.set("documents/doc-b", {
+      id: "doc-b",
+      organizationId: ORG_B,
+      dataRoomId: "room-b",
+      name: "secret.pdf",
+      storagePath: "orgs/org-b/data_rooms/room-b/doc-b_secret.pdf",
+      kind: "deck",
+      createdAt: 1,
+    });
+
+    const { DELETE } = await import("@/app/api/v1/data-rooms/[roomId]/documents/[documentId]/route");
+    const res = await DELETE(
+      authReq("http://localhost/api/v1/data-rooms/room-b/documents/doc-b", {
+        method: "DELETE",
+        secret: orgASecret,
+      }),
+      { params: Promise.resolve({ roomId: "room-b", documentId: "doc-b" }) },
+    );
+    expect(res.status).toBe(404);
+    expect(store.has("documents/doc-b")).toBe(true);
   });
 
   it("rejects revoked keys", async () => {

@@ -36,6 +36,7 @@ List caps: deals 100, investors 500, rooms 120, tasks 200.
 - PATCH /deals/:id — same fields as in-app deal settings (name, type, status, terms, valuation, targetRaise, minimumInvestment, useOfProceeds, tractionMetrics, useOfFundsSplit, whyInvest, narrative text, linkedDataRoomId)
 - POST /investors, PATCH /investors/:id — CRM create/update, pipelineStage, archive via crmStatus
 - POST /data-rooms (optional dealId), PATCH /data-rooms/:roomId — settings, link/unlink deal, archive
+- DELETE /data-rooms/:roomId/documents/:documentId — remove a document the org uploaded (Storage + Firestore)
 - POST /tasks, PATCH /tasks/:id — create/update, mark done or cancelled
 
 ### Document uploads (preferred, up to 50MB)

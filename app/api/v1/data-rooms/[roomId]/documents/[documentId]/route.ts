@@ -2,7 +2,9 @@ import { NextRequest } from "next/server";
 import { withApiKeyAuth } from "@/lib/api/v1/with-auth";
 import { serializeDocument, uploadDataRoomDocument } from "@/lib/api/v1/upload-document";
 import { v1BadRequest, v1Json, v1NotFound } from "@/lib/api/v1/responses";
+import { writeAuditLog } from "@/lib/audit";
 import { authorizeRoomDocumentReadForOrg } from "@/lib/data-room/authorize-room-document-read";
+import { deleteDataRoomDocument } from "@/lib/data-room/delete-document";
 import { getAdminFirestore, getAdminBucket } from "@/lib/firebase/admin";
 import { col } from "@/lib/firestore/paths";
 import type { RoomDocument } from "@/lib/firestore/types";
@@ -77,5 +79,33 @@ export async function PUT(
     }
 
     return v1Json({ document: serializeDocument(result.document) });
+  });
+}
+
+export async function DELETE(
+  req: NextRequest,
+  routeCtx: { params: Promise<{ roomId: string; documentId: string }> },
+) {
+  return withApiKeyAuth(req, async (ctx) => {
+    const { roomId, documentId } = await routeCtx.params;
+    const result = await deleteDataRoomDocument({
+      db: getAdminFirestore(),
+      bucket: getAdminBucket(),
+      orgId: ctx.orgId,
+      documentId,
+      expectedRoomId: roomId,
+    });
+
+    if (!result.ok) return v1NotFound("Document");
+
+    await writeAuditLog({
+      organizationId: ctx.orgId,
+      actorId: ctx.actorId,
+      action: "data_room.document_delete",
+      resource: `${col.documents}/${documentId}`,
+      payload: { name: result.name, folder: result.folder, via: "api" },
+    });
+
+    return v1Json({ deleted: true, id: documentId });
   });
 }

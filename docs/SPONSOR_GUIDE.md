@@ -33,7 +33,7 @@ Open **REST API keys** (`/settings/api`) from **Settings** — the header button
 
 Send the key on every request as `Authorization: Bearer cpin_live_…` or `X-API-Key`. Keys authenticate as this **organization**, not as your user session. Treat the secret like a password: do not commit it, paste it into tickets, or email it in the clear. **Revoke** a key from the same page if it leaks or is no longer needed.
 
-Through `/api/v1` you can create and update deals (including going live with `status: "active"`), investors, data rooms, documents, tasks, and the organization profile — the same surfaces staff edit in the app. **Invites, outreach, and email sends stay in the CapitalOS UI**; those actions deliver mail to third parties and are blocked on the API.
+Through `/api/v1` you can create and update deals (including going live with `status: "active"`), investors, data rooms, documents, tasks, and the organization profile — the same surfaces staff edit in the app. Uploaded data-room documents can also be **deleted** with `DELETE /api/v1/data-rooms/:roomId/documents/:documentId`. **Invites, outreach, and email sends stay in the CapitalOS UI**; those actions deliver mail to third parties and are blocked on the API.
 
 Technical endpoint list, upload steps, and curl examples: [docs/API.md](./API.md).
 
